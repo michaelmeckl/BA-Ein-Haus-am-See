@@ -1,10 +1,13 @@
 /* eslint-env browser */
 
-function main(): void {
+function init(): void {
+  /*
   const outputElement = document.querySelector("div");
   if (outputElement) {
     outputElement.innerHTML = "It works!";
   }
+  */
+  console.log("Hello World from TS client!");
 }
 
-main();
+init();

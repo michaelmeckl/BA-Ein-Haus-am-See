@@ -1,24 +1,12 @@
 /* eslint-env node */
+import Server from "./server/server";
 
-import fs from "fs";
-import express from "express";
-
-const app = express();
-const PORT = 8000;
+const DEFAULT_PORT = 8000;
 
 function init(): void {
-  app.use(express.static("src"));
-
-  app.get("/", (req, res) => {
-    res.send("Hello World!");
-  });
-
-  app.listen(PORT, (err) => {
-    if (err) {
-      return console.error(err);
-    }
-    return console.log(`Server is listening on ${PORT}`);
-  });
+  const appPort = Number(process.env.PORT || DEFAULT_PORT); // port to use for serving static files
+  const server = new Server();
+  server.start(appPort);
 }
 
 init();
