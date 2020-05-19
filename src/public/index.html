@@ -10,6 +10,10 @@
     <script type="text/typescript" src="./app/main.ts" async defer></script>
     <!--<script type="module" src="./app/test.js" async defer></script>-->
 
+    <!-- include Mapbox GL -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.css" rel="stylesheet" />
+
     <!-- include ts transpiling -->
     <!--TODO: test if that impacts the performance! -->
     <script src="https://rawgit.com/Microsoft/TypeScript/master/lib/typescriptServices.js"></script>
@@ -23,11 +27,23 @@
         </strong>
     </noscript>
 
-    <header>
-        <h1>Ein Haus am See im Browser</h1>
-    </header>
-
     <div id="map"></div>
+
+    <script>
+        mapboxgl.accessToken =
+            "pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ";
+
+        const map = new mapboxgl.Map({
+            container: "map", // container id
+            style: "mapbox://styles/mapbox/streets-v11", // stylesheet location
+            center: [12.550343, 55.665957], // starting position [lng, lat]
+            zoom: 9 // starting zoom
+        });
+
+        const marker = new mapboxgl.Marker()
+            .setLngLat([12.550343, 55.665957])
+            .addTo(map);
+    </script>
 
 </body>
 
