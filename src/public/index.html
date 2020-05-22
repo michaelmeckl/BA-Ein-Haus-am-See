@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Ein Haus am See</title>
     <link href="./css/style.css" type="text/css" rel="stylesheet">
     <script type="text/typescript" src="./app/main.ts" async defer></script>
@@ -14,7 +14,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.css" rel="stylesheet" />
 
-    <!-- include ts transpiling -->
+    <!-- include ts transpiling, vgl. https://github.com/basarat/typescript-script -->
     <!--TODO: test if that impacts the performance! -->
     <script src="https://rawgit.com/Microsoft/TypeScript/master/lib/typescriptServices.js"></script>
     <script src="https://rawgit.com/basarat/typescript-script/master/transpiler.js"></script>
@@ -29,20 +29,94 @@
 
     <div id="map"></div>
 
+    <div class='map-overlay' id='legend'></div>
+
+
     <script>
         mapboxgl.accessToken =
             "pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ";
 
+        const coordinates = [12.10, 49.008];
+
         const map = new mapboxgl.Map({
             container: "map", // container id
-            style: "mapbox://styles/mapbox/streets-v11", // stylesheet location
-            center: [12.550343, 55.665957], // starting position [lng, lat]
-            zoom: 9 // starting zoom
+            style: "mapbox://styles/michaelmeckl/ckai9m24j0mca1ikwtsmtt9ss", // stylesheet location
+            center: coordinates, // starting position [lng, lat]
+            zoom: 12 // starting zoom
         });
 
+        /*
+        // set the initial view bounds, in this case the USA
+        map.fitBounds([
+            [-133.2421875, 16.972741],
+            [-47.63671875, 52.696361]
+        ]);
+        */
+
+        //set cursor style to mouse pointer
+        map.getCanvas().style.cursor = 'default';
+
         const marker = new mapboxgl.Marker()
-            .setLngLat([12.550343, 55.665957])
+            .setLngLat(coordinates)
             .addTo(map);
+
+        // Add map controls
+        map.addControl(new mapboxgl.NavigationControl())
+
+
+        map.on('load', async () => {
+
+            var layers = ['0-10', '10-20', '20-50', '50-100', '100-200', '200-500', '500-1000', '1000+'];
+            var colors = ['#FFEDA0', '#FED976', '#FEB24C', '#FD8D3C', '#FC4E2A', '#E31A1C', '#BD0026',
+                '#800026'
+            ];
+
+
+            for (i = 0; i < layers.length; i++) {
+                var layer = layers[i];
+                var color = colors[i];
+                var item = document.createElement('div');
+                var key = document.createElement('span');
+                key.className = 'legend-key';
+                key.style.backgroundColor = color;
+
+                var value = document.createElement('span');
+                value.innerHTML = layer;
+                item.appendChild(key);
+                item.appendChild(value);
+                legend.appendChild(item);
+            }
+        });
+
+        map.on('click', function (e) {
+            /*
+            var features = map.queryRenderedFeatures(e.point, {
+                layers: ['TODO']
+            });
+
+            if (!features.length) {
+                return;
+            }
+
+            var feature = features[0];
+            */
+
+            console.log(e);
+
+            var popup = new mapboxgl.Popup({
+                    offset: [0, -30],
+                    closeOnMove: true,
+                    maxWidth: 'none'
+                })
+                /*
+                .setLngLat(feature.geometry.coordinates)
+                .setHTML('<h3>' + feature.properties.title + '</h3><p>' + feature.properties.description +
+                    '</p>')
+                    */
+                .setLngLat(coordinates)
+                .setHTML('<h1>Universität Regensburg</h1><p>Beschreibungstext für Uni</p>')
+                .addTo(map);
+        });
     </script>
 
 </body>
