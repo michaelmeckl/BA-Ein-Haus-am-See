@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "serve": "nodemon",
     "serve:watch": "tsc-watch --outDir ./build --onSuccess \"npx ts-node src/index.ts\"",
+    "start": "tsc src/public/app/main.ts --outDir ./dist",
     "build": "rimraf ./build && tsc",
     "deploy": "npm run build && node build/index.js",
     "lint": "eslint . --ext .ts"

@@ -37,12 +37,15 @@
             "pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ";
 
         const coordinates = [12.10, 49.008];
+        const mapStyle = "mapbox://styles/michaelmeckl/ckajo8dpn22r41imzu1my2ekh";
+        //const mapStyle = "mapbox://styles/michaelmeckl/ckai9m24j0mca1ikwtsmtt9ss";
+        const defaultZoom = 12;
 
         const map = new mapboxgl.Map({
             container: "map", // container id
-            style: "mapbox://styles/michaelmeckl/ckai9m24j0mca1ikwtsmtt9ss", // stylesheet location
+            style: mapStyle, // stylesheet location
             center: coordinates, // starting position [lng, lat]
-            zoom: 12 // starting zoom
+            zoom: defaultZoom // starting zoom
         });
 
         /*
