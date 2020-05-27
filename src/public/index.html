@@ -33,93 +33,121 @@
 
 
     <script>
-        mapboxgl.accessToken =
-            "pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ";
-
-        const coordinates = [12.10, 49.008];
-        const mapStyle = "mapbox://styles/michaelmeckl/ckajo8dpn22r41imzu1my2ekh";
-        //const mapStyle = "mapbox://styles/michaelmeckl/ckai9m24j0mca1ikwtsmtt9ss";
-        const defaultZoom = 12;
-
-        const map = new mapboxgl.Map({
-            container: "map", // container id
-            style: mapStyle, // stylesheet location
-            center: coordinates, // starting position [lng, lat]
-            zoom: defaultZoom // starting zoom
-        });
-
-        /*
-        // set the initial view bounds, in this case the USA
-        map.fitBounds([
-            [-133.2421875, 16.972741],
-            [-47.63671875, 52.696361]
-        ]);
-        */
-
-        //set cursor style to mouse pointer
-        map.getCanvas().style.cursor = 'default';
-
-        const marker = new mapboxgl.Marker()
-            .setLngLat(coordinates)
-            .addTo(map);
-
-        // Add map controls
-        map.addControl(new mapboxgl.NavigationControl())
+        async function init() {
+            const token = await fetchAccessToken("/token");
+            setupMap(token);
+        }
 
 
-        map.on('load', async () => {
+        async function fetchAccessToken(url) {
+            const token = await fetch(url, {
+                    method: "GET",
+                    cache: "no-cache"
+                })
+                .then(response => response.text())
+                .then(data => {
+                    return data;
+                })
+                .catch(err => {
+                    console.log('Fetch problem: ' + err.message);
+                });
 
-            var layers = ['0-10', '10-20', '20-50', '50-100', '100-200', '200-500', '500-1000', '1000+'];
-            var colors = ['#FFEDA0', '#FED976', '#FEB24C', '#FD8D3C', '#FC4E2A', '#E31A1C', '#BD0026',
-                '#800026'
-            ];
+            return token;
+        }
 
 
-            for (i = 0; i < layers.length; i++) {
-                var layer = layers[i];
-                var color = colors[i];
-                var item = document.createElement('div');
-                var key = document.createElement('span');
-                key.className = 'legend-key';
-                key.style.backgroundColor = color;
+        function setupMap(accessToken) {
+            mapboxgl.accessToken = accessToken;
 
-                var value = document.createElement('span');
-                value.innerHTML = layer;
-                item.appendChild(key);
-                item.appendChild(value);
-                legend.appendChild(item);
-            }
-        });
+            const coordinates = [12.10, 49.008];
+            const mapStyle = "mapbox://styles/michaelmeckl/ckajo8dpn22r41imzu1my2ekh";
+            //const mapStyle = "mapbox://styles/michaelmeckl/ckai9m24j0mca1ikwtsmtt9ss";
+            const defaultZoom = 12;
 
-        map.on('click', function (e) {
-            /*
-            var features = map.queryRenderedFeatures(e.point, {
-                layers: ['TODO']
+            const map = new mapboxgl.Map({
+                container: "map", // container id
+                style: mapStyle, // stylesheet location
+                center: coordinates, // starting position [lng, lat]
+                zoom: defaultZoom // starting zoom
             });
 
-            if (!features.length) {
-                return;
-            }
-
-            var feature = features[0];
+            /*
+            // set the initial view bounds, in this case the USA
+            map.fitBounds([
+                [-133.2421875, 16.972741],
+                [-47.63671875, 52.696361]
+            ]);
             */
 
-            console.log(e);
+            //set cursor style to mouse pointer
+            map.getCanvas().style.cursor = "default";
 
-            var popup = new mapboxgl.Popup({
-                    offset: [0, -30],
-                    closeOnMove: true,
-                    maxWidth: 'none'
-                })
-                /*
-                .setLngLat(feature.geometry.coordinates)
-                .setHTML('<h3>' + feature.properties.title + '</h3><p>' + feature.properties.description +
-                    '</p>')
-                    */
+            const marker = new mapboxgl.Marker()
                 .setLngLat(coordinates)
-                .setHTML('<h1>Universität Regensburg</h1><p>Beschreibungstext für Uni</p>')
                 .addTo(map);
-        });
+
+            // Add map controls
+            map.addControl(new mapboxgl.NavigationControl())
+
+
+            map.on('load', async () => {
+
+                var layers = ['0-10', '10-20', '20-50', '50-100', '100-200', '200-500', '500-1000',
+                    '1000+'
+                ];
+                var colors = ['#FFEDA0', '#FED976', '#FEB24C', '#FD8D3C', '#FC4E2A', '#E31A1C', '#BD0026',
+                    '#800026'
+                ];
+
+
+                for (i = 0; i < layers.length; i++) {
+                    var layer = layers[i];
+                    var color = colors[i];
+                    var item = document.createElement('div');
+                    var key = document.createElement('span');
+                    key.className = 'legend-key';
+                    key.style.backgroundColor = color;
+
+                    var value = document.createElement('span');
+                    value.innerHTML = layer;
+                    item.appendChild(key);
+                    item.appendChild(value);
+                    legend.appendChild(item);
+                }
+            });
+
+            map.on('click', function (e) {
+                /*
+                var features = map.queryRenderedFeatures(e.point, {
+                    layers: ['TODO']
+                });
+
+                if (!features.length) {
+                    return;
+                }
+
+                var feature = features[0];
+                */
+
+                console.log(e);
+
+                var popup = new mapboxgl.Popup({
+                        offset: [0, -30],
+                        closeOnMove: true,
+                        maxWidth: 'none'
+                    })
+                    /*
+                    .setLngLat(feature.geometry.coordinates)
+                    .setHTML('<h3>' + feature.properties.title + '</h3><p>' + feature.properties.description +
+                        '</p>')
+                        */
+                    .setLngLat(coordinates)
+                    .setHTML('<h1>Universität Regensburg</h1><p>Beschreibungstext für Uni</p>')
+                    .addTo(map);
+            });
+        };
+
+        init();
     </script>
 
 </body>

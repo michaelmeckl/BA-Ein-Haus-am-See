@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "serve": "nodemon",
-    "serve:watch": "tsc-watch --outDir ./build --onSuccess \"npx ts-node src/index.ts\"",
+    "serve:watch": "tsc-watch --outDir ./build --onSuccess \"npx ts-node --files -r dotenv/config src/index.ts\"",
     "start": "tsc src/public/app/main.ts --outDir ./dist",
     "build": "rimraf ./build && tsc",
     "deploy": "npm run build && node build/index.js",
@@ -29,11 +29,17 @@
   },
   "homepage": "https://github.com/michaelmeckl/BA-Ein-Haus-am-See#readme",
   "dependencies": {
-    "express": "^4.17.1"
+    "@types/cors": "^2.8.6",
+    "@types/dotenv": "^8.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "query-overpass": "^1.5.5"
   },
   "devDependencies": {
     "@types/express": "^4.17.6",
     "@types/node": "^14.0.1",
+    "@types/geojson": "^7946.0.7",
     "@typescript-eslint/eslint-plugin": "^2.33.0",
     "@typescript-eslint/parser": "^2.33.0",
     "eslint": "^7.0.0",
