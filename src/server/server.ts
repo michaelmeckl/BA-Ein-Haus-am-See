@@ -7,7 +7,6 @@ import { GeoJsonObject } from "geojson";
 
 const staticDir = path.join(__dirname, "../", "public"); // folder with client files
 
-//TODO: use webpack later?
 export default class Server {
   private app = express();
 
@@ -18,10 +17,11 @@ export default class Server {
     // use an application-level middleware to add the CORS HTTP header to every request by default.
     //this.app.use(cors());
 
-    // Default every route to serve the index.html
+    /*
     this.app.get("/", (req, res) => {
       res.sendFile("index.html", { root: staticDir });
     });
+    */
 
     this.app.get("/token", (req, res) => {
       return res.send(process.env.MAPBOX_TOKEN);
@@ -45,19 +45,11 @@ export default class Server {
   });
   */
 
-  /*
-  const context: FrontendContext = {
-    cssFiles: this.cssFiles,
-    config: {
-        welcomePhrases: ['Bienvenue', 'Welcome', 'Willkommen', 'Welkom', 'Hoş geldin', 'Benvenuta', 'Bienvenido']
-    }
-}
-const renderPage = (template: string) => async (req: Request, res: Response, _: NextFunction) => {
-    res.type('text/html').render(template, context)
-}
-*/
-
   start(port: number): void {
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Starting in Development Mode ...");
+    }
+
     this.app.listen(port, (err) => {
       if (err) {
         return console.error(err);

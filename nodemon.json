@@ -4,5 +4,5 @@
     ],
     "ext": ".ts,.js",
     "ignore": [],
-    "exec": "npx ts-node --files src/index.ts"
+    "exec": "npx ts-node --files -r dotenv/config src/index.ts"
 }

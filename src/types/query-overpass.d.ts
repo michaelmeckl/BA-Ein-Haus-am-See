@@ -1,4 +1,4 @@
-// types for https://github.com/perliedman/query-overpass
+// custom type declaration for https://github.com/perliedman/query-overpass
 declare module "query-overpass" {
   export default function queryOverpass(
     query: string,
