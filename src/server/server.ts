@@ -4,13 +4,8 @@ import path from "path";
 import cors from "cors";
 import queryOverpass from "query-overpass";
 import { GeoJsonObject } from "geojson";
-import webpack from "webpack";
-import webpackConfig from "../../webpack.config";
-import webpackDevMiddleware from "webpack-dev-middleware";
-import webpackHotMiddleware from "webpack-hot-middleware";
 
 const staticDir = path.join(__dirname, "../", "public"); // folder with client files
-//declare const module: any;
 
 export default class Server {
   private app = express();
@@ -25,31 +20,14 @@ export default class Server {
 
     this.app.use(router);
 
-    //this.addWebpackMiddleware();
-
     // use an application-level middleware to add the CORS HTTP header to every request by default.
     //this.app.use(cors());
 
     //this.extractOSMData();
   }
 
-  /*
-  router.post('/', (req, res) => {
-    const id = uuidv4();
-    const message = {
-      id,
-      text: req.body.text,
-      userId: req.context.me.id,
-    };
-   
-    req.context.models.messages[id] = message;
-   
-    return res.send(message);
-  });
-  */
-
   start(port: number): void {
-    const server = this.app.listen(port, (err) => {
+    this.app.listen(port, (err) => {
       if (err) {
         return console.error(err);
       }
@@ -58,26 +36,6 @@ export default class Server {
         `Server started. Client available at http://localhost:${port}`
       );
     });
-
-    /*
-    if (module.hot) {
-      module.hot.accept();
-      module.hot.dispose(() => server.close());
-    }*/
-  }
-
-  addWebpackMiddleware(): void {
-    const compiler = webpack(webpackConfig);
-
-    // Tell express to use the webpack-dev-middleware and use the webpack.config.js configuration file as a base.
-    this.app.use(
-      webpackDevMiddleware(compiler, {
-        //noInfo: true,
-        publicPath: webpackConfig.output.publicPath
-      })
-    );
-    // Tell express to use the webpack-hot-middleware
-    this.app.use(webpackHotMiddleware(compiler));
   }
 
   extractOSMData(): void {

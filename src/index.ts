@@ -1,6 +1,6 @@
 /* eslint-env node */
 import Server from "./server/server";
-import opn from "opn";
+import open from "open";
 
 const DEFAULT_PORT = 8000;
 
@@ -10,7 +10,7 @@ function init(): void {
   server.start(appPort);
 
   // open the website automatically
-  opn(`http://localhost:${appPort}`);
+  open(`http://localhost:${appPort}`);
 }
 
 init();

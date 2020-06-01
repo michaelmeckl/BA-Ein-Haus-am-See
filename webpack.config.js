@@ -11,14 +11,11 @@ module.exports = {
     mode: "development",
     devtool: "none",
     entry: [
-        //TODO: Hot module replacement doesn't work with own server at the moment
-        //"webpack-hot-middleware/client?path=/__webpack_hmr&timeout=20000&noInfo=true",
         "./src/public/app/main.ts",
     ],
     output: {
         filename: "bundle.js",
         path: path.resolve(__dirname, "src/public/dist"),
-        publicPath: "./src/public/",
         pathinfo: false,
     },
     resolve: {
@@ -47,7 +44,6 @@ module.exports = {
         whitelist: ["mapbox-gl"],
     })],
     plugins: [
-        new webpack.HotModuleReplacementPlugin(),
         //new CleanWebpackPlugin(),
         /*
         new HtmlWebpackPlugin({

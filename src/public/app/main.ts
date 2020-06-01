@@ -99,21 +99,21 @@ function setupUI(): void {
 }
 
 async function init(): Promise<void> {
-  console.log("Hello World from TS client!");
+  try {
+    const token = await fetchAccessToken("/token");
+    if (!token) {
+      throw new Error("Map couldn't be loaded! Invalid Mapbox Token:" + token);
+    }
 
-  const token = await fetchAccessToken("/token");
-  if (token) {
     const t0 = performance.now();
-
     setupMap(token);
-
     const t1 = performance.now();
     console.log("SetupMap took " + (t1 - t0) + " milliseconds.");
-  } else {
-    console.error("Mapbox Token not valid:" + token);
-  }
 
-  setupUI();
+    setupUI();
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 init();
