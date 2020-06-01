@@ -8,15 +8,14 @@
       "dom.iterable",
     ],
     "allowJs": true,
-    "outDir": "build",
-    "rootDir": "src",
+    "rootDir": ".",
     "declaration": false,
     "strict": true,
     "esModuleInterop": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "sourceMap": true,
+    "sourceMap": false,
     //"noImplicitAny": false
   },
   "include": [

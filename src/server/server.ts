@@ -4,8 +4,13 @@ import path from "path";
 import cors from "cors";
 import queryOverpass from "query-overpass";
 import { GeoJsonObject } from "geojson";
+import webpack from "webpack";
+import webpackConfig from "../../webpack.config";
+import webpackDevMiddleware from "webpack-dev-middleware";
+import webpackHotMiddleware from "webpack-hot-middleware";
 
 const staticDir = path.join(__dirname, "../", "public"); // folder with client files
+//declare const module: any;
 
 export default class Server {
   private app = express();
@@ -14,18 +19,16 @@ export default class Server {
     // serve front-end content
     this.app.use(express.static(staticDir));
 
+    const router = express.Router();
+    router.get("/", (req, res) => res.render("index"));
+    router.get("/token", (req, res) => res.send(process.env.MAPBOX_TOKEN));
+
+    this.app.use(router);
+
+    //this.addWebpackMiddleware();
+
     // use an application-level middleware to add the CORS HTTP header to every request by default.
     //this.app.use(cors());
-
-    /*
-    this.app.get("/", (req, res) => {
-      res.sendFile("index.html", { root: staticDir });
-    });
-    */
-
-    this.app.get("/token", (req, res) => {
-      return res.send(process.env.MAPBOX_TOKEN);
-    });
 
     //this.extractOSMData();
   }
@@ -46,11 +49,7 @@ export default class Server {
   */
 
   start(port: number): void {
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Starting in Development Mode ...");
-    }
-
-    this.app.listen(port, (err) => {
+    const server = this.app.listen(port, (err) => {
       if (err) {
         return console.error(err);
       }
@@ -59,6 +58,26 @@ export default class Server {
         `Server started. Client available at http://localhost:${port}`
       );
     });
+
+    /*
+    if (module.hot) {
+      module.hot.accept();
+      module.hot.dispose(() => server.close());
+    }*/
+  }
+
+  addWebpackMiddleware(): void {
+    const compiler = webpack(webpackConfig);
+
+    // Tell express to use the webpack-dev-middleware and use the webpack.config.js configuration file as a base.
+    this.app.use(
+      webpackDevMiddleware(compiler, {
+        //noInfo: true,
+        publicPath: webpackConfig.output.publicPath
+      })
+    );
+    // Tell express to use the webpack-hot-middleware
+    this.app.use(webpackHotMiddleware(compiler));
   }
 
   extractOSMData(): void {

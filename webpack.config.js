@@ -1,4 +1,5 @@
 const path = require("path");
+const webpack = require("webpack");
 const nodeExternals = require("webpack-node-externals");
 /*
 //TODO:
@@ -10,11 +11,14 @@ module.exports = {
     mode: "development",
     devtool: "none",
     entry: [
+        //TODO: Hot module replacement doesn't work with own server at the moment
+        //"webpack-hot-middleware/client?path=/__webpack_hmr&timeout=20000&noInfo=true",
         "./src/public/app/main.ts",
     ],
     output: {
         filename: "bundle.js",
         path: path.resolve(__dirname, "src/public/dist"),
+        publicPath: "./src/public/",
         pathinfo: false,
     },
     resolve: {
@@ -38,16 +42,17 @@ module.exports = {
     },
     // in order to ignore built-in modules like path, fs, etc. for bundling
     target: "node",
-    // don't bundle node_modules except for the mapbox-gl module (necessary because it is imported)
+    // don't bundle node_modules except for the mapbox-gl module
     externals: [nodeExternals({
         whitelist: ["mapbox-gl"],
     })],
-    /*
     plugins: [
-        new CleanWebpackPlugin(),
+        new webpack.HotModuleReplacementPlugin(),
+        //new CleanWebpackPlugin(),
+        /*
         new HtmlWebpackPlugin({
             title: "Ein Haus am See im Browser",
         }),
+        */
     ],
-    */
 };
