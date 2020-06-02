@@ -6,10 +6,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Ein Haus am See</title>
+    <link rel="icon" href="./assets/favicon.ico">
     <link href="./css/style.css" type="text/css" rel="stylesheet">
     <script src="./dist/bundle.js" async defer></script>
 
-    <!-- include Mapbox GL -->
+    <!-- include Mapbox GL style -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.css" rel="stylesheet" />
 </head>
 
@@ -22,11 +23,21 @@
 
     <header class="heading">
         <h2>Ein Haus am See</h2>
-        <button type="button" id="getOSM">Get test data from osm</button>
+        <button type="button" id="getOSM">Use current map selection</button>
+        <div id="overpass-api-controls">
+            <input id="query-input" value="amenity=bar" size="50">
+            <input id="query-button" type="button" value="Laden">
+        </div>
     </header>
 
     <div id="mapContainer">
         <div id="map"></div>
+
+        <!-- TODO: Home Button to get back to initial view?
+        <div id="homeButton">
+            <button type="button">Default</button>
+        </div>
+        -->
     </div>
 
 </body>

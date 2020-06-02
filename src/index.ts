@@ -10,7 +10,7 @@ function init(): void {
   server.start(appPort);
 
   // open the website automatically
-  open(`http://localhost:${appPort}`);
+  //open(`http://localhost:${appPort}`);
 }
 
 init();
