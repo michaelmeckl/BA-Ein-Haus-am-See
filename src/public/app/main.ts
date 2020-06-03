@@ -66,21 +66,18 @@ function setupMap(accessToken: string): mapboxgl.Map {
   map.on("click", function (e) {
     console.log("Click:", e);
 
+    /*
     const popup = new mapboxgl.Popup({
       offset: [0, -30],
       closeOnMove: true,
       maxWidth: "none",
     })
-      /*
-      .setLngLat(feature.geometry.coordinates)
-      .setHTML('<h3>' + feature.properties.title + '</h3><p>' + feature.properties.description +
-          '</p>')
-      */
       .setLngLat(coordinates)
       .setHTML(
         "<h1>Universität Regensburg</h1><p>Beschreibungstext für Uni</p>"
       )
       .addTo(map);
+      */
   });
 
   return map;
@@ -132,7 +129,10 @@ function onEachFeature(feature, layer) {
 - Fehlerbehandlung, falls die Overpass API einen Timeout wegen zu großer Datenmenge erzeugt
    */
 
-async function fetchOsmData(mapBounds: string, query: string): Promise<void> {
+async function fetchOsmData(
+  mapBounds: string,
+  query: string
+): Promise<string | null> {
   try {
     console.log("sending request!");
     const params = new URLSearchParams({
@@ -147,7 +147,7 @@ async function fetchOsmData(mapBounds: string, query: string): Promise<void> {
       method: "GET",
     });
 
-    //console.log(response);
+    console.log(response);
 
     if (!response.ok) {
       throw new Error(
@@ -155,12 +155,16 @@ async function fetchOsmData(mapBounds: string, query: string): Promise<void> {
       );
     }
 
-    const answer = await response.text();
-    //console.log("Answer:", answer);
+    //TODO: is blob more efficient than url?
+    //TODO: 2.only send status code in response when only url is used??
+    console.log(await response.blob());
 
-    //TODO: zu map hinzufügen!
+    //const answer = await response.text();
+    //console.log("Answer:", answer);
+    return response.url;
   } catch (error) {
     console.error(error);
+    return null;
   }
 }
 
@@ -173,7 +177,7 @@ function setupUI(map: mapboxgl.Map): void {
   const queryInput = document.querySelector("#query-input") as HTMLInputElement;
   const queryButton = document.querySelector("#query-button");
   if (queryButton && queryInput) {
-    queryButton.addEventListener("click", () => {
+    queryButton.addEventListener("click", async () => {
       // get input
       const query = queryInput.value;
 
@@ -185,7 +189,62 @@ function setupUI(map: mapboxgl.Map): void {
       const bounds = `${map.getBounds().getSouth()},${map.getBounds().getWest()},${map.getBounds().getNorth()},${map.getBounds().getEast()}`;
 
       // request data from osm
-      fetchOsmData(bounds, query);
+      const data = await fetchOsmData(bounds, query);
+
+      //console.log(data);
+      if (data) {
+        console.log("now adding to map...");
+        // and show it on the map
+
+        map.addSource("points", {
+          type: "geojson",
+          data: data,
+          //data: "./app/data.geojson",
+        });
+
+        //TODO:
+
+        map.addLayer({
+          id: "layer1",
+          type: "symbol",
+          source: "points",
+          layout: {
+            //"icon-image": ["concat", ["get", "icon"], "-15"],
+            "text-field": ["get", "name", ["get", "tags"]],
+            //"text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+            //"text-offset": [0, 0.6],
+            //"text-anchor": "top",
+          },
+          //interactive: true,
+          /*
+          paint: {
+            "circle-radius": 3,
+            "circle-color": "#ff0000",
+          },
+          */
+        });
+
+        /*
+        // Add a circle layer with a vector source
+        map.addLayer({
+          id: "points-of-interest",
+          source: {
+            type: "vector",
+            url: "mapbox://mapbox.mapbox-streets-v8",
+          },
+          "source-layer": "poi_label",
+          type: "circle",
+          paint: {
+            // Mapbox Style Specification paint properties
+          },
+          layout: {
+            // Mapbox Style Specification layout properties
+          },
+        });
+        */
+
+        console.log("Finished adding layer!");
+      }
     });
 
     // add it as a separate layer / source? to the map

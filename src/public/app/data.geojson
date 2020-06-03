@@ -1,0 +1,898 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "id": "way/104016277",
+            "properties": {
+                "type": "way",
+                "id": 104016277,
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "4",
+                    "addr:postcode": "93047",
+                    "addr:street": "Bismarckplatz",
+                    "amenity": "bar",
+                    "building": "commercial",
+                    "building:levels": "3",
+                    "name": "Marple & Stringer",
+                    "opening_hours": "Mo-Fr 11:00-15:00,17:00-02:00, Sa,Su 10:00-02:00",
+                    "roof:levels": "1",
+                    "wheelchair": "limited"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            12.0892389,
+                            49.0187158
+                        ],
+                        [
+                            12.0892448,
+                            49.0187763
+                        ],
+                        [
+                            12.0892456,
+                            49.0187846
+                        ],
+                        [
+                            12.0890621,
+                            49.0187944
+                        ],
+                        [
+                            12.0890573,
+                            49.0187231
+                        ],
+                        [
+                            12.0892389,
+                            49.0187158
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "way/367350021",
+            "properties": {
+                "type": "way",
+                "id": 367350021,
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "5",
+                    "addr:postcode": "93055",
+                    "addr:street": "Vilshofener Straße",
+                    "amenity": "bar",
+                    "brewery": "Paulaner",
+                    "building": "commercial",
+                    "name": "Sila Shisha Bar Regensburg",
+                    "opening_hours": "Mo-Fr 00:00-01:00,15:00-24:00; Sa,Su 00:00-03:00,15:00-24:00",
+                    "source": "Bing"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            12.1360514,
+                            49.00896
+                        ],
+                        [
+                            12.1361494,
+                            49.0091325
+                        ],
+                        [
+                            12.1360079,
+                            49.0091671
+                        ],
+                        [
+                            12.1359459,
+                            49.0090581
+                        ],
+                        [
+                            12.1357961,
+                            49.0090947
+                        ],
+                        [
+                            12.1357648,
+                            49.0090398
+                        ],
+                        [
+                            12.1359147,
+                            49.0090031
+                        ],
+                        [
+                            12.1359099,
+                            49.0089946
+                        ],
+                        [
+                            12.1360514,
+                            49.00896
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "way/436686769",
+            "properties": {
+                "type": "way",
+                "id": 436686769,
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:postcode": "93047",
+                    "addr:street": "Bahnhofstraße",
+                    "amenity": "bar",
+                    "fixme": "name",
+                    "name": "TEST",
+                    "indoor": "room",
+                    "level": "1"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [
+                            12.0998262,
+                            49.0123167
+                        ],
+                        [
+                            12.0998267,
+                            49.0122687
+                        ],
+                        [
+                            12.0999324,
+                            49.0122692
+                        ],
+                        [
+                            12.0999318,
+                            49.0123172
+                        ],
+                        [
+                            12.0998262,
+                            49.0123167
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/359841593",
+            "properties": {
+                "type": "node",
+                "id": "359841593",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "1",
+                    "addr:postcode": "93047",
+                    "addr:street": "Unter den Schwibbögen",
+                    "amenity": "bar",
+                    "name": "Wuid & Schee",
+                    "phone": "+49 171 3637996",
+                    "smoking": "no",
+                    "wheelchair": "no"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0976892,
+                    49.0203765
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/362778890",
+            "properties": {
+                "type": "node",
+                "id": "362778890",
+                "tags": {
+                    "amenity": "bar",
+                    "name": "Orange Bar",
+                    "opening_hours": "Tu-Th 20:00-01:00, Fr,Sa 20:00-03:00",
+                    "website": "http://www.orange-bar-regensburg.de/",
+                    "wheelchair": "no"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0936159,
+                    49.0211379
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/542560592",
+            "properties": {
+                "type": "node",
+                "id": "542560592",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "9",
+                    "addr:postcode": "93047",
+                    "addr:street": "Obermünsterstraße",
+                    "amenity": "bar",
+                    "name": "da Silva",
+                    "opening_hours": "Tu, Th-Sa 21:00-02:00",
+                    "toilets:wheelchair": "no",
+                    "wheelchair": "limited"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0959919,
+                    49.0166878
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/651792488",
+            "properties": {
+                "type": "node",
+                "id": "651792488",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "2",
+                    "addr:postcode": "93047",
+                    "addr:street": "Baumhackergasse",
+                    "amenity": "bar",
+                    "name": "Flannigan's",
+                    "opening_hours": "Mo-Th 19:00-01:00, Fr-Sa 19:00-02:00",
+                    "phone": "+49 941 53481",
+                    "wheelchair": "no"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0940149,
+                    49.0210155
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/652855128",
+            "properties": {
+                "type": "node",
+                "id": "652855128",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "11",
+                    "addr:postcode": "93047",
+                    "addr:street": "Keplerstraße",
+                    "amenity": "bar",
+                    "name": "Wunderbar",
+                    "opening_hours": "Su-Th 21:00-03:00, Fr-Sa 21:00-04:00",
+                    "website": "http://www.wunderbar.de",
+                    "wheelchair": "no"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0927913,
+                    49.021261
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/779127403",
+            "properties": {
+                "type": "node",
+                "id": "779127403",
+                "tags": {
+                    "addr:housenumber": "5",
+                    "addr:street": "Hinter der Grieb",
+                    "amenity": "bar",
+                    "email": "kontakt@ka5per.de",
+                    "name": "Ka5par",
+                    "phone": "+49 941 59579099",
+                    "website": "http://ka5per.de",
+                    "wheelchair": "limited"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0942687,
+                    49.0189923
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/1203984719",
+            "properties": {
+                "type": "node",
+                "id": "1203984719",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "2",
+                    "addr:postcode": "93047",
+                    "addr:street": "Am Wiedfang",
+                    "amenity": "bar",
+                    "level": "0;1",
+                    "name": "Mood",
+                    "opening_hours": "Mo-Sa 19:00-02:00",
+                    "phone": "+49 151 58559894",
+                    "website": "http://mood-regensburg.de",
+                    "wheelchair": "no"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0964679,
+                    49.0211935
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/1226710037",
+            "properties": {
+                "type": "node",
+                "id": "1226710037",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:housenumber": "1",
+                    "addr:postcode": "93047",
+                    "addr:street": "Jakobstraße",
+                    "amenity": "bar",
+                    "email": "cafeblomberg@gmail.com",
+                    "name": "Blomberg",
+                    "opening_hours": "Mo-Su 10:00-24:00",
+                    "phone": "+49 941 465 235 82",
+                    "wheelchair": "limited"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0890521,
+                    49.0189563
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/1226710556",
+            "properties": {
+                "type": "node",
+                "id": "1226710556",
+                "tags": {
+                    "amenity": "bar",
+                    "name": "Heigl´s",
+                    "wheelchair": "limited"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0891942,
+                    49.02049
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/1372005059",
+            "properties": {
+                "type": "node",
+                "id": "1372005059",
+                "tags": {
+                    "amenity": "bar",
+                    "name": "Brazil",
+                    "opening_hours": "Mo-Th 10:00-1:00, Fr 10:00-3:00, Sa 14:00-3:00, Su 14:00-1:00",
+                    "operator": "H. Kehl KG",
+                    "website": "http://www.bar-brazil.de/",
+                    "wheelchair": "limited"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.055427,
+                    49.013535
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/1482353095",
+            "properties": {
+                "type": "node",
+                "id": "1482353095",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:housenumber": "2",
+                    "addr:postcode": "93047",
+                    "addr:street": "Haidplatz",
+                    "amenity": "bar",
+                    "contact:email": "info@noahregensburg.de",
+                    "contact:fax": "+49 941 5866-168",
+                    "contact:phone": "+49 941 5866-140",
+                    "contact:website": "http://www.regensburghotel.de/altstadthotel-arch/cafe-noah/herzlich-willkommen",
+                    "internet_access": "wlan",
+                    "internet_access:fee": "no",
+                    "name": "NOAH Café / Bar / Lounge",
+                    "smoking": "no",
+                    "wheelchair": "limited"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0933624,
+                    49.0194795
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/1653823224",
+            "properties": {
+                "type": "node",
+                "id": "1653823224",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "20",
+                    "addr:postcode": "93053",
+                    "addr:street": "Galgenbergstraße",
+                    "amenity": "bar",
+                    "name": "Cartoon",
+                    "opening_hours": "Tu-Su 17:00-01:00",
+                    "operator": "Alte Mälzerei e.V.",
+                    "source": "wheelmap-import",
+                    "website": "http://www.alte-maelzerei.de/de/gastro.php",
+                    "wheelchair": "yes",
+                    "wheelchair:description:de": "Ebenerdiger Hintereingang"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0998751,
+                    49.0071065
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/2357397773",
+            "properties": {
+                "type": "node",
+                "id": "2357397773",
+                "tags": {
+                    "addr:housenumber": "3",
+                    "addr:street": "Spiegelgasse",
+                    "amenity": "bar",
+                    "email": "christianschoenek@web.de",
+                    "name": "U-Bar",
+                    "opening_hours": "Tu,Fr,Sa 22:00-02:00, We 22:00-01:00, Th 21:30-02:00",
+                    "website": "http://www.u-bar-regensburg.net",
+                    "wheelchair": "no"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.094138,
+                    49.0178327
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/3126841030",
+            "properties": {
+                "type": "node",
+                "id": "3126841030",
+                "tags": {
+                    "amenity": "bar",
+                    "email": "kontakt@buero-regensburg.de",
+                    "name": "BÜRO",
+                    "opening_hours": "Mo-Sa 20:00-02:00",
+                    "phone": "+49 941 5676204",
+                    "toilets:wheelchair": "no",
+                    "website": "https://www.buero-regensburg.de/",
+                    "wheelchair": "limited",
+                    "wheelchair:description": "Handrolli mit Hilfe erreichbar. E-Rolli mit Hilfe nicht erreichbar."
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0925149,
+                    49.02131
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/3185004797",
+            "properties": {
+                "type": "node",
+                "id": "3185004797",
+                "tags": {
+                    "amenity": "bar",
+                    "name": "Cafe Samer"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.1061433,
+                    49.0147199
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/3414176185",
+            "properties": {
+                "type": "node",
+                "id": "3414176185",
+                "tags": {
+                    "amenity": "bar",
+                    "contact:phone": "+49 1512 5206275",
+                    "name": "Dudes4",
+                    "opening_hours": "Mo-Su 19:00+",
+                    "website": "http://dudes4.de/"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.1005055,
+                    49.0201466
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/3500867001",
+            "properties": {
+                "type": "node",
+                "id": "3500867001",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:housenumber": "4",
+                    "addr:postcode": "93047",
+                    "addr:street": "Arnulfsplatz",
+                    "amenity": "bar",
+                    "email": "info@tikibeat.de",
+                    "name": "Tikibeat",
+                    "phone": "+49 941 93081758",
+                    "website": "http://www.tikibeat.de/",
+                    "wheelchair": "no"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0891782,
+                    49.0198175
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/3500873484",
+            "properties": {
+                "type": "node",
+                "id": "3500873484",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:housenumber": "7",
+                    "addr:postcode": "93047",
+                    "addr:street": "Drei-Mohren-Straße",
+                    "amenity": "bar",
+                    "name": "Il Bar",
+                    "opening_hours": "08:00-20:00",
+                    "phone": "+49 941 59854120",
+                    "smoking": "outside",
+                    "wheelchair": "yes"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0902571,
+                    49.0194675
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/3615355766",
+            "properties": {
+                "type": "node",
+                "id": "3615355766",
+                "tags": {
+                    "amenity": "bar",
+                    "name": "Upper"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0981283,
+                    49.0189608
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/3970730447",
+            "properties": {
+                "type": "node",
+                "id": "3970730447",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:housenumber": "10",
+                    "addr:postcode": "93047",
+                    "addr:street": "Goldene-Bären-Straße",
+                    "amenity": "bar",
+                    "email": "info@kosmonaut-bar.de",
+                    "name": "Kosmonaut",
+                    "opening_hours": "Tu-Sa 20:00-02:00",
+                    "wheelchair": "limited",
+                    "wheelchair:description": "vielleicht mit Handrolli und Hilfe möglich. Behinderten gerechtes WC unklar"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0965443,
+                    49.0209162
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/4186114918",
+            "properties": {
+                "type": "node",
+                "id": "4186114918",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "7",
+                    "addr:postcode": "93051",
+                    "addr:street": "Friedenstraße",
+                    "amenity": "bar",
+                    "name": "Hotelbar Hansa",
+                    "operator": "Hansa Apart-Hotel Regensburg Betriebsgesellschaft mbH",
+                    "website": "https://www.hansa-apart-hotel.de/de/gastronomie/hotelbar-hansa.html",
+                    "wheelchair": "yes"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0911052,
+                    49.0101513
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/4421890292",
+            "properties": {
+                "type": "node",
+                "id": "4421890292",
+                "tags": {
+                    "addr:housenumber": "18",
+                    "addr:postcode": "93047",
+                    "addr:street": "Winklergasse",
+                    "amenity": "bar",
+                    "name": "Jekyll&Hyde BVB FanClub Donau Pöhler",
+                    "name:de": "Jekyll&Hyde BVB FanClub Donau Pöhler",
+                    "phone": "+49 941 46184448"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0877101,
+                    49.0205653
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/4631890671",
+            "properties": {
+                "type": "node",
+                "id": "4631890671",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:housenumber": "2",
+                    "addr:postcode": "93053",
+                    "addr:street": "Galgenbergstraße",
+                    "amenity": "bar",
+                    "name": "Carlito's",
+                    "note": "in der Freisitzsaison: ab 11 Uhr geöffnet",
+                    "opening_hours": "Su-Th 18:00-01:00, Fr,Sa 18:00-05:00",
+                    "phone": "+49 941 20901434"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.101419,
+                    49.0095986
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/4957283050",
+            "properties": {
+                "type": "node",
+                "id": "4957283050",
+                "tags": {
+                    "addr:postcode": "93047",
+                    "amenity": "bar",
+                    "name": "Vincent",
+                    "opening_hours": "Mo-We 08:30-22:00; Th-Sa 08:30-01:00",
+                    "phone": "+49 941 3822 5598"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0987765,
+                    49.0157858
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/4992814073",
+            "properties": {
+                "type": "node",
+                "id": "4992814073",
+                "tags": {
+                    "addr:city": "Regensburg",
+                    "addr:country": "DE",
+                    "addr:housenumber": "19",
+                    "addr:postcode": "93055",
+                    "addr:street": "Alte Straubinger Straße",
+                    "amenity": "bar",
+                    "name": "Checkpoint Bar"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.1254851,
+                    49.0147319
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/5451569921",
+            "properties": {
+                "type": "node",
+                "id": "5451569921",
+                "tags": {
+                    "addr:postcode": "93047",
+                    "amenity": "bar",
+                    "name": "Mira Regensburg"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.094145,
+                    49.0179875
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "node/6606417786",
+            "properties": {
+                "type": "node",
+                "id": "6606417786",
+                "tags": {
+                    "amenity": "bar",
+                    "name": "Barock Bar",
+                    "opening_hours": "Mo-Su 20:00-00:00"
+                },
+                "relations": [],
+                "meta": {}
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    12.0968144,
+                    49.0199932
+                ]
+            }
+        }
+    ]
+}
