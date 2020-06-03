@@ -1,29 +1,64 @@
 /* eslint-env node */
-import express from "express";
+import express, { Request, Response } from "express";
 import path from "path";
 import cors from "cors";
+import bodyParser from "body-parser";
+import helmet from "helmet";
 import queryOverpass from "query-overpass";
 import { GeoJsonObject } from "geojson";
 
 const staticDir = path.join(__dirname, "../", "public"); // folder with client files
 
 export default class Server {
+  // Init express
   private app = express();
 
   constructor() {
+    // add basic security
+    this.app.use(helmet());
+    this.app.use(bodyParser.urlencoded({ extended: true }));
+    this.app.use(bodyParser.text());
+
     // serve front-end content
     this.app.use(express.static(staticDir));
 
     const router = express.Router();
-    router.get("/", (req, res) => res.render("index"));
-    router.get("/token", (req, res) => res.send(process.env.MAPBOX_TOKEN));
+    router.get("/", (req: Request, res: Response) => res.render("index"));
+    router.get("/token", (req: Request, res: Response) => {
+      res.send(process.env.MAPBOX_TOKEN);
+      // TODO: or send it with the "/" route above at the beginning?
+      //res.redirect("/");
+    });
+    router.get("/osmRequest", async (req: Request, res: Response) => {
+      const bounds = req.query.bounds?.toString();
+      const query = req.query.osmQuery?.toString();
+
+      //TODO: check that bounds aren't too big!
+
+      //TODO: die gegebene query muss noch überprüft werden, und sollte mit regexes und case-insensitiv in die url eingebaut werden
+      // vgl. https://wiki.openstreetmap.org/wiki/Overpass_API/Language_Guide
+
+      if (bounds && query) {
+        // TODO: show user some kind of progress information: progress bar or simply percentage / remaining time!
+        //res.status(200).send("Got it! You sent: " + query + ",\n" + bounds);
+
+        //TODO: das geht schöner (z.B. mit async und await oder promises!)
+        this.extractOSMData(bounds, query, (osmResponse, error) => {
+          //console.log(osmResponse);
+          if (error) {
+            res.status(400).send(error);
+            res.end();
+          }
+          res.status(200).send(osmResponse);
+          res.end();
+        });
+      }
+    });
 
     this.app.use(router);
 
     // use an application-level middleware to add the CORS HTTP header to every request by default.
     //this.app.use(cors());
-
-    //this.extractOSMData();
   }
 
   start(port: number): void {
@@ -38,44 +73,59 @@ export default class Server {
     });
   }
 
-  extractOSMData(): void {
-    /*TODO: 
-      - Frontend/Client sucht sich bbox und parameter aus
-      - server baut query mit den gegebenen daten und macht den api call
-      - geojson/error wird an client zurückgeschickt (und client kann dann damit tun was er will)
-    */
-    const query = this.buildOverpassQuery();
+  /*
+  async wait(ms) {
+    return new Promise((resolve, reject) => {
+      setTimeout(resolve, ms);
+    });
+  }*/
 
+  async extractOSMData(
+    bounds: string,
+    overpassQuery: string,
+    callback: (data?: GeoJsonObject, err?: Error) => void
+  ): Promise<void> {
+    const query = this.buildOverpassApiUrl(bounds, overpassQuery);
+    //console.log("Query: " + query);
+
+    // queryOverpass adds the ?data= automatically to the beginning of the query and uses "http://overpass-api.de/api/interpreter"
+    // as the baseUrl (the baseUrl can be changed however, see https://github.com/perliedman/query-overpass).
+    // For this reason, only the raw data query must be given as parameter.
     queryOverpass(
       query,
       (err: Error, data: GeoJsonObject) => {
         if (err) {
-          console.error(err);
-        } else {
-          console.log(data);
+          callback(undefined, err);
         }
+        callback(data);
       }
       //{ flatProperties: true, overpassUrl: "https://lz4.overpass-api.de/api/interpreter" }
     );
   }
 
-  buildOverpassQuery(): string {
-    //[timeout:25];
-    //[maxsize:1073741824]
+  /**
+   * Builds an url for the overpass api to fetch osm data for the current map bounds and the given query.
+   * See https://andreas-bruns.com/2014/11/30/openstreetmap-daten-abfragen-mit-der-overpass-api/.
+   */
+  buildOverpassApiUrl(bounds: string, overpassQuery: string): string {
+    const nodeQuery = `node[${overpassQuery}];`;
+    const wayQuery = `way[${overpassQuery}];`;
+    const relationQuery = `relation[${overpassQuery}];`;
+    // shorthand for the above (nwr = node, way, relation)
+    //const compoundQuery = `nwr[${overpassQuery}](${bounds});`;
+    const compoundQuery = `nwr[${overpassQuery}];`;
 
-    //TODO: interface oder class für boundingbox ?
-    const bbox = "57.7,11.9,57.8,12.0"; //southwest and northeast coordinate pairs
-    const type = "amenity";
-    //TODO: auch mehrere möglich!
-    const value = "bar";
+    // TODO: what is the best output format: xml or json?
+    // output-format xml, runtime of max. 25 seconds (needs to be higher for more complex queries) and global bounding box
+    const querySettings = `[out:xml][timeout:25][bbox:${bounds}];`;
 
-    //[bbox:south,west,north,east]
-    //ganz Regensburg: 12.028,48.966,12.192,49.076
-    //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
+    // output (default) body then use recurse down ">;" (to resolve ways into nodes and relations into nodes and ways)
+    // and output only the necessary infos (skel), also use "qt" to sort by quadtile index
+    // (sorts by location and is faster than sort by id)
+    const query = `${querySettings}(${
+      nodeQuery + wayQuery + relationQuery
+    });out;>;out skel qt;`;
 
-    const defaultQuery = `[out:xml];(node(${bbox}); <;);out;`; // returns everything in the bounding box
-    const newQuery = `node(${bbox})[${type}=${value}];out;`;
-
-    return newQuery;
+    return query;
   }
 }

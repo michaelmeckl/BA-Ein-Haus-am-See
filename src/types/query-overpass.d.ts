@@ -2,7 +2,10 @@
 declare module "query-overpass" {
   export default function queryOverpass(
     query: string,
-    callback: (error: Error, data: GeoJson) => void,
+    callback: (
+      error: Error,
+      data: import("geojson").GeoJsonObject
+    ) => import("geojson").GeoJsonObject | Error | void,
     options?: {}
-  ): void;
+  ): import("geojson").GeoJsonObject | Error;
 }
