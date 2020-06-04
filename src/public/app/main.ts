@@ -1,7 +1,8 @@
-import mapboxgl from "mapbox-gl";
+/* eslint-env browser */
+import MapController from "./mapController";
 
-async function fetchAccessToken(url: string): Promise<string | void> {
-  const token = await fetch(url, {
+async function fetchAccessToken(): Promise<string | null> {
+  const token = await fetch("/token", {
     method: "GET",
     cache: "no-cache",
   })
@@ -11,124 +12,19 @@ async function fetchAccessToken(url: string): Promise<string | void> {
     })
     .catch((err) => {
       console.log("Fetch problem: " + err.message);
+      return null;
     });
 
   return token;
-}
-
-function setupMap(accessToken: string): mapboxgl.Map {
-  if (!mapboxgl.supported()) {
-    throw new Error("Your browser does not support Mapbox GL!");
-  }
-
-  //const t2 = performance.now();
-  console.time("load map");
-
-  mapboxgl.accessToken = accessToken;
-
-  const lat = 49.008;
-  const lng = 12.1;
-  const coordinates: [number, number] = [lng, lat];
-  //const mapStyle = "mapbox://styles/michaelmeckl/ckajo8dpn22r41imzu1my2ekh";
-  const mapStyle = "mapbox://styles/mapbox/streets-v11";
-  const defaultZoom = 12;
-
-  const map = new mapboxgl.Map({
-    container: "map", // container id
-    style: mapStyle, // stylesheet location
-    center: coordinates, // starting position [lng, lat]
-    zoom: defaultZoom, // starting zoom
-  });
-
-  /*
-  // set the initial view bounds, in this case the USA
-  map.fitBounds([
-      [-133.2421875, 16.972741],
-      [-47.63671875, 52.696361]
-  ]);
-  */
-
-  //set cursor style to mouse pointer
-  map.getCanvas().style.cursor = "default";
-
-  // Add map controls
-  map.addControl(new mapboxgl.NavigationControl());
-
-  map.on("load", async () => {
-    //const t3 = performance.now();
-    //console.log("Loading map took " + (t3 - t2) + " milliseconds.");
-    console.timeEnd("load map");
-
-    console.log("Map is loaded!");
-    const marker = new mapboxgl.Marker().setLngLat(coordinates).addTo(map);
-  });
-
-  map.on("click", function (e) {
-    console.log("Click:", e);
-
-    /*
-    const popup = new mapboxgl.Popup({
-      offset: [0, -30],
-      closeOnMove: true,
-      maxWidth: "none",
-    })
-      .setLngLat(coordinates)
-      .setHTML(
-        "<h1>Universität Regensburg</h1><p>Beschreibungstext für Uni</p>"
-      )
-      .addTo(map);
-      */
-  });
-
-  return map;
 }
 
 async function test(): Promise<void> {
   console.log("NOT IMPLEMENTED:\nFetching data from osm ...");
 }
 
-/*
-function filter(feature, layer): boolean {
-  const isPolygon =
-    feature.geometry &&
-    feature.geometry.type !== undefined &&
-    feature.geometry.type === "Polygon";
-
-  if (isPolygon) {
-    feature.geometry.type = "Point";
-    //TODO: layer
-    const polygonCenter = L.latLngBounds(
-      feature.geometry.coordinates[0]
-    ).getCenter();
-
-    feature.geometry.coordinates = [polygonCenter.lat, polygonCenter.lng];
-  }
-  return true;
-}
-
-function onEachFeature(feature, layer) {
-  var popupContent = "";
-  var objectUrl = "http://overpass-api.de/api/interpreter?data=[out:json];" + feature.properties.type + "%28" + feature.properties.id + "%29;out;";
-  $.get(objectUrl, function (objectDataAsJson) {
-    popupContent = popupContent + "<dt>@id</dt><dd>" + feature.properties.type + "/" + feature.properties.id + "</dd>";
-    var keys = Object.keys(objectDataAsJson.elements[0].tags);
-    keys.forEach(function (key) {
-      popupContent = popupContent + "<dt>" + key + "</dt><dd>" + objectDataAsJson.elements[0].tags[key] + "</dd>";
-    });
-    popupContent = popupContent + "</dl>"
-    layer.bindPopup(popupContent);
-  });
-  */
-
-/**
-   * TODO: Falls jemand das Beispiel als Basis für ein eigenes Projekt nutzen möchte, dann sollte man sich zunächst
-   *  um folgende Punkte kümmern:
-- Löschen der vorhandenen Treffer bei erneuerter Abfrage
-- Funktion onEachFeature() anpassen, sodass Treffer-Daten erst nach Anklicken geladen werden (nicht sofort)
-- Laden von Daten über die Overpass API dem Anwender anzeigen, z.B. mit einem Spinner oder Ladebalken
-- Fehlerbehandlung, falls die Overpass API einen Timeout wegen zu großer Datenmenge erzeugt
-   */
-
+//TODO:
+//- Laden von Daten über die Overpass API dem Anwender anzeigen, z.B. mit einem Ladebalken oder einer snackbar
+//- Fehlerbehandlung, falls die Overpass API einen Timeout wegen zu großer Datenmenge erzeugt
 async function fetchOsmData(
   mapBounds: string,
   query: string
@@ -168,7 +64,7 @@ async function fetchOsmData(
   }
 }
 
-function setupUI(map: mapboxgl.Map): void {
+function setupUI(mapController: MapController): void {
   const getDataButton = document.querySelector("#getOSM");
   if (getDataButton) {
     getDataButton.addEventListener("click", test);
@@ -181,117 +77,40 @@ function setupUI(map: mapboxgl.Map): void {
       // get input
       const query = queryInput.value;
 
-      //get current bounding box, in order:
-      //southern-most latitude, western-most longitude, northern-most latitude, eastern-most longitude
+      //TODO: let user choose bounding box?
       //ganz Regensburg: 12.028,48.966,12.192,49.076
       //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
-      // prettier-ignore
-      const bounds = `${map.getBounds().getSouth()},${map.getBounds().getWest()},${map.getBounds().getNorth()},${map.getBounds().getEast()}`;
+      const bounds = mapController.getCurrentBounds();
 
+      let t0 = performance.now();
       // request data from osm
       const data = await fetchOsmData(bounds, query);
+      let t1 = performance.now();
+      console.log("Fetching data took " + (t1 - t0) + " milliseconds.");
 
-      //console.log(data);
       if (data) {
-        console.log("now adding to map...");
-        // and show it on the map
+        t0 = performance.now();
+        mapController.showData(data, "points");
+        t1 = performance.now();
+        console.log("Adding data to map took " + (t1 - t0) + " milliseconds.");
 
-        map.addSource("points", {
-          type: "geojson",
-          data: data,
-          //data: "./app/data.geojson",
-        });
-
-        //TODO:
-
-        map.addLayer({
-          id: "layer1",
-          type: "symbol",
-          source: "points",
-          layout: {
-            //"icon-image": ["concat", ["get", "icon"], "-15"],
-            "text-field": ["get", "name", ["get", "tags"]],
-            //"text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-            //"text-offset": [0, 0.6],
-            //"text-anchor": "top",
-          },
-          //interactive: true,
-          /*
-          paint: {
-            "circle-radius": 3,
-            "circle-color": "#ff0000",
-          },
-          */
-        });
-
-        /*
-        // Add a circle layer with a vector source
-        map.addLayer({
-          id: "points-of-interest",
-          source: {
-            type: "vector",
-            url: "mapbox://mapbox.mapbox-streets-v8",
-          },
-          "source-layer": "poi_label",
-          type: "circle",
-          paint: {
-            // Mapbox Style Specification paint properties
-          },
-          layout: {
-            // Mapbox Style Specification layout properties
-          },
-        });
-        */
-
-        console.log("Finished adding layer!");
+        console.log("Finished adding data to map!");
       }
     });
-
-    // add it as a separate layer / source? to the map
-    /*
-    var resultLayer = L.geoJson(resultAsGeojson, {
-      style: function (feature) {
-        return {color: "#ff0000"};
-      }
-      filter: function (feature, layer) {
-              var isPolygon = (feature.geometry) && (feature.geometry.type !== undefined) && (feature.geometry.type === "Polygon");
-              if (isPolygon) {
-                feature.geometry.type = "Point";
-                var polygonCenter = L.latLngBounds(feature.geometry.coordinates[0]).getCenter();
-                feature.geometry.coordinates = [ polygonCenter.lat, polygonCenter.lng ];
-              }
-              return true;
-            },
-      onEachFeature: function (feature, layer) {
-        var popupContent = "";
-        var objectUrl = "http://overpass-api.de/api/interpreter?data=[out:json];" + feature.properties.type + "%28" + feature.properties.id + "%29;out;";
-        $.get(objectUrl, function (objectDataAsJson) {
-          popupContent = popupContent + "<dt>@id</dt><dd>" + feature.properties.type + "/" + feature.properties.id + "</dd>";
-          var keys = Object.keys(objectDataAsJson.elements[0].tags);
-          keys.forEach(function (key) {
-            popupContent = popupContent + "<dt>" + key + "</dt><dd>" + objectDataAsJson.elements[0].tags[key] + "</dd>";
-          });
-          popupContent = popupContent + "</dl>"
-          layer.bindPopup(popupContent);
-        });
-    }).addTo(map);
-    */
   }
 }
 
 async function init(): Promise<void> {
   try {
-    const token = await fetchAccessToken("/token");
+    const token = await fetchAccessToken();
     if (!token) {
-      throw new Error("Map couldn't be loaded! Invalid Mapbox Token:" + token);
+      throw new Error("Map couldn't be loaded: Invalid Mapbox Token provided!");
     }
 
-    const t0 = performance.now();
-    const map = setupMap(token);
-    const t1 = performance.now();
-    console.log("SetupMap took " + (t1 - t0) + " milliseconds.");
+    const mapController = new MapController(token, "map");
 
-    setupUI(map);
+    //TODO: call this only AFTER the map has been successfully loaded?
+    setupUI(mapController);
   } catch (error) {
     console.log(error);
   }
