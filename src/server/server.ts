@@ -1,5 +1,5 @@
 /* eslint-env node */
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction, Router } from "express";
 import path from "path";
 import cors from "cors";
 import bodyParser from "body-parser";
@@ -16,51 +16,28 @@ export default class Server {
   constructor() {
     // add basic security
     this.app.use(helmet());
+
+    // enable request body parsing
     this.app.use(bodyParser.urlencoded({ extended: true }));
     this.app.use(bodyParser.text());
 
     // serve front-end content
     this.app.use(express.static(staticDir));
 
-    const router = express.Router();
-    router.get("/", (req: Request, res: Response) => res.render("index"));
-    router.get("/token", (req: Request, res: Response) => {
-      res.send(process.env.MAPBOX_TOKEN);
-      // TODO: or send it with the "/" route above at the beginning?
-      //res.redirect("/");
-    });
-    router.get("/osmRequest", async (req: Request, res: Response) => {
-      const bounds = req.query.bounds?.toString();
-      const query = req.query.osmQuery?.toString();
-
-      //TODO: check that bounds aren't too big!
-
-      //TODO: die gegebene query muss noch überprüft werden, und sollte mit regexes und case-insensitiv in die url eingebaut werden
-      // vgl. https://wiki.openstreetmap.org/wiki/Overpass_API/Language_Guide
-
-      if (bounds && query) {
-        // TODO: show user some kind of progress information: progress bar or simply percentage / remaining time!
-        //res.status(200).send("Got it! You sent: " + query + ",\n" + bounds);
-
-        //TODO: das geht schöner (z.B. mit async und await oder promises!)
-        this.extractOSMData(bounds, query, (osmResponse, error) => {
-          //console.log(osmResponse);
-          if (error) {
-            res.status(400).send(error);
-            res.end();
-          }
-          res.status(200).send(osmResponse);
-          res.end();
-        });
-      }
-    });
-
+    // routing
+    const router = this.initRouter();
     this.app.use(router);
 
     // use an application-level middleware to add the CORS HTTP header to every request by default.
     //this.app.use(cors());
+
+    // error handling (must be at the end)
+    this.app.use(this.errorHandler);
   }
 
+  /**
+   * Start the express server on the given port.
+   */
   start(port: number): void {
     this.app.listen(port, (err) => {
       if (err) {
@@ -71,6 +48,64 @@ export default class Server {
         `Server started. Client available at http://localhost:${port}`
       );
     });
+  }
+
+  initRouter(): Router {
+    const router = express.Router();
+
+    router.get("/", (req: Request, res: Response) => res.render("index"));
+
+    router.get("/token", (req: Request, res: Response) => {
+      return res.send(process.env.MAPBOX_TOKEN);
+      // TODO: or send it with the "/" route above at the beginning?
+      //res.redirect("/");
+    });
+
+    router.get(
+      "/osmRequest",
+      async (req: Request, res: Response, next: NextFunction) => {
+        const bounds = req.query.bounds?.toString();
+        const query = req.query.osmQuery?.toString();
+
+        //TODO: check that bounds aren't too big!
+
+        //TODO: die gegebene query muss noch überprüft werden, und sollte mit regexes und case-insensitiv in die url eingebaut werden
+        // vgl. https://wiki.openstreetmap.org/wiki/Overpass_API/Language_Guide
+
+        if (bounds && query) {
+          // TODO: show user some kind of progress information: progress bar or simply percentage / remaining time!
+          //res.status(200).send("Got it! You sent: " + query + ",\n" + bounds);
+
+          //TODO: das geht schöner (z.B. mit async und await oder promises!)
+          // is this called twice?
+          this.extractOSMData(bounds, query, (osmResponse, error) => {
+            //console.log(osmResponse);
+            if (error) {
+              res.status(400).send(error);
+              //res.end();
+              return next(error);
+            }
+            return res.status(200).send(osmResponse);
+            //res.end();
+          });
+        }
+      }
+    );
+
+    return router;
+  }
+
+  errorHandler(
+    err: Error,
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Response<any> | void {
+    if (res.headersSent) {
+      return next(err);
+    }
+    res.status(500);
+    return res.send(err);
   }
 
   /*
