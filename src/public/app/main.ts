@@ -37,7 +37,7 @@ async function fetchOsmData(
     });
     const url = "/osmRequest?" + params;
 
-    console.log("url:" + url);
+    //console.log("url:" + url);
 
     const response = await fetch(url, {
       method: "GET",
@@ -50,13 +50,8 @@ async function fetchOsmData(
         `Request failed! Status ${response.status} (${response.statusText})`
       );
     }
+    //console.log(response.url);
 
-    //TODO: is blob more efficient than url?
-    //TODO: 2.only send status code in response when only url is used??
-    console.log(await response.blob());
-
-    //const answer = await response.text();
-    //console.log("Answer:", answer);
     return response.url;
   } catch (error) {
     console.error(error);
@@ -68,6 +63,14 @@ function setupUI(mapController: MapController): void {
   const getDataButton = document.querySelector("#getOSM");
   if (getDataButton) {
     getDataButton.addEventListener("click", test);
+  }
+
+  const showWebGLButton = document.querySelector("#showCustomData");
+  if (showWebGLButton) {
+    showWebGLButton.addEventListener(
+      "click",
+      mapController.addWebGlLayer.bind(mapController) // necessary to bind as the this context would be different in the addWebGL method otherwise
+    );
   }
 
   const queryInput = document.querySelector("#query-input") as HTMLInputElement;

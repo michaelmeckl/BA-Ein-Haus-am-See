@@ -7,6 +7,10 @@ import helmet from "helmet";
 import queryOverpass from "query-overpass";
 import { GeoJsonObject } from "geojson";
 
+const RESPONSE_OK = 200;
+const BAD_REQUEST = 400;
+const INTERNAL_SERVER_ERROR = 500;
+
 const staticDir = path.join(__dirname, "../", "public"); // folder with client files
 
 export default class Server {
@@ -79,14 +83,11 @@ export default class Server {
           //TODO: das geht schöner (z.B. mit async und await oder promises!)
           // is this called twice?
           this.extractOSMData(bounds, query, (osmResponse, error) => {
-            //console.log(osmResponse);
             if (error) {
-              res.status(400).send(error);
-              //res.end();
+              res.status(BAD_REQUEST).send(error);
               return next(error);
             }
-            return res.status(200).send(osmResponse);
-            //res.end();
+            return res.status(RESPONSE_OK).send(osmResponse);
           });
         }
       }
@@ -104,7 +105,8 @@ export default class Server {
     if (res.headersSent) {
       return next(err);
     }
-    res.status(500);
+    res.status(INTERNAL_SERVER_ERROR);
+    console.log(err);
     return res.send(err);
   }
 
@@ -126,16 +128,12 @@ export default class Server {
     // queryOverpass adds the ?data= automatically to the beginning of the query and uses "http://overpass-api.de/api/interpreter"
     // as the baseUrl (the baseUrl can be changed however, see https://github.com/perliedman/query-overpass).
     // For this reason, only the raw data query must be given as parameter.
-    queryOverpass(
-      query,
-      (err: Error, data: GeoJsonObject) => {
-        if (err) {
-          callback(undefined, err);
-        }
-        callback(data);
+    queryOverpass(query, (err: Error, data: GeoJsonObject) => {
+      if (err) {
+        callback(undefined, err);
       }
-      //{ flatProperties: true, overpassUrl: "https://lz4.overpass-api.de/api/interpreter" }
-    );
+      callback(data);
+    });
   }
 
   /**
