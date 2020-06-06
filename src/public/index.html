@@ -6,18 +6,12 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Ein Haus am See</title>
+    <link rel="icon" href="./assets/favicon.ico">
     <link href="./css/style.css" type="text/css" rel="stylesheet">
-    <script type="text/typescript" src="./app/main.ts" async defer></script>
-    <!--<script type="module" src="./app/test.js" async defer></script>-->
+    <script src="./dist/bundle.js" async defer></script>
 
-    <!-- include Mapbox GL -->
-    <script src="https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.js"></script>
+    <!-- include Mapbox GL style -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.css" rel="stylesheet" />
-
-    <!-- include ts transpiling, vgl. https://github.com/basarat/typescript-script -->
-    <!--TODO: test if that impacts the performance! -->
-    <script src="https://rawgit.com/Microsoft/TypeScript/master/lib/typescriptServices.js"></script>
-    <script src="https://rawgit.com/basarat/typescript-script/master/transpiler.js"></script>
 </head>
 
 <body>
@@ -27,100 +21,26 @@
         </strong>
     </noscript>
 
-    <div id="map"></div>
+    <header class="heading">
+        <h2>Ein Haus am See</h2>
+        <button type="button" id="getOSM">Use current map selection</button>
+        <button type="button" id="showCustomData">Add WebGL custom data</button>
 
-    <div class='map-overlay' id='legend'></div>
+        <div id="overpass-api-controls">
+            <input id="query-input" value="amenity=bar" size="50">
+            <input id="query-button" type="button" value="Laden">
+        </div>
+    </header>
 
+    <div id="mapContainer">
+        <div id="map"></div>
 
-    <script>
-        mapboxgl.accessToken =
-            "pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ";
-
-        const coordinates = [12.10, 49.008];
-        const mapStyle = "mapbox://styles/michaelmeckl/ckajo8dpn22r41imzu1my2ekh";
-        //const mapStyle = "mapbox://styles/michaelmeckl/ckai9m24j0mca1ikwtsmtt9ss";
-        const defaultZoom = 12;
-
-        const map = new mapboxgl.Map({
-            container: "map", // container id
-            style: mapStyle, // stylesheet location
-            center: coordinates, // starting position [lng, lat]
-            zoom: defaultZoom // starting zoom
-        });
-
-        /*
-        // set the initial view bounds, in this case the USA
-        map.fitBounds([
-            [-133.2421875, 16.972741],
-            [-47.63671875, 52.696361]
-        ]);
-        */
-
-        //set cursor style to mouse pointer
-        map.getCanvas().style.cursor = 'default';
-
-        const marker = new mapboxgl.Marker()
-            .setLngLat(coordinates)
-            .addTo(map);
-
-        // Add map controls
-        map.addControl(new mapboxgl.NavigationControl())
-
-
-        map.on('load', async () => {
-
-            var layers = ['0-10', '10-20', '20-50', '50-100', '100-200', '200-500', '500-1000', '1000+'];
-            var colors = ['#FFEDA0', '#FED976', '#FEB24C', '#FD8D3C', '#FC4E2A', '#E31A1C', '#BD0026',
-                '#800026'
-            ];
-
-
-            for (i = 0; i < layers.length; i++) {
-                var layer = layers[i];
-                var color = colors[i];
-                var item = document.createElement('div');
-                var key = document.createElement('span');
-                key.className = 'legend-key';
-                key.style.backgroundColor = color;
-
-                var value = document.createElement('span');
-                value.innerHTML = layer;
-                item.appendChild(key);
-                item.appendChild(value);
-                legend.appendChild(item);
-            }
-        });
-
-        map.on('click', function (e) {
-            /*
-            var features = map.queryRenderedFeatures(e.point, {
-                layers: ['TODO']
-            });
-
-            if (!features.length) {
-                return;
-            }
-
-            var feature = features[0];
-            */
-
-            console.log(e);
-
-            var popup = new mapboxgl.Popup({
-                    offset: [0, -30],
-                    closeOnMove: true,
-                    maxWidth: 'none'
-                })
-                /*
-                .setLngLat(feature.geometry.coordinates)
-                .setHTML('<h3>' + feature.properties.title + '</h3><p>' + feature.properties.description +
-                    '</p>')
-                    */
-                .setLngLat(coordinates)
-                .setHTML('<h1>Universität Regensburg</h1><p>Beschreibungstext für Uni</p>')
-                .addTo(map);
-        });
-    </script>
+        <!-- TODO: Home Button to get back to initial view?
+        <div id="homeButton">
+            <button type="button">Default</button>
+        </div>
+        -->
+    </div>
 
 </body>
 

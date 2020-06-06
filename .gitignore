@@ -31,6 +31,7 @@ bld/
 [Ll]og/
 [Ll]ogs/
 build/
+dist/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
@@ -230,6 +231,7 @@ ClientBin/
 *.pfx
 *.publishsettings
 orleans.codegen.cs
+.env
 
 # Including strong name files can present a security risk
 # (https://github.com/github/gitignore/pull/2483#issue-259490424)
