@@ -1,5 +1,6 @@
 /* eslint-env browser */
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
+import * as glUtils from "./webglUtils";
 
 export default class Map {
   private readonly map: mapboxgl.Map;
@@ -148,7 +149,7 @@ export default class Map {
           "#223b53",
           "no",
           "#3bb2d0",
-          /* other */ "#ff0000",
+          "#ff0000", // other
         ],
       },
     });
@@ -195,7 +196,6 @@ export default class Map {
     */
   }
 
-  //TODO: richtig machen und austesten!
   addWebGlLayer(): void {
     console.log("adding webgl data...");
 
@@ -203,75 +203,55 @@ export default class Map {
     let aPos: number;
     let buffer: WebGLBuffer | null;
 
-    const highlightLayer: CustomLayerInterface = {
-      id: "highlight",
-      type: "custom",
+    // define vertices to be rendered in the custom style layer
+    const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat({
+      lng: 12.089283,
+      lat: 48.9920256,
+    });
+    const uniSouthEast = mapboxgl.MercatorCoordinate.fromLngLat({
+      lng: 12.1025303,
+      lat: 48.9941069,
+    });
+    const uniNorthWest = mapboxgl.MercatorCoordinate.fromLngLat({
+      lng: 12.0909411,
+      lat: 49.0012031,
+    });
+    const uniNorthEast = mapboxgl.MercatorCoordinate.fromLngLat({
+      lng: 12.0989967,
+      lat: 49.0016276,
+    });
 
+    /*
+    const data = [uniSouthWest, uniSouthEast, uniNorthWest, uniNorthEast];
+    const flatData = data.flatMap((x) => [x.x, x.y]);
+    */
+
+    const glCustomLayer: CustomLayerInterface = {
+      id: "webglCustom",
+      type: "custom",
       // method called when the layer is added to the map
       // https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
-      onAdd: function (map: mapboxgl.Map, gl: WebGLRenderingContext): void {
-        // create GLSL source for vertex shader
-        const vertexSource =
-          "" +
-          "uniform mat4 u_matrix;" +
-          "attribute vec2 a_pos;" +
-          "void main() {" +
-          "    gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);" +
-          "}";
+      onAdd: (map: mapboxgl.Map, gl: WebGL2RenderingContext) => {
+        const vertexSource = this.createVertexShaderSource();
+        const fragmentSource = this.createFragmentShaderSource();
 
-        // create GLSL source for fragment shader
-        const fragmentSource =
-          "" +
-          "void main() {" +
-          "    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);" +
-          "}";
-
-        // create a vertex shader
-        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-        if (!vertexShader) {
-          return;
-        }
-        gl.shaderSource(vertexShader, vertexSource);
-        gl.compileShader(vertexShader);
-
-        // create a fragment shader
-        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-        if (!fragmentShader) {
-          return;
-        }
-        gl.shaderSource(fragmentShader, fragmentSource);
-        gl.compileShader(fragmentShader);
+        // create a vertex and a fragment shader
+        const vertexShader = glUtils.createShader(
+          gl,
+          gl.VERTEX_SHADER,
+          vertexSource
+        );
+        const fragmentShader = glUtils.createShader(
+          gl,
+          gl.FRAGMENT_SHADER,
+          fragmentSource
+        );
 
         // link the two shaders into a WebGL program
-        const pgrm = gl.createProgram();
-        if (pgrm) {
-          program = pgrm;
-        } else {
-          return;
-        }
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
+        program = glUtils.createProgram(gl, vertexShader, fragmentShader);
 
+        // look up where the vertex data needs to go.
         aPos = gl.getAttribLocation(program, "a_pos");
-
-        // define vertices to be rendered in the custom style layer
-        const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat({
-          lng: 12.089283,
-          lat: 48.9920256,
-        });
-        const uniSouthEast = mapboxgl.MercatorCoordinate.fromLngLat({
-          lng: 12.1025303,
-          lat: 48.9941069,
-        });
-        const uniNorthWest = mapboxgl.MercatorCoordinate.fromLngLat({
-          lng: 12.0909411,
-          lat: 49.0012031,
-        });
-        const uniNorthEast = mapboxgl.MercatorCoordinate.fromLngLat({
-          lng: 12.0989967,
-          lat: 49.0016276,
-        });
 
         // create and initialize a WebGLBuffer to store vertex and color data
         buffer = gl.createBuffer();
@@ -294,7 +274,7 @@ export default class Map {
 
       // method fired on each animation frame
       // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
-      render: function (gl: WebGLRenderingContext, matrix: number[]): void {
+      render: function (gl: WebGL2RenderingContext, matrix: number[]): void {
         gl.useProgram(program);
         gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "u_matrix"),
@@ -302,29 +282,73 @@ export default class Map {
           matrix
         );
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.enableVertexAttribArray(aPos);
-        gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(aPos); // this command tells WebGL we want to supply data from a buffer.
+
+        const size = 2; // always 1 to 4
+        const stride = 0; // stride = how many bytes to skip to get from one piece of data to the next piece of data)
+        // 0 for stride means "use a stride that matches the type and size".
+        const normalized = false;
+        //this command tells WebGL to get data from the buffer that was last bound with gl.bindBuffer,
+        gl.vertexAttribPointer(aPos, size, gl.FLOAT, normalized, stride, 0);
+        //enable alpha blending
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        const primitiveType = gl.TRIANGLE_STRIP;
+        const offset = 0; // 0 for offset means start at the beginning of the buffer.
+        const count = 4;
+        gl.drawArrays(primitiveType, offset, count);
       },
     };
 
+    const firstSymbolId = this.findLayerByType("symbol");
+    // Insert the layer beneath the first symbol layer in the layer stack if one exists.
+    this.map.addLayer(glCustomLayer, firstSymbolId);
+
+    console.log("Finished adding webgl data!");
+  }
+
+  /**
+   * Create and return GLSL source for vertex shader.
+   */
+  createVertexShaderSource(): string {
+    const vertexSource =
+      "" +
+      "uniform mat4 u_matrix;" +
+      "attribute vec2 a_pos;" +
+      "void main() {" +
+      "    gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);" +
+      "}";
+
+    return vertexSource;
+  }
+
+  /**
+   * Create and return GLSL source for fragment shader.
+   */
+  createFragmentShaderSource(): string {
+    const fragmentSource =
+      "" +
+      "void main() {" +
+      "    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);" +
+      "}";
+
+    return fragmentSource;
+  }
+
+  /**
+   * Find the first layer with the given type and return its id (or undefined if no layer with that type exists).
+   */
+  findLayerByType(layerType: string): string | undefined {
     const layers = this.map.getStyle().layers;
-    // Find the index of the first symbol layer in the map style
-    let firstSymbolId;
+
     if (layers) {
-      for (let i = 0; i < layers.length; i++) {
-        if (layers[i].type === "symbol") {
-          firstSymbolId = layers[i].id;
-          break;
+      for (const layer of layers) {
+        if (layer.type === layerType) {
+          return layer.id;
         }
       }
     }
-
-    // Insert the layer beneath the first symbol layer in the layer stack.
-    this.map.addLayer(highlightLayer, firstSymbolId);
-
-    console.log("Finished adding webgl data!");
+    return undefined;
   }
 }
