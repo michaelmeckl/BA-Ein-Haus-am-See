@@ -2,7 +2,7 @@
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import * as glUtils from "./webglUtils";
 
-export default class Map {
+export default class MapController {
   private readonly map: mapboxgl.Map;
   private defaultCoordinates: [number, number];
 

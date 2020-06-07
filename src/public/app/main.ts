@@ -59,10 +59,50 @@ async function fetchOsmData(
   }
 }
 
+//TODO: auslagern in eigene Datei/Klasse (oder automatisch extrahieren??? -> vllt nicht so gut, da dann noch zusätzlich traffic?)
+function getKeyType(val: string): string {
+  switch (val) {
+    case "Bar":
+    case "Restaurant":
+    case "Cafe":
+      return "amenity";
+
+    case "University":
+      return "building"; // could be amenity too if we want the whole campus
+
+    case "Supermarket":
+      return "shop";
+
+    case "Park":
+      return "leisure";
+
+    case "River":
+      return "waterway";
+
+    default:
+      throw new Error("Unknown input value! Key couldn't be found!");
+  }
+}
+
+function setData(e: Event): void {
+  e.stopPropagation();
+  e.preventDefault();
+
+  const queryInput = document.querySelector("#query-input") as HTMLInputElement;
+  const value = (e.target as HTMLAnchorElement).innerText;
+  const key = getKeyType(value);
+  queryInput.value = key + "=" + value;
+}
+
 function setupUI(mapController: MapController): void {
   const getDataButton = document.querySelector("#getOSM");
   if (getDataButton) {
     getDataButton.addEventListener("click", test);
+  }
+
+  const dropdownList = document.querySelector(".dropdown-content");
+  if (dropdownList) {
+    dropdownList.addEventListener("click", setData);
   }
 
   const showWebGLButton = document.querySelector("#showCustomData");
@@ -78,7 +118,7 @@ function setupUI(mapController: MapController): void {
   if (queryButton && queryInput) {
     queryButton.addEventListener("click", async () => {
       // get input
-      const query = queryInput.value;
+      const query = queryInput.value.toLowerCase();
 
       //TODO: let user choose bounding box?
       //ganz Regensburg: 12.028,48.966,12.192,49.076
