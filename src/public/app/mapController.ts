@@ -1,10 +1,12 @@
 /* eslint-env browser */
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import * as glUtils from "./webglUtils";
+//import U from "mapbox-gl-utils";
 
 export default class MapController {
-  private readonly map: mapboxgl.Map;
+  public readonly map: mapboxgl.Map;
   private defaultCoordinates: [number, number];
+  //private mapUtils: any;
 
   constructor(accessToken: string, containerId: string) {
     this.checkGLSupport();
@@ -12,22 +14,25 @@ export default class MapController {
     mapboxgl.accessToken = accessToken;
 
     const lat = 49.008;
-    const lon = 12.1;
-    this.defaultCoordinates = [lon, lat];
+    const lng = 12.1;
+    this.defaultCoordinates = [lng, lat];
     //const mapStyle = "mapbox://styles/michaelmeckl/ckajo8dpn22r41imzu1my2ekh";
+    // remove unused layers and features with ?optimize=true
     const mapStyle = "mapbox://styles/mapbox/streets-v11";
     const defaultZoom = 12;
 
     console.time("load map");
+
     this.map = new mapboxgl.Map({
       container: containerId,
       style: mapStyle, // stylesheet location
-      center: this.defaultCoordinates, // starting position [lon, lat]
+      center: this.defaultCoordinates, // starting position [lng, lat]
       zoom: defaultZoom, // starting zoom
+      //attributionControl: false,
       antialias: false, // set to true for antialiasing custom layers but has a negative impact on performance
     });
 
-    this.setupMap();
+    //this.mapUtils = U.init(this.map, mapboxgl);
   }
 
   checkGLSupport(): void {
@@ -36,39 +41,22 @@ export default class MapController {
     }
   }
 
-  setupMap(): void {
+  setupMap(callbackFunc: (controller: this) => void): void {
     //set cursor style to mouse pointer
     this.map.getCanvas().style.cursor = "default";
 
     // Add map controls
     this.map.addControl(new mapboxgl.NavigationControl());
 
-    //TODO: await map load instead of callback?
-    this.map.on("load", async () => {
+    this.map.on("load", () => {
       console.timeEnd("load map");
-
       console.log("Map is fully loaded!");
-      const marker = new mapboxgl.Marker()
-        .setLngLat(this.defaultCoordinates)
-        .addTo(this.map);
+      // call callbackFunction after the map has fully loaded
+      callbackFunc(this);
     });
 
-    this.map.on("click", function (e) {
+    this.map.on("click", (e) => {
       console.log("Click:", e);
-
-      /*
-      //show a popup window with custom text
-      const popup = new mapboxgl.Popup({
-        offset: [0, -30],
-        closeOnMove: true,
-        maxWidth: "none",
-      })
-        .setLngLat(coordinates)
-        .setHTML(
-          "<h1>Universität Regensburg</h1><p>Beschreibungstext für Uni</p>"
-        )
-        .addTo(map);
-        */
     });
   }
 
@@ -80,11 +68,11 @@ export default class MapController {
   getCurrentBounds(): string {
     const currBounds = this.map.getBounds();
     const southLat = currBounds.getSouth();
-    const westLon = currBounds.getWest();
+    const westLng = currBounds.getWest();
     const northLat = currBounds.getNorth();
-    const eastLon = currBounds.getEast();
+    const eastLng = currBounds.getEast();
 
-    return `${southLat},${westLon},${northLat},${eastLon}`;
+    return `${southLat},${westLng},${northLat},${eastLng}`;
   }
 
   removeLayerSource(map: mapboxgl.Map, id: string): boolean {
@@ -130,6 +118,9 @@ export default class MapController {
       type: "circle",
       source: sourceName,
       //interactive: true,
+      layout: {
+        //"visibility": "visible",  //TODO: damit vllt am anfang alles unsichtbar und wenn fertig alle auf visible?
+      },
       paint: {
         //increase circle radius when zooming in
         "circle-radius": {
@@ -151,6 +142,12 @@ export default class MapController {
           "#3bb2d0",
           "#ff0000", // other
         ],
+        "circle-opacity": {
+          stops: [
+            [2, 0.2],
+            [16, 0.8],
+          ],
+        },
       },
     });
 

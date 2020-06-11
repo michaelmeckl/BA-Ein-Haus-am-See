@@ -19,7 +19,7 @@ body {
     background-color: lavender;
     z-index: 2;
     height: 49px;
-    box-shadow: 0 4px 2px -2px gray;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
 }
 
 .heading h2 {

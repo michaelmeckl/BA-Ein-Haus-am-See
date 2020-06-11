@@ -151,9 +151,7 @@ async function init(): Promise<void> {
     }
 
     const mapController = new MapController(token, "map");
-
-    //TODO: call this only AFTER the map has been successfully loaded?
-    setupUI(mapController);
+    mapController.setupMap(setupUI);
   } catch (error) {
     console.log(error);
   }
