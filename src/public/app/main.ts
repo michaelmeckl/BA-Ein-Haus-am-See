@@ -143,13 +143,17 @@ function setupUI(mapController: MapController): void {
       // request data from osm
       const data = await fetchOsmData(bounds, query);
       let t1 = performance.now();
-      console.log("Fetching data took " + (t1 - t0) + " milliseconds.");
+      console.log(
+        "Fetching data took " + (t1 - t0).toFixed(3) + " milliseconds."
+      );
 
       if (data) {
         t0 = performance.now();
         mapController.showData(data, "points");
         t1 = performance.now();
-        console.log("Adding data to map took " + (t1 - t0) + " milliseconds.");
+        console.log(
+          "Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds."
+        );
 
         console.log("Finished adding data to map!");
       }

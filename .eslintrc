@@ -49,7 +49,7 @@
     "no-new": "error",
     "no-new-func": "error",
     "no-new-wrappers": "error",
-    "no-unused-expressions": "error",
+    "no-unused-expressions": "warn",
     "no-useless-concat": "error",
     "no-undef-init": "error",
     "no-underscore-dangle": "error",

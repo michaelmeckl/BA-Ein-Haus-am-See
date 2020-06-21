@@ -1,5 +1,5 @@
 /* eslint-env browser */
-import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
+import mapboxgl, { CustomLayerInterface, GeoJSONSource } from "mapbox-gl";
 import * as glUtils from "./webglUtils";
 //import U from "mapbox-gl-utils";
 
@@ -79,19 +79,39 @@ export default class MapController {
     return `${southLat},${westLng},${northLat},${eastLng}`;
   }
 
-  removeLayerSource(map: mapboxgl.Map, id: string): boolean {
-    const mapLayer = map.getLayer(id);
+  // TODO: macht das Sinn alle Layer zu löschen????
+  // oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
+  removeLayerSource(id: string): boolean {
+    // eslint-disable-next-line no-unused-expressions
+    this.map.getStyle().layers?.forEach((layer) => {
+      if (layer.source === id) {
+        console.log("deleting layer:" + JSON.stringify(layer));
+        this.map.removeLayer(layer.id);
+      }
+    });
+
+    /*
+    const mapLayer = this.map.getLayer(id);
 
     console.log("maplayer:" + mapLayer);
 
     //TODO: improve this! there can be more than one layer (and they don't have the same id name as the source but only start with it)
     if (typeof mapLayer !== "undefined") {
       // Remove map layer & source.
-      map.removeLayer(id).removeSource(id);
+      this.map.removeLayer(id).removeSource(id);
       return true;
     }
+    */
 
     return false;
+  }
+
+  updateLayerSource(id: string, data: string): boolean {
+    if (this.map.getSource(id)?.type !== "geojson") {
+      return false;
+    }
+    const result = (this.map.getSource(id) as GeoJSONSource).setData(data);
+    return result ? true : false;
   }
 
   addVectorData(data: any): void {
@@ -115,10 +135,14 @@ export default class MapController {
     console.log("now adding to map...");
 
     //TODO: maybe ask user and don't remove if its the same?
-    this.removeLayerSource(this.map, sourceName);
+    this.removeLayerSource(sourceName);
 
     if (this.map.getSource(sourceName)) {
-      console.log(`Source ${sourceName} is already used! Can't use it again`);
+      console.log(this.map.getSource(sourceName));
+      console.log(`Source ${sourceName} is already used! Updating it!`);
+      this.updateLayerSource(sourceName, data);
+      console.log(this.map.getSource(sourceName));
+      this.addLayers(sourceName);
       return;
     }
 
@@ -134,6 +158,10 @@ export default class MapController {
       //data: "../app/amenity_points.geojson",
     });
 
+    this.addLayers(sourceName);
+  }
+
+  addLayers(sourceName: string): void {
     //visualize source
     this.map.addLayer({
       id: sourceName + "-l1",
