@@ -21,7 +21,8 @@ module.exports = {
     resolve: {
         extensions: [".tsx", ".ts", ".js"],
         alias: {
-            //"mapbox-gl": path.resolve("./node_modules/mapbox-gl/dist/mapbox-gl.js"),
+            //Required for non-browserify bundlers (e.g. webpack):
+            "mapbox-gl$": path.resolve("./node_modules/mapbox-gl/dist/mapbox-gl.js"),
         },
     },
     module: {
@@ -39,10 +40,12 @@ module.exports = {
     },
     // in order to ignore built-in modules like path, fs, etc. for bundling
     target: "node",
+    /*
     // don't bundle node_modules except for the mapbox-gl module
     externals: [nodeExternals({
         whitelist: ["mapbox-gl"],
     })],
+    */
     plugins: [
         //new CleanWebpackPlugin(),
         /*
