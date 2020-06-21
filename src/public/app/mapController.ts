@@ -13,6 +13,10 @@ export default class MapController {
     // provide Mapbox accessToken
     mapboxgl.accessToken = accessToken;
 
+    // default api to request tiles, styles, ...
+    // could be used to load tiles from own tileserver
+    mapboxgl.baseApiUrl = "https://api.mapbox.com";
+
     const lat = 49.008;
     const lng = 12.1;
     this.defaultCoordinates = [lng, lat];
@@ -90,6 +94,23 @@ export default class MapController {
     return false;
   }
 
+  addVectorData(data: any): void {
+    this.map.addSource("tv", {
+      type: "vector",
+      url: data,
+    });
+
+    this.map.addLayer({
+      id: "tv",
+      type: "circle",
+      source: "tv",
+      "source-layer": "Regensburg_Test",
+      paint: {
+        "circle-color": "#ff69b4",
+      },
+    });
+  }
+
   showData(data: string, sourceName: string): void {
     console.log("now adding to map...");
 
@@ -110,6 +131,7 @@ export default class MapController {
       buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 0.45, // higher means simpler geometries and increased performance
       data: data, // url or inline geojson
+      //data: "../app/amenity_points.geojson",
     });
 
     //visualize source
@@ -123,13 +145,14 @@ export default class MapController {
       },
       paint: {
         //increase circle radius when zooming in
-        "circle-radius": {
+        "circle-radius": 25,
+        /*{
           base: 1,
           stops: [
-            [8, 2],
-            [16, 10],
+            [8, 4],
+            [16, 25],
           ],
-        },
+        },*/
         // style color based on wheelchair access
         "circle-color": [
           "match",
@@ -142,17 +165,67 @@ export default class MapController {
           "#3bb2d0",
           "#ff0000", // other
         ],
+        //"circle-stroke-width": 4,
+        "circle-blur": 1,
+        /*
         "circle-opacity": {
           stops: [
             [2, 0.2],
             [16, 0.8],
           ],
         },
+        */
       },
     });
 
     this.map.addLayer({
       id: sourceName + "-l2",
+      type: "line",
+      source: sourceName,
+      paint: {
+        "line-color": "#ff0000",
+        "line-width": 8,
+        "line-blur": 8,
+        //"line-offset": 3,
+      },
+    });
+
+    this.map.addLayer({
+      id: sourceName + "-l3",
+      type: "fill",
+      source: sourceName,
+      paint: {
+        "fill-color": "#00dd00",
+      },
+    });
+
+    // with "has", "name" it can be tested if something exists in the properties
+
+    //this.map.setFilter(sourceName + "-l1", ["==", ["geometry-type"], "Point"]);
+    this.map.setFilter(sourceName + "-l1", [
+      "match",
+      ["geometry-type"],
+      ["Point", "MultiPoint"],
+      true,
+      false,
+    ]);
+    this.map.setFilter(sourceName + "-l2", [
+      "match",
+      ["geometry-type"],
+      ["LineString", "MultiLineString"],
+      true,
+      false,
+    ]);
+    this.map.setFilter(sourceName + "-l3", [
+      "match",
+      ["geometry-type"],
+      ["Polygon", "MultiPolygon"],
+      true,
+      false,
+    ]);
+
+    this.map.addLayer({
+      id: sourceName + "-l4",
       type: "symbol",
       source: sourceName,
       layout: {

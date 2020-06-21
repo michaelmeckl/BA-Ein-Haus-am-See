@@ -18,6 +18,19 @@ async function fetchAccessToken(): Promise<string | null> {
   return token;
 }
 
+async function testVectorTileAPI(c: MapController): Promise<void> {
+  const url =
+    "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/1/0/0.mvt?access_token=pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ";
+
+  //const response = await fetch(url);
+  //console.info(response);
+
+  const test = "mapbox://michaelmeckl.ckajnwfb70hd62apmuw6m5rls-0pr4p";
+  const url2 = "mapbox://mapbox.mapbox-streets-v8";
+
+  c.addVectorData(test);
+}
+
 async function test(): Promise<void> {
   console.log("NOT IMPLEMENTED:\nFetching data from osm ...");
 }
@@ -50,7 +63,6 @@ async function fetchOsmData(
         `Request failed! Status ${response.status} (${response.statusText})`
       );
     }
-    //console.log(response.url);
 
     return response.url;
   } catch (error) {
@@ -62,7 +74,7 @@ async function fetchOsmData(
 //TODO: auslagern in eigene Datei/Klasse (oder automatisch extrahieren??? -> vllt nicht so gut, da dann noch zusätzlich traffic?)
 function getKeyType(val: string): string {
   switch (val) {
-    case "Bar":
+    case "Bar": // oder club, ...
     case "Restaurant":
     case "Cafe":
       return "amenity";
@@ -73,7 +85,7 @@ function getKeyType(val: string): string {
     case "Supermarket":
       return "shop";
 
-    case "Park":
+    case "Park": // oder leisure	nature_reserve
       return "leisure";
 
     case "River":
@@ -84,13 +96,13 @@ function getKeyType(val: string): string {
   }
 }
 
-function setData(e: Event): void {
+function selectData(e: Event): void {
   e.stopPropagation();
   e.preventDefault();
 
   const queryInput = document.querySelector("#query-input") as HTMLInputElement;
   const value = (e.target as HTMLAnchorElement).innerText;
-  const key = getKeyType(value);
+  const key = getKeyType(value); //TODO: flexibler! -> compund / union queries in overpass/osm möglich?
   queryInput.value = key + "=" + value;
 }
 
@@ -100,9 +112,11 @@ function setupUI(mapController: MapController): void {
     getDataButton.addEventListener("click", test);
   }
 
+  //testVectorTileAPI(mapController);
+
   const dropdownList = document.querySelector(".dropdown-content");
   if (dropdownList) {
-    dropdownList.addEventListener("click", setData);
+    dropdownList.addEventListener("click", selectData);
   }
 
   const showWebGLButton = document.querySelector("#showCustomData");
