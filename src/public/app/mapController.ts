@@ -1,11 +1,13 @@
 /* eslint-env browser */
 import mapboxgl, { CustomLayerInterface, GeoJSONSource } from "mapbox-gl";
 import * as glUtils from "./webglUtils";
+import MapboxDraw from "@mapbox/mapbox-gl-draw";
 //import U from "mapbox-gl-utils";
 
 export default class MapController {
   public readonly map: mapboxgl.Map;
   private defaultCoordinates: [number, number];
+  private Draw: any;
   //private mapUtils: any;
 
   constructor(accessToken: string, containerId: string) {
@@ -36,6 +38,7 @@ export default class MapController {
       antialias: false, // set to true for antialiasing custom layers but has a negative impact on performance
     });
 
+    this.Draw = new MapboxDraw();
     //this.mapUtils = U.init(this.map, mapboxgl);
   }
 
@@ -51,6 +54,8 @@ export default class MapController {
 
     // Add map controls
     this.map.addControl(new mapboxgl.NavigationControl());
+
+    this.map.addControl(this.Draw, "bottom-right");
 
     this.map.on("load", () => {
       console.timeEnd("load map");
@@ -114,7 +119,8 @@ export default class MapController {
     return result ? true : false;
   }
 
-  addVectorData(data: any): void {
+  addVectorData(data: string): void {
+    /*
     this.map.addSource("tv", {
       type: "vector",
       url: data,
@@ -127,6 +133,22 @@ export default class MapController {
       "source-layer": "Regensburg_Test",
       paint: {
         "circle-color": "#ff69b4",
+      },
+    });*/
+
+    // Test für eigenen TileServer
+    this.map.addSource("customTiles", {
+      type: "vector",
+      tiles: [data],
+    });
+
+    this.map.addLayer({
+      id: "customTiles",
+      type: "line",
+      source: "customTiles",
+      "source-layer": "state",
+      paint: {
+        "line-color": "#ff69b4",
       },
     });
   }
@@ -151,7 +173,8 @@ export default class MapController {
     this.map.addSource(sourceName, {
       type: "geojson",
       //maxzoom: 13, // default: 18
-      //cluster: true, // cluster near points (default: false)
+      cluster: true, // cluster near points (default: false)
+      clusterRadius: 10, //default is 50
       buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 0.45, // higher means simpler geometries and increased performance
       data: data, // url or inline geojson
@@ -216,6 +239,7 @@ export default class MapController {
         "line-blur": 8,
         //"line-offset": 3,
       },
+      //filter: ["==", "$type", "Polygon"],
     });
 
     this.map.addLayer({
@@ -229,7 +253,7 @@ export default class MapController {
 
     // with "has", "name" it can be tested if something exists in the properties
 
-    //this.map.setFilter(sourceName + "-l1", ["==", ["geometry-type"], "Point"]);
+    //TODO: extract types as an enum
     this.map.setFilter(sourceName + "-l1", [
       "match",
       ["geometry-type"],
@@ -262,6 +286,7 @@ export default class MapController {
         "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
         "text-offset": [0, 0.6],
         "text-anchor": "top",
+        "text-allow-overlap": true,
       },
     });
 
