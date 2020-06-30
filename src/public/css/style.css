@@ -27,7 +27,6 @@ body {
 }
 
 .heading button {
-    float: inline-end;
     margin-left: 5em;
     margin-bottom: 1em;
     padding: 0.6em;
