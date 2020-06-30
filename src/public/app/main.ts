@@ -50,8 +50,6 @@ async function fetchOsmData(
     });
     const url = "/osmRequest?" + params;
 
-    //console.log("url:" + url);
-
     const response = await fetch(url, {
       method: "GET",
     });
@@ -64,7 +62,7 @@ async function fetchOsmData(
       );
     }
 
-    return response.url;
+    return await response.json();
   } catch (error) {
     console.error(error);
     return null;
@@ -113,6 +111,11 @@ function setupUI(mapController: MapController): void {
   }
 
   //testVectorTileAPI(mapController);
+  /*
+  mapController.addVectorData(
+    "http://localhost:8080/data/countries/{z}/{x}/{y}.pbf"
+  );
+  */
 
   const dropdownList = document.querySelector(".dropdown-content");
   if (dropdownList) {
