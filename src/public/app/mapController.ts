@@ -1,6 +1,8 @@
 /* eslint-env browser */
 import mapboxgl, { CustomLayerInterface, GeoJSONSource } from "mapbox-gl";
 import * as glUtils from "./webglUtils";
+import { fetchOsmData } from "./networkUtils";
+import Benchmark from "./benchmarking";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 //import U from "mapbox-gl-utils";
 
@@ -62,6 +64,38 @@ export default class MapController {
       console.log("Map is fully loaded!");
       // call callbackFunction after the map has fully loaded
       callbackFunc(this);
+
+      /*
+      this.map.on("move", () => {
+        console.log("Move event fired!");
+      });
+      */
+
+      this.map.on("movestart", () => {
+        console.log("Move start event fired!");
+      });
+
+      this.map.on("moveend", async () => {
+        console.log("Move end event fired!");
+        const testQuery = "shop=supermarket";
+
+        Benchmark.startMeasure("Fetching data on moveend");
+        const data = await fetchOsmData(this.getCurrentBounds(), testQuery);
+        console.log(Benchmark.stopMeasure("Fetching data on moveend"));
+
+        if (data) {
+          const t0 = performance.now();
+          this.showData(data, "supermarkets");
+          const t1 = performance.now();
+          console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
+
+          console.log("Finished adding data to map!");
+        }
+      });
+    });
+
+    this.map.on("dataloading", () => {
+      console.log("A dataloading event occurred.");
     });
 
     this.map.on("click", (e) => {
@@ -173,7 +207,7 @@ export default class MapController {
     this.map.addSource(sourceName, {
       type: "geojson",
       //maxzoom: 13, // default: 18
-      cluster: true, // cluster near points (default: false)
+      cluster: false, // cluster near points (default: false)
       clusterRadius: 10, //default is 50
       buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 0.45, // higher means simpler geometries and increased performance
@@ -359,16 +393,8 @@ export default class MapController {
         const fragmentSource = this.createFragmentShaderSource();
 
         // create a vertex and a fragment shader
-        const vertexShader = glUtils.createShader(
-          gl,
-          gl.VERTEX_SHADER,
-          vertexSource
-        );
-        const fragmentShader = glUtils.createShader(
-          gl,
-          gl.FRAGMENT_SHADER,
-          fragmentSource
-        );
+        const vertexShader = glUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
+        const fragmentShader = glUtils.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
 
         // link the two shaders into a WebGL program
         program = glUtils.createProgram(gl, vertexShader, fragmentShader);
@@ -399,11 +425,7 @@ export default class MapController {
       // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
       render: function (gl: WebGL2RenderingContext, matrix: number[]): void {
         gl.useProgram(program);
-        gl.uniformMatrix4fv(
-          gl.getUniformLocation(program, "u_matrix"),
-          false,
-          matrix
-        );
+        gl.uniformMatrix4fv(gl.getUniformLocation(program, "u_matrix"), false, matrix);
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.enableVertexAttribArray(aPos); // this command tells WebGL we want to supply data from a buffer.
 
@@ -451,10 +473,7 @@ export default class MapController {
    */
   createFragmentShaderSource(): string {
     const fragmentSource =
-      "" +
-      "void main() {" +
-      "    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);" +
-      "}";
+      "" + "void main() {" + "    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);" + "}";
 
     return fragmentSource;
   }
