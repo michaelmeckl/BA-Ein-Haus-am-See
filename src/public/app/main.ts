@@ -1,22 +1,7 @@
 /* eslint-env browser */
 import MapController from "./mapController";
-
-async function fetchAccessToken(): Promise<string | null> {
-  const token = await fetch("/token", {
-    method: "GET",
-    cache: "no-cache",
-  })
-    .then((response) => response.text())
-    .then((data) => {
-      return data;
-    })
-    .catch((err) => {
-      console.log("Fetch problem: " + err.message);
-      return null;
-    });
-
-  return token;
-}
+import Benchmark from "./benchmarking";
+import { fetchAccessToken, fetchOsmData } from "./networkUtils";
 
 async function testVectorTileAPI(c: MapController): Promise<void> {
   const url =
@@ -33,40 +18,6 @@ async function testVectorTileAPI(c: MapController): Promise<void> {
 
 async function test(): Promise<void> {
   console.log("NOT IMPLEMENTED:\nFetching data from osm ...");
-}
-
-//TODO:
-//- Laden von Daten über die Overpass API dem Anwender anzeigen, z.B. mit einem Ladebalken oder einer snackbar
-//- Fehlerbehandlung, falls die Overpass API einen Timeout wegen zu großer Datenmenge erzeugt
-async function fetchOsmData(
-  mapBounds: string,
-  query: string
-): Promise<string | null> {
-  try {
-    console.log("sending request!");
-    const params = new URLSearchParams({
-      bounds: mapBounds,
-      osmQuery: query,
-    });
-    const url = "/osmRequest?" + params;
-
-    const response = await fetch(url, {
-      method: "GET",
-    });
-
-    console.log(response);
-
-    if (!response.ok) {
-      throw new Error(
-        `Request failed! Status ${response.status} (${response.statusText})`
-      );
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error(error);
-    return null;
-  }
 }
 
 //TODO: auslagern in eigene Datei/Klasse (oder automatisch extrahieren??? -> vllt nicht so gut, da dann noch zusätzlich traffic?)
@@ -142,21 +93,19 @@ function setupUI(mapController: MapController): void {
       //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
       const bounds = mapController.getCurrentBounds();
 
-      let t0 = performance.now();
+      //let t0 = performance.now();
+      Benchmark.startMeasure("Fetching data from osm");
       // request data from osm
       const data = await fetchOsmData(bounds, query);
-      let t1 = performance.now();
-      console.log(
-        "Fetching data took " + (t1 - t0).toFixed(3) + " milliseconds."
-      );
+      //let t1 = performance.now();
+      //console.log("Fetching data from osm took " + (t1 - t0).toFixed(3) + " milliseconds.");
+      console.log(Benchmark.stopMeasure("Fetching data from osm"));
 
       if (data) {
-        t0 = performance.now();
+        const t0 = performance.now();
         mapController.showData(data, "points");
-        t1 = performance.now();
-        console.log(
-          "Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds."
-        );
+        const t1 = performance.now();
+        console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 
         console.log("Finished adding data to map!");
       }
