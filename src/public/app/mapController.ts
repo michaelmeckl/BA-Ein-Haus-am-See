@@ -1,7 +1,7 @@
 /* eslint-env browser */
 import mapboxgl, { CustomLayerInterface, GeoJSONSource } from "mapbox-gl";
-import * as glUtils from "./webglUtils";
-import { fetchOsmData } from "./networkUtils";
+import * as glUtils from "./utils/webglUtils";
+import { fetchOsmData } from "./utils/networkUtils";
 import Benchmark from "./benchmarking";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 //import U from "mapbox-gl-utils";

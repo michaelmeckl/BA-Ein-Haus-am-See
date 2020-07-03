@@ -16,6 +16,14 @@
     <!-- include Mapbox Draw -->
     <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.0.9/mapbox-gl-draw.css'
         type='text/css' />
+
+    <!-- TODO: test the web api from protomaps!
+    <link rel="stylesheet" href="https://cdn.protomaps.com/mapbox-gl-js/1.8.0/mapbox-gl.css"
+        integrity="sha384-hA8DiLlBPc66p22tExfBNlfvPjhPR7uLymTlWBr9tlH5mqWYJDerJpGUNlqU3ne6" crossorigin="anonymous">
+    <script src="https://cdn.protomaps.com/mapbox-gl-js/1.8.0/mapbox-gl.js"
+        integrity="sha384-+OoYp/YzRKWaa9wH3YadmXwczp/YB8E+l8ekdzF7KqXX5bm9pMmkJYgDiZj/2WSd" crossorigin="anonymous">
+    </script>
+    -->
 </head>
 
 <body>
@@ -38,6 +46,7 @@
                 <i class="fa fa-caret-down"></i>
             </button>
             <div class="dropdown-content">
+                <!-- # scrolls to the top -->
                 <a href="#">Bar</a>
                 <a href="#">Restaurant</a>
                 <a href="#">Cafe</a>
@@ -50,16 +59,14 @@
 
         <input id="query-input" placeholder="amenity=bar" type="text" size="40">
         <input id="query-button" type="button" value="Fetch from OSM">
+
+        <div class="selection-box hidden">
+            <ul id="selection-list"></ul>
+        </div>
     </div>
 
     <div id="mapContainer">
         <div id="map"></div>
-
-        <!-- TODO: Home Button to get back to initial view?
-        <div id="homeButton">
-            <button type="button">Default</button>
-        </div>
-        -->
     </div>
 
 </body>

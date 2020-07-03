@@ -1,7 +1,7 @@
 /* eslint-env browser */
 import MapController from "./mapController";
 import Benchmark from "./benchmarking";
-import { fetchAccessToken, fetchOsmData } from "./networkUtils";
+import { fetchAccessToken, fetchOsmData } from "./utils/networkUtils";
 
 async function testVectorTileAPI(c: MapController): Promise<void> {
   const url =
@@ -51,8 +51,25 @@ function selectData(e: Event): void {
 
   const queryInput = document.querySelector("#query-input") as HTMLInputElement;
   const value = (e.target as HTMLAnchorElement).innerText;
-  const key = getKeyType(value); //TODO: flexibler! -> compund / union queries in overpass/osm möglich?
-  queryInput.value = key + "=" + value;
+  const key = getKeyType(value); //TODO: flexibler!
+  const query = key + "=" + value;
+  queryInput.value = query;
+
+  const selectionBox = document.querySelector(".selection-box") as HTMLDivElement;
+  const list = document.querySelector("#selection-list") as HTMLUListElement;
+
+  //TODO: actually the visible features on the map should be shown in the box (not what is clicked!)
+  // check if that list element already exists to prevent adding it twice
+  for (const el of list.getElementsByTagName("li")) {
+    if (el.textContent === query) {
+      return;
+    }
+  }
+
+  const listEl = document.createElement("li");
+  listEl.appendChild(document.createTextNode(query));
+  list.appendChild(listEl);
+  selectionBox.classList.remove("hidden");
 }
 
 function setupUI(mapController: MapController): void {
@@ -93,12 +110,9 @@ function setupUI(mapController: MapController): void {
       //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
       const bounds = mapController.getCurrentBounds();
 
-      //let t0 = performance.now();
       Benchmark.startMeasure("Fetching data from osm");
       // request data from osm
       const data = await fetchOsmData(bounds, query);
-      //let t1 = performance.now();
-      //console.log("Fetching data from osm took " + (t1 - t0).toFixed(3) + " milliseconds.");
       console.log(Benchmark.stopMeasure("Fetching data from osm"));
 
       if (data) {

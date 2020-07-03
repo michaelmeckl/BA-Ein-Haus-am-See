@@ -1,4 +1,4 @@
-import Benchmark from "./benchmarking";
+import Benchmark from "../benchmarking";
 
 export async function fetchAccessToken(): Promise<string | null> {
   const token = await fetch("/token", {
