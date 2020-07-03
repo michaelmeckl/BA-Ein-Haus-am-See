@@ -2,30 +2,20 @@
 import express, { Request, Response, NextFunction, Router } from "express";
 import path from "path";
 import cors from "cors";
+//import pg from "pg";
 import bodyParser from "body-parser";
 import helmet from "helmet";
-import { performance } from "perf_hooks";
-import {
-  GeoJsonObject,
-  FeatureCollection,
-  GeometryObject,
-  Geometry,
-} from "geojson";
-import childProcess from "child_process";
 import os from "os";
+import childProcess from "child_process";
 import Util from "util";
-import axios from "axios";
-//TODO: test
-import nodeFetch from "node-fetch";
-import needle from "needle";
-
-import osmtogeojson from "osmtogeojson";
+import axios, { AxiosError } from "axios";
 import querystring from "querystring";
+import { GeoJsonObject } from "geojson";
+import osmtogeojson from "osmtogeojson";
 import xmldom from "xmldom";
-//import pg from "pg";
+import Benchmark from "../public/app/benchmarking";
 
 const RESPONSE_OK = 200;
-const BAD_REQUEST = 400;
 const INTERNAL_SERVER_ERROR = 500;
 
 // TODO:
@@ -83,16 +73,12 @@ export default class Server {
    * Start the express server on the given port.
    */
   start(port: number): void {
-    //this.executeScript("dir");
-
     this.app.listen(port, (err) => {
       if (err) {
         return console.error(err);
       }
 
-      return console.log(
-        `Server started. Client available at http://localhost:${port}`
-      );
+      return console.log(`Server started. Client available at http://localhost:${port}`);
     });
   }
 
@@ -107,41 +93,57 @@ export default class Server {
       //res.redirect("/");
     });
 
-    router.get(
-      "/osmRequest",
-      async (req: Request, res: Response, next: NextFunction) => {
-        const bounds = req.query.bounds?.toString();
-        const query = req.query.osmQuery?.toString();
+    router.get("/osmRequest", async (req: Request, res: Response, next: NextFunction) => {
+      const bounds = req.query.bounds?.toString();
+      const query = req.query.osmQuery?.toString();
 
-        //TODO: check that bounds aren't too big!
+      //TODO: check that bounds aren't too big!
 
-        //TODO: die gegebene query muss noch überprüft werden, und sollte mit regexes und case-insensitiv in die url eingebaut werden
-        // vgl. https://wiki.openstreetmap.org/wiki/Overpass_API/Language_Guide
+      //TODO: die gegebene query muss noch überprüft werden, und sollte mit regexes und case-insensitiv in die url eingebaut werden
+      // vgl. https://wiki.openstreetmap.org/wiki/Overpass_API/Language_Guide
 
-        if (bounds && query) {
-          // TODO: show user some kind of progress information: progress bar or simply percentage / remaining time!
-          //res.status(200).send("Got it! You sent: " + query + ",\n" + bounds);
+      if (bounds && query) {
+        // TODO: show user some kind of progress information: progress bar or simply percentage / remaining time!
+        //res.status(200).send("Got it! You sent: " + query + ",\n" + bounds);
 
-          //TODO: measure time
-          const osmQuery = this.buildOverpassQuery(bounds, query);
+        Benchmark.startMeasure("Building Query");
+        const osmQuery = this.buildOverpassQuery(bounds, query);
+        console.log(Benchmark.stopMeasure("Building Query"));
+
+        try {
+          Benchmark.startMeasure("Getting data from osm total");
           const geoData = await this.getDataFromOSM(osmQuery);
+          console.log(Benchmark.stopMeasure("Getting data from osm total"));
 
-          if (geoData instanceof Error) {
-            console.log("instance of was error");
-            res.status(BAD_REQUEST).send(geoData);
-            return next(geoData);
-          }
-          console.log("sending to client");
           return res.status(RESPONSE_OK).send(geoData);
+        } catch (error) {
+          if (error.response) {
+            // send error status to client
+            return res.status(error.response.status).send(error.response.statusText);
+          }
+          // if no response property on error (e.g. internal error), pass to error handler
+          return next(error);
         }
-        return res.end();
       }
-    );
+      return res.end();
+    });
 
     //TODO: fetch from db
     //url: 'http://localhost:{port_of_db}/amenities',
     router.get("/amenities", function (req, res) {
       //this.getAmenities(req.body, res);
+    });
+
+    //The 404 Route
+    router.get("*", function (req, res) {
+      res.status(404);
+      // respond with json
+      if (req.accepts("json")) {
+        res.send({ error: "Not found" });
+        return;
+      }
+      // default to plain-text. send()
+      res.type("txt").send("Not found");
     });
 
     return router;
@@ -152,27 +154,13 @@ export default class Server {
     req: Request,
     res: Response,
     next: NextFunction
-  ): Response<any> | void {
+  ): Response<Error> | void {
     if (res.headersSent) {
       return next(err);
     }
-    //res.status(err.status || INTERNAL_SERVER_ERROR);
     res.status(INTERNAL_SERVER_ERROR);
-    console.log(err);
     return res.send(err);
   }
-
-  /*
-  //TODO: use custom benchmarking class
-  // eslint-disable-next-line no-magic-numbers
-  measureTime(func: (args: any) => any, action: string, accuracy = 3): any {
-    const t0 = performance.now();
-    const val = func(args);
-    const t1 = performance.now();
-    console.log(`${action} took ${(t1 - t0).toFixed(accuracy)} milliseconds.`);
-    return val;
-  }
-  */
 
   /**
    * Builds a query for the overpass api to fetch osm data as GeoJson in the given map bounds.
@@ -213,47 +201,34 @@ export default class Server {
     return query;
   }
 
-  async getDataFromOSM(query: string): Promise<any | Error> {
-    try {
-      const encodedQuery = querystring.stringify({ data: query });
+  async getDataFromOSM(query: string): Promise<any> {
+    const encodedQuery = querystring.stringify({ data: query });
 
-      //TODO: test performance for the others too
-      const response = await axios.get(
-        `https://overpass-api.de/api/interpreter?${encodedQuery}`
-      );
+    Benchmark.startMeasure("Requesting and parsing data from overpass");
+    const data = await this.performOverpassRequest(encodedQuery);
+    console.log(Benchmark.stopMeasure("Requesting and parsing data from overpass"));
 
-      const response2 = await nodeFetch(
-        `https://overpass-api.de/api/interpreter?${encodedQuery}`
-      );
-      console.log(response2);
-      console.log(await response2.json());
+    Benchmark.startMeasure("OsmtoGeojson");
+    const geoJson = osmtogeojson(data);
+    console.log(Benchmark.stopMeasure("OsmtoGeojson"));
 
-      const response3 = await needle(
-        "get",
-        `https://overpass-api.de/api/interpreter?${encodedQuery}`
-      );
-      console.log(response3);
-      console.log(response3.body);
+    return geoJson;
+  }
 
-      const contentType = response.headers["content-type"];
-      console.log(contentType);
+  async performOverpassRequest(params: string): Promise<GeoJsonObject | Document> {
+    Benchmark.startMeasure("Overpass API Request");
+    const response = await axios.get(`https://overpass-api.de/api/interpreter?${params}`);
+    console.log(Benchmark.stopMeasure("Overpass API Request"));
 
-      let data: any;
-      if (contentType.endsWith("json")) {
-        data = response.data as GeoJsonObject;
-      } else if (contentType.endsWith("xml")) {
-        const parser = new xmldom.DOMParser();
-        data = parser.parseFromString(response.data);
-      } else {
-        throw new Error("Content type not supported!");
-      }
+    const contentType = response.headers["content-type"];
 
-      const geoJson = osmtogeojson(data);
-      return geoJson;
-    } catch (error) {
-      console.log("Request failed: " + error);
-      return error;
+    if (contentType.endsWith("json")) {
+      return response.data as GeoJsonObject;
+    } else if (contentType.endsWith("xml")) {
+      const parser = new xmldom.DOMParser();
+      return parser.parseFromString(response.data);
     }
+    throw new Error("Content type not supported!");
   }
 
   //TODO: connect to and request data from postgres:
@@ -294,7 +269,7 @@ export default class Server {
   }
   */
 
-  //TODO: test: execute command line scripts
+  // executes command line scripts
   async executeScript(script: string): Promise<void> {
     // TODO: check for correct os!
     const platform = this.getPlatform();
