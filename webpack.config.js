@@ -41,7 +41,7 @@ module.exports = {
     // in order to ignore built-in modules like path, fs, etc. for bundling
     target: "node",
     /*
-    // don't bundle node_modules except for the mapbox-gl module
+    // TODO: don't bundle node_modules except for the mapbox-gl module to decrease bundle size
     externals: [nodeExternals({
         whitelist: ["mapbox-gl"],
     })],

@@ -65,11 +65,16 @@ export default class MapController {
       // call callbackFunction after the map has fully loaded
       callbackFunc(this);
 
-      /*
-      this.map.on("move", () => {
-        console.log("Move event fired!");
+      this.map.on("sourcedata", function (e) {
+        console.log(e.source);
+        if (e.isSourceLoaded) {
+          // Do something when the source has finished loading
+          console.log(e.sourceId);
+          console.log(e.source);
+          console.log(e.coord);
+          console.log(e.tile);
+        }
       });
-      */
 
       this.map.on("movestart", () => {
         console.log("Move start event fired!");
@@ -77,6 +82,7 @@ export default class MapController {
 
       this.map.on("moveend", async () => {
         console.log("Move end event fired!");
+        /*
         const testQuery = "shop=supermarket";
 
         Benchmark.startMeasure("Fetching data on moveend");
@@ -91,9 +97,11 @@ export default class MapController {
 
           console.log("Finished adding data to map!");
         }
+        */
       });
     });
 
+    // fired when any map data begins loading or changing asynchronously.
     this.map.on("dataloading", () => {
       console.log("A dataloading event occurred.");
     });
@@ -207,7 +215,7 @@ export default class MapController {
     this.map.addSource(sourceName, {
       type: "geojson",
       //maxzoom: 13, // default: 18
-      cluster: false, // cluster near points (default: false)
+      cluster: false, // TODO: cluster near points (default: false)
       clusterRadius: 10, //default is 50
       buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 0.45, // higher means simpler geometries and increased performance
@@ -310,6 +318,7 @@ export default class MapController {
       false,
     ]);
 
+    /*
     this.map.addLayer({
       id: sourceName + "-l4",
       type: "symbol",
@@ -323,6 +332,7 @@ export default class MapController {
         "text-allow-overlap": true,
       },
     });
+    */
 
     this.map.on("mouseenter", "points-l1", () => {
       // Change the cursor style as a UI indicator.
@@ -472,7 +482,9 @@ export default class MapController {
    * Create and return GLSL source for fragment shader.
    */
   createFragmentShaderSource(): string {
+    //TODO:
     const fragmentSource =
+      // eslint-disable-next-line no-useless-concat
       "" + "void main() {" + "    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);" + "}";
 
     return fragmentSource;
