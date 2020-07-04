@@ -16,6 +16,7 @@ import xmldom from "xmldom";
 import Benchmark from "../public/app/benchmarking";
 
 const RESPONSE_OK = 200;
+const NOT_FOUND = 404;
 const INTERNAL_SERVER_ERROR = 500;
 
 // TODO:
@@ -53,20 +54,23 @@ export default class Server {
     const router = this.initRouter();
     this.app.use(router);
 
-    /*
-    // catch 404 and forward to error handler
-    this.app.use(function (req, res, next) {
-      const err: any = new Error("Not Found");
-      err.status = 404;
-      next(err);
-    });
-    */
-
     // use an application-level middleware to add the CORS HTTP header to every request by default.
     //this.app.use(cors());
 
-    // error handling (must be at the end)
+    // error handling
     this.app.use(this.errorHandler);
+
+    // catch 404; this must be at the end!
+    this.app.use(function (req, res, next) {
+      res.status(NOT_FOUND);
+      // respond with json
+      if (req.accepts("json")) {
+        res.send({ error: "Not found" });
+        return;
+      }
+      // default to plain-text. send()
+      res.type("txt").send("Not found");
+    });
   }
 
   /**
@@ -89,8 +93,6 @@ export default class Server {
 
     router.get("/token", (req: Request, res: Response) => {
       return res.send(process.env.MAPBOX_TOKEN);
-      // TODO: or send it with the "/" route above at the beginning?
-      //res.redirect("/");
     });
 
     router.get("/osmRequest", async (req: Request, res: Response, next: NextFunction) => {
@@ -132,18 +134,6 @@ export default class Server {
     //url: 'http://localhost:{port_of_db}/amenities',
     router.get("/amenities", function (req, res) {
       //this.getAmenities(req.body, res);
-    });
-
-    //The 404 Route
-    router.get("*", function (req, res) {
-      res.status(404);
-      // respond with json
-      if (req.accepts("json")) {
-        res.send({ error: "Not found" });
-        return;
-      }
-      // default to plain-text. send()
-      res.type("txt").send("Not found");
     });
 
     return router;
