@@ -3,6 +3,7 @@ import mapboxgl, { CustomLayerInterface, GeoJSONSource } from "mapbox-gl";
 import * as glUtils from "./utils/webglUtils";
 import { fetchOsmData } from "./utils/networkUtils";
 import Benchmark from "./benchmarking";
+import { chunk } from "lodash";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 //import U from "mapbox-gl-utils";
 
@@ -65,6 +66,7 @@ export default class MapController {
       // call callbackFunction after the map has fully loaded
       callbackFunc(this);
 
+      /*
       this.map.on("sourcedata", function (e) {
         console.log(e.source);
         if (e.isSourceLoaded) {
@@ -75,6 +77,7 @@ export default class MapController {
           console.log(e.tile);
         }
       });
+      */
 
       this.map.on("movestart", () => {
         console.log("Move start event fired!");
@@ -82,6 +85,16 @@ export default class MapController {
 
       this.map.on("moveend", async () => {
         console.log("Move end event fired!");
+        /*
+        //TODO: test
+        const features = this.map.queryRenderedFeatures({ layers: ["points-l1"] });
+
+        if (features) {
+          const uniqueFeatures = this.getUniqueFeatures(features, "id");
+          console.table(uniqueFeatures);
+        }
+        */
+
         /*
         const testQuery = "shop=supermarket";
 
@@ -98,16 +111,38 @@ export default class MapController {
           console.log("Finished adding data to map!");
         }
         */
+
+        this.getPointsInRadius();
       });
     });
 
     // fired when any map data begins loading or changing asynchronously.
+    /*
     this.map.on("dataloading", () => {
       console.log("A dataloading event occurred.");
     });
+    */
 
     this.map.on("click", (e) => {
       console.log("Click:", e);
+    });
+  }
+
+  getPointsInRadius() {
+    // map click handler
+    this.map.on("click", (e) => {
+      const cluster = this.map.queryRenderedFeatures(e.point, { layers: ["points-l1"] });
+
+      if (cluster[0]) {
+        const pointsInCluster = features.filter((f) => {
+          const pointPixels = this.map.project(f.geometry.coordinates);
+          const pixelDistance = Math.sqrt(
+            Math.pow(e.point.x - pointPixels.x, 2) + Math.pow(e.point.y - pointPixels.y, 2)
+          );
+          return Math.abs(pixelDistance) <= clusterRadius;
+        });
+        console.log(cluster, pointsInCluster);
+      }
     });
   }
 
@@ -220,7 +255,7 @@ export default class MapController {
       buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 0.45, // higher means simpler geometries and increased performance
       data: data, // url or inline geojson
-      //data: "../app/amenity_points.geojson",
+      //data: "./data.geojson",
     });
 
     this.addLayers(sourceName);
@@ -363,7 +398,29 @@ export default class MapController {
     */
   }
 
+  //TODO: or use a set instead
+  getUniqueFeatures(array, comparatorProperty) {
+    const existingFeatureKeys = {};
+    // Because features come from tiled vector data, feature geometries may be split
+    // or duplicated across tile boundaries and, as a result, features may appear
+    // multiple times in query results.
+    const uniqueFeatures = array.filter(function (el) {
+      if (existingFeatureKeys[el.properties[comparatorProperty]]) {
+        return false;
+      } else {
+        existingFeatureKeys[el.properties[comparatorProperty]] = true;
+        return true;
+      }
+    });
+
+    return uniqueFeatures;
+  }
+
   addWebGlLayer(): void {
+    if (this.map.getLayer("webglCustom")) {
+      this.map.removeLayer("webglCustom");
+    }
+
     console.log("adding webgl data...");
 
     let program: WebGLProgram;
@@ -388,10 +445,58 @@ export default class MapController {
       lat: 49.0016276,
     });
 
+    // TODO:
+    // lat lng coordinates aus den tiles, bzw. den sources bekommen!
+    // alternativ auch über x,y,z möglich
+    // => dann könnten alle ganz einfach an WebGl übergeben werden
+    const allGeoData = this.map.querySourceFeatures("points");
+    console.log("QuerySourceFeatures: ");
+    console.log(allGeoData);
+
+    //console.log(...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3)));
+    const testData: number[] = [].concat(
+      ...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))
+    );
+    console.log(testData);
+    const newArray = chunk(testData, 2);
+    console.log("newArray after lodash:", newArray);
+    const MercatorCoordinates = newArray.map((el) => mapboxgl.MercatorCoordinate.fromLngLat(el));
+    console.log("Mercator:", MercatorCoordinates);
+    /*
+    console.log([].concat(...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))));
+    console.log(allGeoData.flatMap((el) => [].concat(el.geometry.coordinates.flat(3))));
+
+    console.log(allGeoData.flatMap((el) => [].concat(...el.geometry.coordinates.flat(3))));
+    console.log(
+      allGeoData.flatMap((el) =>
+        [].concat(...el.geometry.coordinates.flatMap((li) => [li.x, li.y]))
+      )
+    );
+    */
+
+    //TODO:
+    /*
+    allGeoData.forEach((el) => {
+      console.log(el.properties?.type);
+      console.log(el.geometry.coordinates);
+      console.log(...el.geometry.coordinates);
+    });
+
+    for (const el of allGeoData) {
+      console.log(...this.flatten(el.geometry.coordinates));
+    }
+    */
+
+    //const test = mapboxgl.MercatorCoordinate.fromLngLat({geoData});
+
     /*
     const data = [uniSouthWest, uniSouthEast, uniNorthWest, uniNorthEast];
     const flatData = data.flatMap((x) => [x.x, x.y]);
     */
+
+    //const customData = [uniNorthEast.x, uniNorthEast.y, uniSouthWest.x, uniSouthWest.y];
+    const customData = MercatorCoordinates.flatMap((x) => [x.x, x.y]);
+    console.log(customData);
 
     const glCustomLayer: CustomLayerInterface = {
       id: "webglCustom",
@@ -415,20 +520,7 @@ export default class MapController {
         // create and initialize a WebGLBuffer to store vertex and color data
         buffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(
-          gl.ARRAY_BUFFER,
-          new Float32Array([
-            uniSouthWest.x,
-            uniSouthWest.y,
-            uniSouthEast.x,
-            uniSouthEast.y,
-            uniNorthWest.x,
-            uniNorthWest.y,
-            uniNorthEast.x,
-            uniNorthEast.y,
-          ]),
-          gl.STATIC_DRAW
-        );
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(customData), gl.STATIC_DRAW);
       },
 
       // method fired on each animation frame
@@ -451,14 +543,15 @@ export default class MapController {
 
         const primitiveType = gl.TRIANGLE_STRIP;
         const offset = 0; // 0 for offset means start at the beginning of the buffer.
-        const count = 4;
+        const count = customData.length / 2;
         gl.drawArrays(primitiveType, offset, count);
       },
     };
 
-    const firstSymbolId = this.findLayerByType("symbol");
+    //const firstSymbolId = this.findLayerByType("symbol");
     // Insert the layer beneath the first symbol layer in the layer stack if one exists.
-    this.map.addLayer(glCustomLayer, firstSymbolId);
+    //this.map.addLayer(glCustomLayer, firstSymbolId);
+    this.map.addLayer(glCustomLayer);
 
     console.log("Finished adding webgl data!");
   }
@@ -467,13 +560,13 @@ export default class MapController {
    * Create and return GLSL source for vertex shader.
    */
   createVertexShaderSource(): string {
-    const vertexSource =
-      "" +
-      "uniform mat4 u_matrix;" +
-      "attribute vec2 a_pos;" +
-      "void main() {" +
-      "    gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);" +
-      "}";
+    const vertexSource = `
+      uniform mat4 u_matrix;
+      attribute vec2 a_pos;
+
+      void main() {
+          gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+      }`;
 
     return vertexSource;
   }
@@ -482,10 +575,41 @@ export default class MapController {
    * Create and return GLSL source for fragment shader.
    */
   createFragmentShaderSource(): string {
-    //TODO:
-    const fragmentSource =
-      // eslint-disable-next-line no-useless-concat
-      "" + "void main() {" + "    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);" + "}";
+    const fragmentSource = `
+      precision highp float;
+
+      void main() {
+        gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
+      }`;
+
+    const fragmentSourceAlt = `
+      uniform sampler2D texUnit;
+      uniform float[9] conMatrix;
+      uniform float conWeight;
+      uniform vec2 conPixel;
+
+      void main(void)
+      {
+          vec4 color = vec4(0.0);
+          vec2 texCoord = gl_TexCoord[0].st;
+          vec2 offset = conPixel * 1.5;
+          vec2 start = texCoord - offset;
+          vec2 current = start;
+
+          for (int i = 0; i < 9; i++)
+          {
+              color += texture2D( texUnit, current ) * conMatrix[i]; 
+
+              current.x += conPixel.x;
+              if (i == 2 || i == 5) {
+                  current.x = start.x;
+                  current.y += conPixel.y; 
+              }
+          }
+
+          gl_FragColor = color * conWeight;
+      }
+      `;
 
     return fragmentSource;
   }
