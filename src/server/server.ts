@@ -2,13 +2,13 @@
 import express, { Request, Response, NextFunction, Router } from "express";
 import path from "path";
 import cors from "cors";
-//import pg from "pg";
+//import pg from "pg";  //postgres
 import bodyParser from "body-parser";
 import helmet from "helmet";
 import os from "os";
 import childProcess from "child_process";
 import Util from "util";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import querystring from "querystring";
 import { GeoJsonObject } from "geojson";
 import osmtogeojson from "osmtogeojson";
@@ -193,6 +193,7 @@ export default class Server {
 
   async getDataFromOSM(query: string): Promise<any> {
     const encodedQuery = querystring.stringify({ data: query });
+    console.log(encodedQuery);
 
     Benchmark.startMeasure("Requesting and parsing data from overpass");
     const data = await this.performOverpassRequest(encodedQuery);
@@ -208,8 +209,10 @@ export default class Server {
   async performOverpassRequest(params: string): Promise<GeoJsonObject | Document> {
     Benchmark.startMeasure("Overpass API Request");
     const response = await axios.get(`https://overpass-api.de/api/interpreter?${params}`);
+    //const response = await axios.get(`http://192.168.99.101:12345/api/interpreter?${params}`);
     console.log(Benchmark.stopMeasure("Overpass API Request"));
 
+    console.log(response.data);
     const contentType = response.headers["content-type"];
 
     if (contentType.endsWith("json")) {

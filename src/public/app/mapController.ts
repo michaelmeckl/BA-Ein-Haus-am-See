@@ -4,13 +4,14 @@ import * as glUtils from "./utils/webglUtils";
 import { fetchOsmData } from "./utils/networkUtils";
 import Benchmark from "./benchmarking";
 import { chunk } from "lodash";
-import MapboxDraw from "@mapbox/mapbox-gl-draw";
+
+import FrameRateControl from "../libs/mapbox-gl-framerate";
+import MapboxFPS = require("../libs/MapboxFPS");
 //import U from "mapbox-gl-utils";
 
 export default class MapController {
   public readonly map: mapboxgl.Map;
   private defaultCoordinates: [number, number];
-  private Draw: any;
   //private mapUtils: any;
 
   constructor(accessToken: string, containerId: string) {
@@ -25,7 +26,6 @@ export default class MapController {
     const lat = 49.008;
     const lng = 12.1;
     this.defaultCoordinates = [lng, lat];
-    //const mapStyle = "mapbox://styles/michaelmeckl/ckajo8dpn22r41imzu1my2ekh";
     // remove unused layers and features with ?optimize=true
     const mapStyle = "mapbox://styles/mapbox/streets-v11";
     const defaultZoom = 12;
@@ -37,11 +37,9 @@ export default class MapController {
       style: mapStyle, // stylesheet location
       center: this.defaultCoordinates, // starting position [lng, lat]
       zoom: defaultZoom, // starting zoom
-      //attributionControl: false,
       antialias: false, // set to true for antialiasing custom layers but has a negative impact on performance
     });
 
-    this.Draw = new MapboxDraw();
     //this.mapUtils = U.init(this.map, mapboxgl);
   }
 
@@ -58,7 +56,7 @@ export default class MapController {
     // Add map controls
     this.map.addControl(new mapboxgl.NavigationControl());
 
-    this.map.addControl(this.Draw, "bottom-right");
+    this.measureFrameRate();
 
     this.map.on("load", () => {
       console.timeEnd("load map");
@@ -128,6 +126,21 @@ export default class MapController {
     });
   }
 
+  measureFrameRate(): void {
+    //TODO:
+    const fpsControl = new MapboxFPS.FPSControl();
+    this.map.addControl(fpsControl, "bottom-right");
+    setInterval(function () {
+      const report = fpsControl.measurer.getMeasurementsReport();
+      console.log("Report:", report);
+    }, 5000); // alle 5 Sekunden
+
+    //TODO:
+    const fps: any = new FrameRateControl({});
+    this.map.addControl(fps);
+  }
+
+  //TODO:
   getPointsInRadius() {
     // map click handler
     this.map.on("click", (e) => {
@@ -161,12 +174,10 @@ export default class MapController {
     return `${southLat},${westLng},${northLat},${eastLng}`;
   }
 
-  // TODO: macht das Sinn alle Layer zu löschen????
-  // oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
-  removeLayerSource(id: string): boolean {
+  removeAllLayersForSource(sourceID: string): boolean {
     // eslint-disable-next-line no-unused-expressions
     this.map.getStyle().layers?.forEach((layer) => {
-      if (layer.source === id) {
+      if (layer.source === sourceID) {
         console.log("deleting layer:" + JSON.stringify(layer));
         this.map.removeLayer(layer.id);
       }
@@ -234,7 +245,9 @@ export default class MapController {
     console.log("now adding to map...");
 
     //TODO: maybe ask user and don't remove if its the same?
-    this.removeLayerSource(sourceName);
+    //TODO: macht das Sinn alle Layer zu löschen????
+    // oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
+    this.removeAllLayersForSource(sourceName);
 
     if (this.map.getSource(sourceName)) {
       console.log(this.map.getSource(sourceName));
