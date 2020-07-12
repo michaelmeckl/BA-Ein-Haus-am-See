@@ -1,10 +1,9 @@
 /* eslint-env browser */
-import mapboxgl, { CustomLayerInterface, GeoJSONSource } from "mapbox-gl";
-import * as glUtils from "./utils/webglUtils";
-import { fetchOsmData } from "./utils/networkUtils";
+import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
+import * as webglUtils from "./utils/webglUtils";
+import * as mapboxUtils from "./utils/mapboxUtils";
 import Benchmark from "./benchmarking";
 import { chunk } from "lodash";
-
 import FrameRateControl from "../libs/mapbox-gl-framerate";
 import MapboxFPS = require("../libs/MapboxFPS");
 //import U from "mapbox-gl-utils";
@@ -15,7 +14,8 @@ export default class MapController {
   //private mapUtils: any;
 
   constructor(accessToken: string, containerId: string) {
-    this.checkGLSupport();
+    mapboxUtils.checkGLSupport();
+
     // provide Mapbox accessToken
     mapboxgl.accessToken = accessToken;
 
@@ -43,25 +43,20 @@ export default class MapController {
     //this.mapUtils = U.init(this.map, mapboxgl);
   }
 
-  checkGLSupport(): void {
-    if (!mapboxgl.supported()) {
-      throw new Error("Your browser does not support Mapbox GL!");
-    }
-  }
-
   setupMap(callbackFunc: (controller: this) => void): void {
     //set cursor style to mouse pointer
     this.map.getCanvas().style.cursor = "default";
 
-    // Add map controls
+    // Add navigation controls to the map
     this.map.addControl(new mapboxgl.NavigationControl());
 
+    // start measuring the frame rate
     this.measureFrameRate();
 
     this.map.on("load", () => {
       console.timeEnd("load map");
-      console.log("Map is fully loaded!");
-      // call callbackFunction after the map has fully loaded
+
+      // call the callbackFunction after the map has loaded
       callbackFunc(this);
 
       /*
@@ -94,6 +89,7 @@ export default class MapController {
         */
 
         /*
+        //TODO: load data new on every move
         const testQuery = "shop=supermarket";
 
         Benchmark.startMeasure("Fetching data on moveend");
@@ -110,7 +106,7 @@ export default class MapController {
         }
         */
 
-        this.getPointsInRadius();
+        mapboxUtils.getPointsInRadius(this.map);
       });
     });
 
@@ -140,31 +136,12 @@ export default class MapController {
     this.map.addControl(fps);
   }
 
-  //TODO:
-  getPointsInRadius() {
-    // map click handler
-    this.map.on("click", (e) => {
-      const cluster = this.map.queryRenderedFeatures(e.point, { layers: ["points-l1"] });
-
-      if (cluster[0]) {
-        const pointsInCluster = features.filter((f) => {
-          const pointPixels = this.map.project(f.geometry.coordinates);
-          const pixelDistance = Math.sqrt(
-            Math.pow(e.point.x - pointPixels.x, 2) + Math.pow(e.point.y - pointPixels.y, 2)
-          );
-          return Math.abs(pixelDistance) <= clusterRadius;
-        });
-        console.log(cluster, pointsInCluster);
-      }
-    });
-  }
-
   /**
    * Get the current bounding box, in order:
    * southern-most latitude, western-most longitude, northern-most latitude, eastern-most longitude.
    * @return string representation of the bounds in the above order
    */
-  getCurrentBounds(): string {
+  getViewportBounds(): string {
     const currBounds = this.map.getBounds();
     const southLat = currBounds.getSouth();
     const westLng = currBounds.getWest();
@@ -172,39 +149,6 @@ export default class MapController {
     const eastLng = currBounds.getEast();
 
     return `${southLat},${westLng},${northLat},${eastLng}`;
-  }
-
-  removeAllLayersForSource(sourceID: string): boolean {
-    // eslint-disable-next-line no-unused-expressions
-    this.map.getStyle().layers?.forEach((layer) => {
-      if (layer.source === sourceID) {
-        console.log("deleting layer:" + JSON.stringify(layer));
-        this.map.removeLayer(layer.id);
-      }
-    });
-
-    /*
-    const mapLayer = this.map.getLayer(id);
-
-    console.log("maplayer:" + mapLayer);
-
-    //TODO: improve this! there can be more than one layer (and they don't have the same id name as the source but only start with it)
-    if (typeof mapLayer !== "undefined") {
-      // Remove map layer & source.
-      this.map.removeLayer(id).removeSource(id);
-      return true;
-    }
-    */
-
-    return false;
-  }
-
-  updateLayerSource(id: string, data: string): boolean {
-    if (this.map.getSource(id)?.type !== "geojson") {
-      return false;
-    }
-    const result = (this.map.getSource(id) as GeoJSONSource).setData(data);
-    return result ? true : false;
   }
 
   addVectorData(data: string): void {
@@ -247,18 +191,18 @@ export default class MapController {
     //TODO: maybe ask user and don't remove if its the same?
     //TODO: macht das Sinn alle Layer zu löschen????
     // oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
-    this.removeAllLayersForSource(sourceName);
+    mapboxUtils.removeAllLayersForSource(this.map, sourceName);
 
     if (this.map.getSource(sourceName)) {
       console.log(this.map.getSource(sourceName));
       console.log(`Source ${sourceName} is already used! Updating it!`);
-      this.updateLayerSource(sourceName, data);
+      mapboxUtils.updateLayerSource(this.map, sourceName, data);
       console.log(this.map.getSource(sourceName));
       this.addLayers(sourceName);
       return;
     }
 
-    // add source
+    // add geojson source
     // see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson
     this.map.addSource(sourceName, {
       type: "geojson",
@@ -411,24 +355,6 @@ export default class MapController {
     */
   }
 
-  //TODO: or use a set instead
-  getUniqueFeatures(array, comparatorProperty) {
-    const existingFeatureKeys = {};
-    // Because features come from tiled vector data, feature geometries may be split
-    // or duplicated across tile boundaries and, as a result, features may appear
-    // multiple times in query results.
-    const uniqueFeatures = array.filter(function (el) {
-      if (existingFeatureKeys[el.properties[comparatorProperty]]) {
-        return false;
-      } else {
-        existingFeatureKeys[el.properties[comparatorProperty]] = true;
-        return true;
-      }
-    });
-
-    return uniqueFeatures;
-  }
-
   addWebGlLayer(): void {
     if (this.map.getLayer("webglCustom")) {
       this.map.removeLayer("webglCustom");
@@ -517,15 +443,15 @@ export default class MapController {
       // method called when the layer is added to the map
       // https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
       onAdd: (map: mapboxgl.Map, gl: WebGL2RenderingContext) => {
-        const vertexSource = this.createVertexShaderSource();
-        const fragmentSource = this.createFragmentShaderSource();
+        const vertexSource = webglUtils.createVertexShaderSource();
+        const fragmentSource = webglUtils.createFragmentShaderSource();
 
         // create a vertex and a fragment shader
-        const vertexShader = glUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
-        const fragmentShader = glUtils.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+        const vertexShader = webglUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
+        const fragmentShader = webglUtils.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
 
         // link the two shaders into a WebGL program
-        program = glUtils.createProgram(gl, vertexShader, fragmentShader);
+        program = webglUtils.createProgram(gl, vertexShader, fragmentShader);
 
         // look up where the vertex data needs to go.
         aPos = gl.getAttribLocation(program, "a_pos");
@@ -561,85 +487,11 @@ export default class MapController {
       },
     };
 
-    //const firstSymbolId = this.findLayerByType("symbol");
+    //const firstSymbolId = mapboxUtils.findLayerByType(this.map, "symbol");
     // Insert the layer beneath the first symbol layer in the layer stack if one exists.
     //this.map.addLayer(glCustomLayer, firstSymbolId);
     this.map.addLayer(glCustomLayer);
 
     console.log("Finished adding webgl data!");
-  }
-
-  /**
-   * Create and return GLSL source for vertex shader.
-   */
-  createVertexShaderSource(): string {
-    const vertexSource = `
-      uniform mat4 u_matrix;
-      attribute vec2 a_pos;
-
-      void main() {
-          gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
-      }`;
-
-    return vertexSource;
-  }
-
-  /**
-   * Create and return GLSL source for fragment shader.
-   */
-  createFragmentShaderSource(): string {
-    const fragmentSource = `
-      precision highp float;
-
-      void main() {
-        gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
-      }`;
-
-    const fragmentSourceAlt = `
-      uniform sampler2D texUnit;
-      uniform float[9] conMatrix;
-      uniform float conWeight;
-      uniform vec2 conPixel;
-
-      void main(void)
-      {
-          vec4 color = vec4(0.0);
-          vec2 texCoord = gl_TexCoord[0].st;
-          vec2 offset = conPixel * 1.5;
-          vec2 start = texCoord - offset;
-          vec2 current = start;
-
-          for (int i = 0; i < 9; i++)
-          {
-              color += texture2D( texUnit, current ) * conMatrix[i]; 
-
-              current.x += conPixel.x;
-              if (i == 2 || i == 5) {
-                  current.x = start.x;
-                  current.y += conPixel.y; 
-              }
-          }
-
-          gl_FragColor = color * conWeight;
-      }
-      `;
-
-    return fragmentSource;
-  }
-
-  /**
-   * Find the first layer with the given type and return its id (or undefined if no layer with that type exists).
-   */
-  findLayerByType(layerType: string): string | undefined {
-    const layers = this.map.getStyle().layers;
-
-    if (layers) {
-      for (const layer of layers) {
-        if (layer.type === layerType) {
-          return layer.id;
-        }
-      }
-    }
-    return undefined;
   }
 }

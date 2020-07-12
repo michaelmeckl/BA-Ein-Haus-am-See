@@ -1,3 +1,64 @@
+/**
+ * Create a GLSL source for the vertex shader.
+ */
+export function createVertexShaderSource(): string {
+  const vertexSource = `
+      uniform mat4 u_matrix;
+      attribute vec2 a_pos;
+
+      void main() {
+          gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+      }
+      `;
+
+  return vertexSource;
+}
+
+/**
+ * Create a GLSL source for the fragment shader.
+ */
+export function createFragmentShaderSource(): string {
+  const fragmentSource = `
+      precision highp float;
+
+      void main() {
+        gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
+      }
+      `;
+
+  //TODO: Blur - Filter
+  const fragmentSourceAlt = `
+      uniform sampler2D texUnit;
+      uniform float[9] conMatrix;
+      uniform float conWeight;
+      uniform vec2 conPixel;
+
+      void main(void)
+      {
+          vec4 color = vec4(0.0);
+          vec2 texCoord = gl_TexCoord[0].st;
+          vec2 offset = conPixel * 1.5;
+          vec2 start = texCoord - offset;
+          vec2 current = start;
+
+          for (int i = 0; i < 9; i++)
+          {
+              color += texture2D( texUnit, current ) * conMatrix[i]; 
+
+              current.x += conPixel.x;
+              if (i == 2 || i == 5) {
+                  current.x = start.x;
+                  current.y += conPixel.y; 
+              }
+          }
+
+          gl_FragColor = color * conWeight;
+      }
+      `;
+
+  return fragmentSource;
+}
+
 // see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
 export function createShader(
   gl: WebGL2RenderingContext,

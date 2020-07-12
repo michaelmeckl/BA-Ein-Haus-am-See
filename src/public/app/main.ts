@@ -108,7 +108,7 @@ function setupUI(mapController: MapController): void {
       //TODO: let user choose bounding box?
       //ganz Regensburg: 12.028,48.966,12.192,49.076
       //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
-      const bounds = mapController.getCurrentBounds();
+      const bounds = mapController.getViewportBounds();
 
       Benchmark.startMeasure("Fetching data from osm");
       // request data from osm
