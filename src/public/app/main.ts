@@ -3,6 +3,8 @@ import MapController from "./mapController";
 import Benchmark from "./benchmarking";
 import { fetchAccessToken, fetchOsmData } from "./utils/networkUtils";
 
+export const parameterSelection: Set<string> = new Set();
+
 const LI_TEMPLATE = document.querySelector("#li-template")?.innerHTML.trim();
 
 async function testVectorTileAPI(c: MapController): Promise<void> {
@@ -79,10 +81,15 @@ function selectData(e: Event, mapController: MapController): void {
   listEl.appendChild(document.createTextNode(query));
   list.appendChild(listEl);
 
+  parameterSelection.add(query.toLowerCase());
+
   // remove the list element when its close button is clicked
   closeButton.addEventListener("click", function (this: ChildNode) {
     const listElement = this.parentElement as Node;
     list.removeChild(listElement);
+    parameterSelection.delete(query);
+
+    // remove data from the map as well
     const textContent = listElement.textContent?.trim();
     if (textContent) {
       mapController.removeData(textContent.toLowerCase());

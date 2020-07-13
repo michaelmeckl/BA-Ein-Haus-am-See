@@ -6,6 +6,8 @@ import Benchmark from "./benchmarking";
 import { chunk } from "lodash";
 import FrameRateControl from "../libs/mapbox-gl-framerate";
 import MapboxFPS = require("../libs/MapboxFPS");
+import { parameterSelection } from "./main";
+import { fetchOsmData } from "./utils/networkUtils";
 //import U from "mapbox-gl-utils";
 
 export default class MapController {
@@ -88,23 +90,21 @@ export default class MapController {
         }
         */
 
-        /*
         //TODO: load data new on every move
-        const testQuery = "shop=supermarket";
+        parameterSelection.forEach(async (param) => {
+          Benchmark.startMeasure("Fetching data on moveend");
+          const data = await fetchOsmData(this.getViewportBounds(), param);
+          console.log(Benchmark.stopMeasure("Fetching data on moveend"));
 
-        Benchmark.startMeasure("Fetching data on moveend");
-        const data = await fetchOsmData(this.getCurrentBounds(), testQuery);
-        console.log(Benchmark.stopMeasure("Fetching data on moveend"));
+          if (data) {
+            const t0 = performance.now();
+            this.showData(data, param);
+            const t1 = performance.now();
+            console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 
-        if (data) {
-          const t0 = performance.now();
-          this.showData(data, "supermarkets");
-          const t1 = performance.now();
-          console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
-
-          console.log("Finished adding data to map!");
-        }
-        */
+            console.log("Finished adding data to map!");
+          }
+        });
 
         mapboxUtils.getPointsInRadius(this.map);
       });
@@ -394,7 +394,14 @@ export default class MapController {
     // lat lng coordinates aus den tiles, bzw. den sources bekommen!
     // alternativ auch über x,y,z möglich
     // => dann könnten alle ganz einfach an WebGl übergeben werden
-    const allGeoData = this.map.querySourceFeatures("points");
+    console.log(parameterSelection.entries);
+
+    const allGeoData: mapboxgl.MapboxGeoJSONFeature[] = [];
+    for (const el of parameterSelection) {
+      const features = this.map.querySourceFeatures(el);
+      allGeoData.push(...features);
+    }
+
     console.log("QuerySourceFeatures: ");
     console.log(allGeoData);
 
