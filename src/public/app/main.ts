@@ -3,6 +3,8 @@ import MapController from "./mapController";
 import Benchmark from "./benchmarking";
 import { fetchAccessToken, fetchOsmData } from "./utils/networkUtils";
 
+const LI_TEMPLATE = document.querySelector("#li-template")?.innerHTML.trim();
+
 async function testVectorTileAPI(c: MapController): Promise<void> {
   const url =
     "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/1/0/0.mvt?access_token=pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ";
@@ -45,13 +47,13 @@ function getKeyType(val: string): string {
   }
 }
 
-function selectData(e: Event): void {
+function selectData(e: Event, mapController: MapController): void {
   e.stopPropagation();
   e.preventDefault();
 
   const queryInput = document.querySelector("#query-input") as HTMLInputElement;
   const value = (e.target as HTMLAnchorElement).innerText;
-  const key = getKeyType(value); //TODO: flexibler!
+  const key = getKeyType(value); //TODO: flexibler machen!
   const query = key + "=" + value;
   queryInput.value = query;
 
@@ -59,16 +61,40 @@ function selectData(e: Event): void {
   const list = document.querySelector("#selection-list") as HTMLUListElement;
 
   //TODO: actually the visible features on the map should be shown in the box (not what is clicked!)
+
   // check if that list element already exists to prevent adding it twice
   for (const el of list.getElementsByTagName("li")) {
-    if (el.textContent === query) {
+    if (el.textContent?.trim() === query) {
       return;
     }
   }
 
-  const listEl = document.createElement("li");
+  const containerElement = document.createElement("div");
+  containerElement.innerHTML = LI_TEMPLATE as string;
+  const listEl = containerElement.firstChild as ChildNode;
+  // get the close button for the list element
+  const closeButton = containerElement.firstChild?.childNodes[1] as ChildNode;
+
+  // add the selected data to the list element and append the list element
   listEl.appendChild(document.createTextNode(query));
   list.appendChild(listEl);
+
+  // remove the list element when its close button is clicked
+  closeButton.addEventListener("click", function (this: ChildNode) {
+    const listElement = this.parentElement as Node;
+    list.removeChild(listElement);
+    const textContent = listElement.textContent?.trim();
+    if (textContent) {
+      mapController.removeData(textContent.toLowerCase());
+    }
+
+    // check if there are other list elements, if not hide selection box
+    if (list.children.length === 0) {
+      selectionBox.classList.add("hidden");
+    }
+  });
+
+  // show selection box
   selectionBox.classList.remove("hidden");
 }
 
@@ -87,7 +113,9 @@ function setupUI(mapController: MapController): void {
 
   const dropdownList = document.querySelector(".dropdown-content");
   if (dropdownList) {
-    dropdownList.addEventListener("click", selectData);
+    dropdownList.addEventListener("click", function (ev) {
+      selectData(ev, mapController);
+    });
   }
 
   const showWebGLButton = document.querySelector("#showCustomData");
@@ -117,7 +145,7 @@ function setupUI(mapController: MapController): void {
 
       if (data) {
         const t0 = performance.now();
-        mapController.showData(data, "points");
+        mapController.showData(data, query);
         const t1 = performance.now();
         console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 

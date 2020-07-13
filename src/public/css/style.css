@@ -6,6 +6,11 @@ body {
     color: #000000;
 }
 
+/*Include the padding and border in an element's total width and height */
+* {
+    box-sizing: border-box;
+}
+
 #overpass-api-controls {
     position: absolute;
     z-index: 1;
@@ -26,13 +31,43 @@ body {
 
 #selection-list {
     margin: 0;
-    padding: 6px;
+    padding: 3px;
     font-size: 0.9em;
     list-style: none;
 }
 
 #selection-list li {
-    margin-bottom: 12px;
+    position: relative;
+    padding: 6px;
+    margin: 3px 0 3px 0;
+    background: #eeeeeeb0;
+    transition: 0.2s;
+
+    /* make the list items unselectable */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Darker background-color on hover */
+#selection-list li:hover {
+    background: #ddd;
+}
+
+
+/* close button */
+.close {
+    float: right;
+    /*border: 0.5px solid lightgrey;*/
+    border: none;
+    margin-left: 10px;
+    padding: 2px 6px 2px 6px;
+}
+
+.close:hover {
+    background-color: rgba(199, 15, 15, 0.911);
+    color: white;
 }
 
 .hidden {

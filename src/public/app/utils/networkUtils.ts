@@ -20,6 +20,8 @@ export async function fetchAccessToken(): Promise<string | null> {
 //TODO:
 //- Laden von Daten über die Overpass API dem Anwender anzeigen, z.B. mit einem Ladebalken oder einer snackbar
 //- Fehlerbehandlung, falls die Overpass API einen Timeout wegen zu großer Datenmenge erzeugt
+
+//TODO: use a webworker instead to load data async? better ux?
 export async function fetchOsmData(mapBounds: string, query: string): Promise<string | null> {
   try {
     console.log("sending request!");

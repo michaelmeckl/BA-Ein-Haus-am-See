@@ -185,8 +185,14 @@ export default class MapController {
     });
   }
 
+  removeData(sourceName: string): void {
+    mapboxUtils.removeAllLayersForSource(this.map, sourceName);
+    this.map.removeSource(sourceName);
+  }
+
   showData(data: string, sourceName: string): void {
     console.log("now adding to map...");
+    console.log(sourceName);
 
     //TODO: maybe ask user and don't remove if its the same?
     //TODO: macht das Sinn alle Layer zu löschen????
