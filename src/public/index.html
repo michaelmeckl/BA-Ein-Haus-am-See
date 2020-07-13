@@ -7,11 +7,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Ein Haus am See</title>
     <link rel="icon" href="./assets/favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link href="./css/style.css" type="text/css" rel="stylesheet">
     <script src="./dist/bundle.js" async defer></script>
 
     <!-- include Mapbox GL style -->
-    <link href="https://api.mapbox.com/mapbox-gl-js/v1.8.1/mapbox-gl.css" rel="stylesheet" />
+    <link href="https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.css" rel="stylesheet" />
+    <!-- include Mapbox Draw -->
+    <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.0.9/mapbox-gl-draw.css'
+        type='text/css' />
 </head>
 
 <body>
@@ -25,22 +29,43 @@
         <h2>Ein Haus am See</h2>
         <button type="button" id="getOSM">Use current map selection</button>
         <button type="button" id="showCustomData">Add WebGL custom data</button>
-
-        <div id="overpass-api-controls">
-            <input id="query-input" value="amenity=bar" size="50">
-            <input id="query-button" type="button" value="Laden">
-        </div>
     </header>
+
+    <div id="overpass-api-controls">
+        <div class="dropdown">
+            <button type="button" class="dropbtn">
+                Select type of data
+                <i class="fa fa-caret-down"></i>
+            </button>
+            <div class="dropdown-content">
+                <!-- # scrolls to the top -->
+                <a href="#">Bar</a>
+                <a href="#">Restaurant</a>
+                <a href="#">Cafe</a>
+                <a href="#">Supermarket</a>
+                <a href="#">River</a>
+                <a href="#">University</a>
+                <a href="#">Park</a>
+            </div>
+        </div>
+
+        <input id="query-input" placeholder="amenity=bar" type="text" size="40">
+        <input id="query-button" type="button" value="Fetch from OSM">
+
+        <div class="selection-box hidden">
+            <ul id="selection-list"></ul>
+        </div>
+    </div>
 
     <div id="mapContainer">
         <div id="map"></div>
-
-        <!-- TODO: Home Button to get back to initial view?
-        <div id="homeButton">
-            <button type="button">Default</button>
-        </div>
-        -->
     </div>
+
+    <template id="li-template">
+        <li>
+            <button id="close-btn" class="close"><i class="fa fa-close"></i></button>
+        </li>
+    </template>
 
 </body>
 
