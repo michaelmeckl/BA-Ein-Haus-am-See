@@ -1,10 +1,9 @@
 /* eslint-env node */
 import Server from "./server/server";
-
-const DEFAULT_PORT = 8000;
+import { Config } from "./shared/config";
 
 function init(): void {
-  const appPort = Number(process.env.PORT || DEFAULT_PORT); // port to use for serving static files
+  const appPort = Config.SERVER_PORT; // port to use for the express server
   const server = new Server();
   server.start(appPort);
 }

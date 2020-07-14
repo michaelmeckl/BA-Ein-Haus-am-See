@@ -6,7 +6,7 @@ module.exports = {
         "mount:shared": "mount src/shared --to /_dist_/shared",
         "run:tsc": "tsc --noEmit",
         "run:tsc::watch": "$1 --watch",
-        "run:dev_server": "ts-node-dev --files -r dotenv/config src/index.ts",
+        "run:dev_server": "ts-node-dev src/index.ts",
     },
     plugin: [],
     installOptions: {
