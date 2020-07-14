@@ -5,8 +5,8 @@
   "scripts": {
     "lint": "prettier --check \"src/**/*.{ts,js}\"",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "snowpack init": "npx snowpack",
-    "start": "snowpack dev",
+    "snowpack:init": "npx snowpack",
+    "start": "concurrently --kill-others \"ts-node-dev src/index.ts\" \"snowpack dev\"",
     "build": "snowpack build",
     "serve": "ts-node-dev --files -r dotenv/config src"
   },
