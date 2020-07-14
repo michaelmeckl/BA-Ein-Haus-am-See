@@ -2,7 +2,6 @@
  * Utility-Methods for working with Mapbox Gl.
  */
 import mapboxgl, { GeoJSONSource } from "mapbox-gl";
-import MapboxController from "../mapController";
 
 /**
  * Utility function to check whether MapboxGl (and WebGL) are supported in the browser.

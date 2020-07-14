@@ -1,8 +1,7 @@
 /* eslint-env node */
 import express, { Request, Response, NextFunction, Router } from "express";
-import path from "path";
 import cors from "cors";
-//import pg from "pg";  //postgres
+import * as HttpStatus from "http-status-codes";
 import bodyParser from "body-parser";
 import helmet from "helmet";
 import os from "os";
@@ -10,14 +9,11 @@ import childProcess from "child_process";
 import Util from "util";
 import axios from "axios";
 import querystring from "querystring";
-import { GeoJsonObject } from "geojson";
+import type { GeoJsonObject } from "geojson";
 import osmtogeojson from "osmtogeojson";
 import xmldom from "xmldom";
-import Benchmark from "../public/app/benchmarking";
-
-const RESPONSE_OK = 200;
-const NOT_FOUND = 404;
-const INTERNAL_SERVER_ERROR = 500;
+import Benchmark from "../shared/benchmarking";
+//import pg from "pg";  //postgres
 
 // TODO:
 /*
@@ -33,7 +29,10 @@ const tileURL = endpoint
 
 const exec = Util.promisify(childProcess.exec);
 
-const staticDir = path.join(__dirname, "../", "public"); // folder with client files
+const corsOptions = {
+  origin: "http://localhost:8080",
+  optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
+};
 
 export default class Server {
   // Init express
@@ -43,26 +42,23 @@ export default class Server {
     // add basic security
     this.app.use(helmet());
 
+    // use an application-level middleware to add the CORS HTTP header to every request by default.
+    this.app.use(cors(corsOptions));
+
     // enable request body parsing
     this.app.use(bodyParser.urlencoded({ extended: true }));
     this.app.use(bodyParser.text());
 
-    // serve front-end content
-    this.app.use(express.static(staticDir));
-
     // routing
     const router = this.initRouter();
     this.app.use(router);
-
-    // use an application-level middleware to add the CORS HTTP header to every request by default.
-    //this.app.use(cors());
 
     // error handling
     this.app.use(this.errorHandler);
 
     // catch 404; this must be at the end!
     this.app.use(function (req, res, next) {
-      res.status(NOT_FOUND);
+      res.status(HttpStatus.NOT_FOUND);
       // respond with json
       if (req.accepts("json")) {
         res.send({ error: "Not found" });
@@ -82,18 +78,12 @@ export default class Server {
         return console.error(err);
       }
 
-      return console.log(`Server started. Client available at http://localhost:${port}`);
+      return console.log(`Server started at http://localhost:${port}`);
     });
   }
 
   initRouter(): Router {
     const router = express.Router();
-
-    router.get("/", (req: Request, res: Response) => res.render("index"));
-
-    router.get("/token", (req: Request, res: Response) => {
-      return res.send(process.env.MAPBOX_TOKEN);
-    });
 
     router.get("/osmRequest", async (req: Request, res: Response, next: NextFunction) => {
       const bounds = req.query.bounds?.toString();
@@ -117,7 +107,7 @@ export default class Server {
           const geoData = await this.getDataFromOSM(osmQuery);
           console.log(Benchmark.stopMeasure("Getting data from osm total"));
 
-          return res.status(RESPONSE_OK).send(geoData);
+          return res.status(HttpStatus.OK).send(geoData);
         } catch (error) {
           if (error.response) {
             // send error status to client
@@ -148,7 +138,7 @@ export default class Server {
     if (res.headersSent) {
       return next(err);
     }
-    res.status(INTERNAL_SERVER_ERROR);
+    res.status(HttpStatus.INTERNAL_SERVER_ERROR);
     return res.send(err);
   }
 

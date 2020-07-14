@@ -1,21 +1,4 @@
-import Benchmark from "../benchmarking";
-
-export async function fetchAccessToken(): Promise<string | null> {
-  const token = await fetch("/token", {
-    method: "GET",
-    cache: "no-cache",
-  })
-    .then((response) => response.text())
-    .then((data) => {
-      return data;
-    })
-    .catch((err) => {
-      console.log("Fetch problem: " + err.message);
-      return null;
-    });
-
-  return token;
-}
+import Benchmark from "../../shared/benchmarking";
 
 //TODO:
 //- Laden von Daten über die Overpass API dem Anwender anzeigen, z.B. mit einem Ladebalken oder einer snackbar
@@ -30,7 +13,7 @@ export async function fetchOsmData(mapBounds: string, query: string): Promise<st
       bounds: mapBounds,
       osmQuery: query,
     });
-    const url = "/osmRequest?" + params;
+    const url = "http://localhost:8000/osmRequest?" + params;
 
     const response = await fetch(url, {
       method: "GET",

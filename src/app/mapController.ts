@@ -2,12 +2,12 @@
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import * as webglUtils from "./utils/webglUtils";
 import * as mapboxUtils from "./utils/mapboxUtils";
-import Benchmark from "./benchmarking";
-import { chunk } from "lodash";
-import FrameRateControl from "../libs/mapbox-gl-framerate";
-import MapboxFPS = require("../libs/MapboxFPS");
-import { parameterSelection } from "./main";
 import { fetchOsmData } from "./utils/networkUtils";
+import Benchmark from "../shared/benchmarking";
+import { chunk } from "lodash-es";
+//import FrameRateControl from "./vendors/mapbox-gl-framerate";
+import { parameterSelection } from "./app";
+import { Config } from "../shared/config";
 //import U from "mapbox-gl-utils";
 
 export default class MapController {
@@ -15,11 +15,12 @@ export default class MapController {
   private defaultCoordinates: [number, number];
   //private mapUtils: any;
 
-  constructor(accessToken: string, containerId: string) {
+  constructor(containerId: string) {
     mapboxUtils.checkGLSupport();
 
     // provide Mapbox accessToken
-    mapboxgl.accessToken = accessToken;
+    //const token = await fetchAccessToken();
+    mapboxgl.accessToken = Config.MAPBOX_TOKEN;
 
     // default api to request tiles, styles, ...
     // could be used to load tiles from own tileserver
@@ -123,17 +124,10 @@ export default class MapController {
   }
 
   measureFrameRate(): void {
-    //TODO:
-    const fpsControl = new MapboxFPS.FPSControl();
-    this.map.addControl(fpsControl, "bottom-right");
-    setInterval(function () {
-      const report = fpsControl.measurer.getMeasurementsReport();
-      console.log("Report:", report);
-    }, 5000); // alle 5 Sekunden
-
-    //TODO:
+    /*
     const fps: any = new FrameRateControl({});
     this.map.addControl(fps);
+    */
   }
 
   /**
