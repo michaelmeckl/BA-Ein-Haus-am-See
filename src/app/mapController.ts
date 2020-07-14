@@ -145,6 +145,24 @@ export default class MapController {
     return `${southLat},${westLng},${northLat},${eastLng}`;
   }
 
+  testX(): void {
+    this.map.addSource("vector", {
+      type: "vector",
+      tiles: ["./assets/ny_extract.osm.pbf"],
+    });
+
+    /*
+    this.map.addLayer({
+      id: "vector",
+      type: "line",
+      source: "vector",
+      "source-layer": "state",
+      paint: {
+        "line-color": "#ff69b4",
+      },
+    });*/
+  }
+
   addVectorData(data: string): void {
     /*
     this.map.addSource("tv", {
@@ -212,7 +230,7 @@ export default class MapController {
       buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 0.45, // higher means simpler geometries and increased performance
       data: data, // url or inline geojson
-      //data: "./data.geojson",
+      //data: "./assets/data.geojson",
     });
 
     this.addLayers(sourceName);

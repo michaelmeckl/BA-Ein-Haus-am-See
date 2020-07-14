@@ -6,7 +6,7 @@ import { Config } from "../shared/config";
 
 export const parameterSelection: Set<string> = new Set();
 
-const LI_TEMPLATE = document.querySelector("#li-template")?.innerHTML.trim();
+const LIST_TEMPLATE = document.querySelector("#li-template")?.innerHTML.trim();
 
 async function testVectorTileAPI(c: MapController): Promise<void> {
   const url =
@@ -73,7 +73,7 @@ function selectData(e: Event, mapController: MapController): void {
   }
 
   const containerElement = document.createElement("div");
-  containerElement.innerHTML = LI_TEMPLATE as string;
+  containerElement.innerHTML = LIST_TEMPLATE as string;
   const listEl = containerElement.firstChild as ChildNode;
   // get the close button for the list element
   const closeButton = containerElement.firstChild?.childNodes[1] as ChildNode;
