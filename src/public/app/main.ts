@@ -87,7 +87,7 @@ function selectData(e: Event, mapController: MapController): void {
   closeButton.addEventListener("click", function (this: ChildNode) {
     const listElement = this.parentElement as Node;
     list.removeChild(listElement);
-    parameterSelection.delete(query);
+    parameterSelection.delete(query.toLowerCase());
 
     // remove data from the map as well
     const textContent = listElement.textContent?.trim();
