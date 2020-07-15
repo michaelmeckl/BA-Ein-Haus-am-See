@@ -4,8 +4,9 @@ module.exports = {
         "mount:public": "mount public --to /",
         "mount:src": "mount src/app --to /_dist_/app",
         "mount:shared": "mount src/shared --to /_dist_/shared",
-        "run:tsc": "tsc --noEmit",
-        "run:tsc::watch": "$1 --watch",
+        //"run:tsc": "tsc --noEmit",
+        //"run:tsc::watch": "$1 --watch",
+        "run:tsc::watch": "tsc --noEmit --watch",
     },
     plugin: [],
     installOptions: {
