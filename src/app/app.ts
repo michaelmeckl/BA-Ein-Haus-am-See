@@ -1,11 +1,12 @@
 /* eslint-env browser */
 import MapController from "./mapController";
-import Benchmark from "./benchmarking";
-import { fetchAccessToken, fetchOsmData } from "./utils/networkUtils";
+import Benchmark from "../shared/benchmarking";
+import { fetchOsmData } from "./utils/networkUtils";
+import { Config } from "../shared/config";
 
 export const parameterSelection: Set<string> = new Set();
 
-const LI_TEMPLATE = document.querySelector("#li-template")?.innerHTML.trim();
+const LIST_TEMPLATE = document.querySelector("#li-template")?.innerHTML.trim();
 
 async function testVectorTileAPI(c: MapController): Promise<void> {
   const url =
@@ -72,7 +73,7 @@ function selectData(e: Event, mapController: MapController): void {
   }
 
   const containerElement = document.createElement("div");
-  containerElement.innerHTML = LI_TEMPLATE as string;
+  containerElement.innerHTML = LIST_TEMPLATE as string;
   const listEl = containerElement.firstChild as ChildNode;
   // get the close button for the list element
   const closeButton = containerElement.firstChild?.childNodes[1] as ChildNode;
@@ -87,7 +88,7 @@ function selectData(e: Event, mapController: MapController): void {
   closeButton.addEventListener("click", function (this: ChildNode) {
     const listElement = this.parentElement as Node;
     list.removeChild(listElement);
-    parameterSelection.delete(query);
+    parameterSelection.delete(query.toLowerCase());
 
     // remove data from the map as well
     const textContent = listElement.textContent?.trim();
@@ -97,12 +98,12 @@ function selectData(e: Event, mapController: MapController): void {
 
     // check if there are other list elements, if not hide selection box
     if (list.children.length === 0) {
-      selectionBox.classList.add("hidden");
+      selectionBox.classList.add(Config.CSS_HIDDEN);
     }
   });
 
   // show selection box
-  selectionBox.classList.remove("hidden");
+  selectionBox.classList.remove(Config.CSS_HIDDEN);
 }
 
 function setupUI(mapController: MapController): void {
@@ -164,12 +165,7 @@ function setupUI(mapController: MapController): void {
 
 async function init(): Promise<void> {
   try {
-    const token = await fetchAccessToken();
-    if (!token) {
-      throw new Error("Map couldn't be loaded: Invalid Mapbox Token provided!");
-    }
-
-    const mapController = new MapController(token, "map");
+    const mapController = new MapController("map");
     mapController.setupMap(setupUI);
   } catch (error) {
     console.log(error);
