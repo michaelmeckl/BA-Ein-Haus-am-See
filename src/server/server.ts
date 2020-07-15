@@ -13,6 +13,7 @@ import type { GeoJsonObject } from "geojson";
 import osmtogeojson from "osmtogeojson";
 import xmldom from "xmldom";
 import Benchmark from "../shared/benchmarking";
+import compression from "compression";
 //import pg from "pg";  //postgres
 
 // TODO:
@@ -29,27 +30,29 @@ const tileURL = endpoint
 
 const exec = Util.promisify(childProcess.exec);
 
-const corsOptions = {
-  origin: "http://localhost:8080",
-  optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
-};
-
 export default class Server {
   // Init express
-  private app = express();
+  private readonly app = express();
 
   constructor() {
+    //compress all routes to improve performance
+    this.app.use(compression());
+
     // add basic security
     this.app.use(helmet());
 
     // use an application-level middleware to add the CORS HTTP header to every request by default.
+    const corsOptions = {
+      origin: "http://localhost:8080",
+      optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
+    };
     this.app.use(cors(corsOptions));
 
     // enable request body parsing
     this.app.use(bodyParser.urlencoded({ extended: true }));
     this.app.use(bodyParser.text());
 
-    // routing
+    // setup routes
     const router = this.initRouter();
     this.app.use(router);
 
@@ -57,14 +60,14 @@ export default class Server {
     this.app.use(this.errorHandler);
 
     // catch 404; this must be at the end!
-    this.app.use(function (req, res, next) {
+    this.app.use(function (req, res) {
       res.status(HttpStatus.NOT_FOUND);
       // respond with json
       if (req.accepts("json")) {
         res.send({ error: "Not found" });
         return;
       }
-      // default to plain-text. send()
+      // default to plain-text
       res.type("txt").send("Not found");
     });
   }
@@ -82,6 +85,9 @@ export default class Server {
     });
   }
 
+  /**
+   * Init the express router and setup routes.
+   */
   initRouter(): Router {
     const router = express.Router();
 
@@ -97,10 +103,7 @@ export default class Server {
       if (bounds && query) {
         // TODO: show user some kind of progress information: progress bar or simply percentage / remaining time!
         //res.status(200).send("Got it! You sent: " + query + ",\n" + bounds);
-
-        Benchmark.startMeasure("Building Query");
         const osmQuery = this.buildOverpassQuery(bounds, query);
-        console.log(Benchmark.stopMeasure("Building Query"));
 
         try {
           Benchmark.startMeasure("Getting data from osm total");
@@ -163,21 +166,18 @@ export default class Server {
     nwr[${userQuery1}];   // in the form of ["key"~"value1|value2|value3|..."] -> no whitespace between! (regex)
     */
 
-    // TODO: what is the best output format: xml or json?
     // output-format json, runtime of max. 25 seconds (needs to be higher for more complex queries) and global bounding box
     const querySettings = `[out:json][timeout:25][bbox:${bounds}];`;
 
-    const output = "out geom qt;";
+    const output = "out geom qt;"; // use "qt" to sort by quadtile index (sorts by location and is faster than sort by id)
+
     /*
-    // output (default) body then use recurse down ">;" (to resolve ways into nodes and relations into nodes and ways)
-    // and output only the necessary infos (skel), also use "qt" to sort by quadtile index (sorts by location and is faster than sort by id)
     const output1 = "out;>;out skel qt;";;
     const output2 = "out geom qt;>;out skel qt;";
     const output3 = "out geom qt;<;out skel qt;";
     */
 
     const query = `${querySettings}(${request});${output}`;
-
     return query;
   }
 
@@ -202,7 +202,7 @@ export default class Server {
     //const response = await axios.get(`http://192.168.99.101:12345/api/interpreter?${params}`);
     console.log(Benchmark.stopMeasure("Overpass API Request"));
 
-    console.log(response.data);
+    //console.log(response.data);
     const contentType = response.headers["content-type"];
 
     if (contentType.endsWith("json")) {
@@ -280,9 +280,11 @@ export default class Server {
     }
   }
 
+  /**
+   * Returns a string identifying the operating system platform. The value is set at compile time.
+   * Possible values are 'aix', 'darwin', 'freebsd', 'linux', 'openbsd', 'sunos', and 'win32'.
+   */
   getPlatform(): string {
-    // Returns a string identifying the operating system platform. The value is set at compile time.
-    // Possible values are 'aix', 'darwin', 'freebsd', 'linux', 'openbsd', 'sunos', and 'win32'.
     return os.platform();
   }
 }
