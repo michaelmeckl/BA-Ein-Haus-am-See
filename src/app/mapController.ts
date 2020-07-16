@@ -2,12 +2,12 @@
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import * as webglUtils from "./utils/webglUtils";
 import * as mapboxUtils from "./utils/mapboxUtils";
+import { fetchOsmData } from "./utils/networkUtils";
 import Benchmark from "../shared/benchmarking";
 import { chunk } from "lodash";
 import FrameRateControl from "./vendors/mapbox-gl-framerate";
 import MapboxFPS = require("./vendors/MapboxFPS");
 import { parameterSelection } from "./main";
-import { fetchOsmData } from "./utils/networkUtils";
 import { Config } from "../shared/config";
 //import U from "mapbox-gl-utils";
 
@@ -150,6 +150,24 @@ export default class MapController {
     const eastLng = currBounds.getEast();
 
     return `${southLat},${westLng},${northLat},${eastLng}`;
+  }
+
+  testX(): void {
+    this.map.addSource("vector", {
+      type: "vector",
+      tiles: ["./assets/ny_extract.osm.pbf"],
+    });
+
+    /*
+    this.map.addLayer({
+      id: "vector",
+      type: "line",
+      source: "vector",
+      "source-layer": "state",
+      paint: {
+        "line-color": "#ff69b4",
+      },
+    });*/
   }
 
   addVectorData(data: string): void {
