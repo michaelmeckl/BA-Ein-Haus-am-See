@@ -3,28 +3,31 @@
     "target": "es6",
     "module": "commonjs",
     "lib": [
-      "es2019",
+      "esnext",
       "es6",
       "dom",
       "dom.iterable",
     ],
     "allowJs": true,
-    "rootDir": ".",
+    //"allowSyntheticDefaultImports": true,
     "declaration": false,
-    "strict": true,
     "esModuleInterop": true,
+    "importsNotUsedAsValues": "error",
     "moduleResolution": "node",
+    /* noEmit - We only use TypeScript for type checking not compiling. */
+    "noEmit": true,
+    //"noImplicitAny": false
+    "pretty": true,
     "resolveJsonModule": true,
+    "rootDir": ".",
     "skipLibCheck": true,
     "sourceMap": false,
-    //"noImplicitAny": false
+    "strict": true,
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.tsx",
   ],
   "exclude": [
     "node_modules",
-    "build"
   ]
 }

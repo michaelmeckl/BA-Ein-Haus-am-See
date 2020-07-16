@@ -2,22 +2,23 @@
 import express, { Request, Response, NextFunction, Router } from "express";
 import path from "path";
 import cors from "cors";
-//import pg from "pg";  //postgres
 import bodyParser from "body-parser";
 import helmet from "helmet";
 import os from "os";
 import childProcess from "child_process";
+import { OK, NOT_FOUND, INTERNAL_SERVER_ERROR } from "http-status-codes";
+import compression from "compression";
 import Util from "util";
 import axios from "axios";
 import querystring from "querystring";
-import { GeoJsonObject } from "geojson";
+import type { GeoJsonObject } from "geojson";
 import osmtogeojson from "osmtogeojson";
 import xmldom from "xmldom";
-import Benchmark from "../public/app/benchmarking";
+import Benchmark from "../shared/benchmarking";
+//import pg from "pg";  //postgres
 
-const RESPONSE_OK = 200;
-const NOT_FOUND = 404;
-const INTERNAL_SERVER_ERROR = 500;
+const staticDir = path.join(__dirname, "../", "app"); // folder with client files
+const publicDir = path.join(__dirname, "../../", "public"); // folder with static files
 
 // TODO:
 /*
@@ -32,30 +33,36 @@ const tileURL = endpoint
   */
 
 const exec = Util.promisify(childProcess.exec);
-
-const staticDir = path.join(__dirname, "../", "public"); // folder with client files
-
 export default class Server {
   // Init express
-  private app = express();
+  private readonly app = express();
 
   constructor() {
+    //compress all routes to improve performance
+    this.app.use(compression());
+
     // add basic security
     this.app.use(helmet());
+
+    // use an application-level middleware to add the CORS HTTP header to every request by default.
+    const localhostAddress = "http://localhost:8000";
+    const corsOptions = {
+      origin: localhostAddress,
+      optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
+    };
+    this.app.use(cors(corsOptions));
 
     // enable request body parsing
     this.app.use(bodyParser.urlencoded({ extended: true }));
     this.app.use(bodyParser.text());
 
     // serve front-end content
+    this.app.use(express.static(publicDir));
     this.app.use(express.static(staticDir));
 
-    // routing
+    // setup routes
     const router = this.initRouter();
     this.app.use(router);
-
-    // use an application-level middleware to add the CORS HTTP header to every request by default.
-    //this.app.use(cors());
 
     // error handling
     this.app.use(this.errorHandler);
@@ -68,7 +75,7 @@ export default class Server {
         res.send({ error: "Not found" });
         return;
       }
-      // default to plain-text. send()
+      // default to plain-text
       res.type("txt").send("Not found");
     });
   }
@@ -82,18 +89,15 @@ export default class Server {
         return console.error(err);
       }
 
-      return console.log(`Server started. Client available at http://localhost:${port}`);
+      return console.log(`Server started at http://localhost:${port}`);
     });
   }
 
+  /**
+   * Init the express router and setup routes.
+   */
   initRouter(): Router {
     const router = express.Router();
-
-    router.get("/", (req: Request, res: Response) => res.render("index"));
-
-    router.get("/token", (req: Request, res: Response) => {
-      return res.send(process.env.MAPBOX_TOKEN);
-    });
 
     router.get("/osmRequest", async (req: Request, res: Response, next: NextFunction) => {
       const bounds = req.query.bounds?.toString();
@@ -117,7 +121,7 @@ export default class Server {
           const geoData = await this.getDataFromOSM(osmQuery);
           console.log(Benchmark.stopMeasure("Getting data from osm total"));
 
-          return res.status(RESPONSE_OK).send(geoData);
+          return res.status(OK).send(geoData);
         } catch (error) {
           if (error.response) {
             // send error status to client
@@ -154,7 +158,6 @@ export default class Server {
 
   /**
    * Builds a query for the overpass api to fetch osm data as GeoJson in the given map bounds.
-   * See https://andreas-bruns.com/2014/11/30/openstreetmap-daten-abfragen-mit-der-overpass-api/.
    */
   buildOverpassQuery(bounds: string, userQuery: string): string {
     // shorthand for query instead of 3 separate ones (nwr = node, way, relation)
@@ -177,17 +180,15 @@ export default class Server {
     // output-format json, runtime of max. 25 seconds (needs to be higher for more complex queries) and global bounding box
     const querySettings = `[out:json][timeout:25][bbox:${bounds}];`;
 
+    // use "qt" to sort by quadtile index (sorts by location and is faster than sort by id)
     const output = "out geom qt;";
     /*
-    // output (default) body then use recurse down ">;" (to resolve ways into nodes and relations into nodes and ways)
-    // and output only the necessary infos (skel), also use "qt" to sort by quadtile index (sorts by location and is faster than sort by id)
     const output1 = "out;>;out skel qt;";;
     const output2 = "out geom qt;>;out skel qt;";
     const output3 = "out geom qt;<;out skel qt;";
     */
 
     const query = `${querySettings}(${request});${output}`;
-
     return query;
   }
 
@@ -212,7 +213,7 @@ export default class Server {
     //const response = await axios.get(`http://192.168.99.101:12345/api/interpreter?${params}`);
     console.log(Benchmark.stopMeasure("Overpass API Request"));
 
-    console.log(response.data);
+    //console.log(response.data);
     const contentType = response.headers["content-type"];
 
     if (contentType.endsWith("json")) {
@@ -290,9 +291,11 @@ export default class Server {
     }
   }
 
+  /**
+   * Returns a string identifying the operating system platform. The value is set at compile time.
+   * Possible values are 'aix', 'darwin', 'freebsd', 'linux', 'openbsd', 'sunos', and 'win32'.
+   */
   getPlatform(): string {
-    // Returns a string identifying the operating system platform. The value is set at compile time.
-    // Possible values are 'aix', 'darwin', 'freebsd', 'linux', 'openbsd', 'sunos', and 'win32'.
     return os.platform();
   }
 }

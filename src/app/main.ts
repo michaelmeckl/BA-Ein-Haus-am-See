@@ -1,6 +1,6 @@
 /* eslint-env browser */
 import MapController from "./mapController";
-import Benchmark from "./benchmarking";
+import Benchmark from "../shared/benchmarking";
 import { fetchAccessToken, fetchOsmData } from "./utils/networkUtils";
 
 export const parameterSelection: Set<string> = new Set();
@@ -164,12 +164,7 @@ function setupUI(mapController: MapController): void {
 
 async function init(): Promise<void> {
   try {
-    const token = await fetchAccessToken();
-    if (!token) {
-      throw new Error("Map couldn't be loaded: Invalid Mapbox Token provided!");
-    }
-
-    const mapController = new MapController(token, "map");
+    const mapController = new MapController("map");
     mapController.setupMap(setupUI);
   } catch (error) {
     console.log(error);

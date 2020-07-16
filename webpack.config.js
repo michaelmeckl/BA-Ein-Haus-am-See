@@ -11,11 +11,11 @@ module.exports = {
     mode: "development",
     devtool: "none",
     entry: [
-        "./src/public/app/main.ts",
+        "./src/app/main.ts",
     ],
     output: {
         filename: "bundle.js",
-        path: path.resolve(__dirname, "src/public/dist"),
+        path: path.resolve(__dirname, "./public/dist"),
         pathinfo: false,
     },
     resolve: {

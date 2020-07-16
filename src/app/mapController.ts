@@ -2,12 +2,13 @@
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import * as webglUtils from "./utils/webglUtils";
 import * as mapboxUtils from "./utils/mapboxUtils";
-import Benchmark from "./benchmarking";
+import Benchmark from "../shared/benchmarking";
 import { chunk } from "lodash";
-import FrameRateControl from "../libs/mapbox-gl-framerate";
-import MapboxFPS = require("../libs/MapboxFPS");
+import FrameRateControl from "./vendors/mapbox-gl-framerate";
+import MapboxFPS = require("./vendors/MapboxFPS");
 import { parameterSelection } from "./main";
 import { fetchOsmData } from "./utils/networkUtils";
+import { Config } from "../shared/config";
 //import U from "mapbox-gl-utils";
 
 export default class MapController {
@@ -15,11 +16,11 @@ export default class MapController {
   private defaultCoordinates: [number, number];
   //private mapUtils: any;
 
-  constructor(accessToken: string, containerId: string) {
+  constructor(containerId: string) {
     mapboxUtils.checkGLSupport();
 
     // provide Mapbox accessToken
-    mapboxgl.accessToken = accessToken;
+    mapboxgl.accessToken = Config.MAPBOX_TOKEN;
 
     // default api to request tiles, styles, ...
     // could be used to load tiles from own tileserver
@@ -218,7 +219,7 @@ export default class MapController {
       buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 0.45, // higher means simpler geometries and increased performance
       data: data, // url or inline geojson
-      //data: "./data.geojson",
+      //data: "../assets/data.geojson",
     });
 
     this.addLayers(sourceName);
