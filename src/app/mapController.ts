@@ -9,8 +9,13 @@ import FrameRateControl from "./vendors/mapbox-gl-framerate";
 import MapboxFPS = require("./vendors/MapboxFPS");
 import { parameterSelection } from "./main";
 import { Config } from "../shared/config";
-import { mat4 } from "gl-matrix";
 import { addWebglCircle } from "./utils/webglCircle";
+import shortestPath from "@turf/shortest-path";
+import sector from "@turf/sector";
+import buffer from "@turf/buffer";
+import circle from "@turf/circle";
+import intersect from "@turf/intersect";
+import * as turfHelpers from "@turf/helpers";
 //import U from "mapbox-gl-utils";
 
 export default class MapController {
@@ -83,6 +88,10 @@ export default class MapController {
 
       this.map.on("moveend", async () => {
         console.log("Move end event fired!");
+        // show current zoom level
+        console.log("ZoomLevel:");
+        console.log(this.map.getZoom());
+
         /*
         //TODO: test
         const features = this.map.queryRenderedFeatures({ layers: ["points-l1"] });
@@ -93,7 +102,8 @@ export default class MapController {
         }
         */
 
-        //TODO: load data new on every move
+        /*
+        //TODO: load data new on every move, works but needs another source than overpass api mirror
         parameterSelection.forEach(async (param) => {
           Benchmark.startMeasure("Fetching data on moveend");
           const data = await fetchOsmData(this.getViewportBounds(), param);
@@ -108,6 +118,7 @@ export default class MapController {
             console.log("Finished adding data to map!");
           }
         });
+        */
 
         mapboxUtils.getPointsInRadius(this.map);
       });
@@ -122,7 +133,166 @@ export default class MapController {
 
     this.map.on("click", (e) => {
       console.log("Click:", e);
-      addWebglCircle(this.map);
+
+      this.testTurfFunctions();
+      //addWebglCircle(this.map);
+    });
+  }
+
+  testTurfFunctions(): void {
+    const start = [12.089283, 48.9920256];
+    const end = [12.0989967, 49.0016276];
+    const point = [12.132873153688053, 49.01678217405953];
+    this.addTurfPath(start, end);
+
+    const firstSector = this.addTurfSector(start, 0.6, "sector1");
+    const secondSector = this.addTurfSector(end, 1, "sector2");
+
+    //this.addTurfIntersection(firstSector, secondSector);
+    this.addTurfBuffer(firstSector);
+    this.addTurfCircle(point);
+  }
+
+  addTurfBuffer(p): void {
+    const point = turfHelpers.point(p);
+    const buff = buffer(p, 1.4, { units: "kilometers" });
+    console.log(buff);
+    const source = "turfBuffer";
+    this.removeData(source);
+
+    this.map.addSource(source, {
+      type: "geojson",
+      data: buff,
+    });
+    this.map.addLayer({
+      id: source,
+      type: "line",
+      source: source,
+      paint: {
+        "line-width": 2,
+        "line-color": "#ff0000",
+      },
+    });
+    this.map.addLayer({
+      id: source + "f",
+      type: "fill",
+      source: source,
+      paint: {
+        "fill-color": "rgba(255, 0, 0, 0)",
+      },
+    });
+  }
+
+  addTurfCircle(p): void {
+    const kreis = circle(p, 1.4);
+    const source = "turfCircle";
+    this.removeData(source);
+
+    this.map.addSource(source, {
+      type: "geojson",
+      data: kreis,
+    });
+    this.map.addLayer({
+      id: "l",
+      type: "line",
+      source: source,
+      paint: {
+        "line-width": 2,
+        "line-color": "#0000ff",
+      },
+    });
+    this.map.addLayer({
+      id: "f",
+      type: "fill",
+      source: source,
+      paint: {
+        "fill-color": "rgba(255, 0, 0, 0)",
+      },
+    });
+  }
+
+  addTurfIntersection(s1, s2): void {
+    //TODO: doesn't work for some reason
+    const intersection = intersect(s1, s2);
+    const source = "turfIntersection";
+    this.removeData(source);
+
+    this.map.addSource(source, {
+      type: "geojson",
+      data: intersection,
+    });
+    this.map.addLayer({
+      id: "l",
+      type: "line",
+      source: source,
+      paint: {
+        "line-width": 2,
+        "line-color": "#ff0000",
+      },
+    });
+    this.map.addLayer({
+      id: "f",
+      type: "fill",
+      source: source,
+      paint: {
+        "fill-color": "rgb(255, 0, 0)",
+      },
+    });
+  }
+
+  addTurfSector(center, radius, name): any {
+    //const radius = 0.2; // in kilometer, 0.2 == 200 m
+    const bearing1 = 0;
+    const bearing2 = 360;
+
+    const circle = sector(center, radius, bearing1, bearing2);
+
+    const source = name;
+    this.removeData(source);
+
+    this.map.addSource(source, {
+      type: "geojson",
+      data: circle,
+    });
+    this.map.addLayer({
+      id: name + "ttt-l",
+      type: "line",
+      source: source,
+      paint: {
+        "line-width": 1,
+      },
+    });
+    this.map.addLayer({
+      id: name + "ttt-f",
+      type: "fill",
+      source: source,
+      paint: {
+        "fill-color": "rgba(127, 127, 127, 0.3)",
+      },
+    });
+
+    return circle;
+  }
+
+  addTurfPath(start, end): void {
+    const options = {
+      resolution: 100,
+    };
+    const path = shortestPath(start, end, options);
+    const sourceLine = "turfShortestPath";
+    this.removeData(sourceLine);
+
+    this.map.addSource(sourceLine, {
+      type: "geojson",
+      data: path,
+    });
+    this.map.addLayer({
+      id: "line",
+      type: "line",
+      source: sourceLine,
+      paint: {
+        "line-color": "#66dddd",
+      },
     });
   }
 
@@ -208,6 +378,9 @@ export default class MapController {
   }
 
   removeData(sourceName: string): void {
+    if (!this.map.getSource(sourceName)) {
+      return;
+    }
     mapboxUtils.removeAllLayersForSource(this.map, sourceName);
     this.map.removeSource(sourceName);
   }
