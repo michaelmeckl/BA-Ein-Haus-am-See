@@ -40,6 +40,57 @@ export function getPointsInRadius(map: mapboxgl.Map) {
   });
 }
 
+function addIconLayer(map: mapboxgl.Map, sourceName: string): void {
+  map.addLayer({
+    id: sourceName + "-symbol",
+    type: "symbol",
+    source: sourceName,
+    layout: {
+      "icon-image": [
+        "match",
+        ["get", "amenity", ["get", "tags"]],
+        "bar",
+        "bar-11",
+        "marker-11", // other
+      ],
+      "icon-allow-overlap": true,
+    },
+  });
+}
+
+function getNearestPoint(map: mapboxgl.Map): void {
+  map.on("click", function (e: mapboxgl.MapMouseEvent) {
+    const libraryFeatures = map.queryRenderedFeatures(e.point, { layers: ["libraries"] });
+    if (!libraryFeatures.length) {
+      return;
+    }
+
+    const libraryFeature = libraryFeatures[0];
+
+    const nearestHospital = turf.nearest(libraryFeature, hospitals);
+
+    if (nearestHospital !== null) {
+      map.getSource("nearest-hospital").setData({
+        type: "FeatureCollection",
+        features: [nearestHospital],
+      });
+
+      map.addLayer(
+        {
+          id: "nearest-hospital",
+          type: "circle",
+          source: "nearest-hospital",
+          paint: {
+            "circle-radius": 12,
+            "circle-color": "#486DE0",
+          },
+        },
+        "hospitals"
+      );
+    }
+  });
+}
+
 //TODO: or use a set instead
 // called like this:
 /*

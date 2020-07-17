@@ -9,6 +9,8 @@ import FrameRateControl from "./vendors/mapbox-gl-framerate";
 import MapboxFPS = require("./vendors/MapboxFPS");
 import { parameterSelection } from "./main";
 import { Config } from "../shared/config";
+import { mat4 } from "gl-matrix";
+import { addWebglCircle } from "./utils/webglCircle";
 //import U from "mapbox-gl-utils";
 
 export default class MapController {
@@ -120,6 +122,7 @@ export default class MapController {
 
     this.map.on("click", (e) => {
       console.log("Click:", e);
+      addWebglCircle(this.map);
     });
   }
 
@@ -380,17 +383,7 @@ export default class MapController {
     */
   }
 
-  addWebGlLayer(): void {
-    if (this.map.getLayer("webglCustom")) {
-      this.map.removeLayer("webglCustom");
-    }
-
-    console.log("adding webgl data...");
-
-    let program: WebGLProgram;
-    let aPos: number;
-    let buffer: WebGLBuffer | null;
-
+  getDataFromMap() {
     // define vertices to be rendered in the custom style layer
     const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat({
       lng: 12.089283,
@@ -468,6 +461,21 @@ export default class MapController {
     //const customData = [uniNorthEast.x, uniNorthEast.y, uniSouthWest.x, uniSouthWest.y];
     const customData = MercatorCoordinates.flatMap((x) => [x.x, x.y]);
     console.log(customData);
+    return customData;
+  }
+
+  addWebGlLayer(): void {
+    if (this.map.getLayer("webglCustom")) {
+      this.map.removeLayer("webglCustom");
+    }
+
+    console.log("adding webgl data...");
+
+    let program: WebGLProgram;
+    let aPos: number;
+    let buffer: WebGLBuffer | null;
+
+    const customData = this.getDataFromMap();
 
     const glCustomLayer: CustomLayerInterface = {
       id: "webglCustom",
