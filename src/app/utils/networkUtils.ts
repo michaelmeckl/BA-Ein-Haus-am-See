@@ -40,21 +40,25 @@ function buildOverpassQuery(bounds: string, userQuery: string): string {
 export async function fetchOsmData(mapBounds: string, query: string): Promise<any> {
   try {
     console.log("sending request!");
-    Benchmark.startMeasure("Request client side");
-
     const overpassQuery = new URLSearchParams({
       data: buildOverpassQuery(mapBounds, query),
     });
+
+    Benchmark.startMeasure("Request client side");
+    // online overpass api
     const url = `https://overpass-api.de/api/interpreter?${overpassQuery}`;
+
+    // local overpass api (docker image)
+    //const url = `https://192.168.99.100:12345/api/interpreter?${overpassQuery}`;
 
     const response = await axios.get(url);
     console.log(Benchmark.stopMeasure("Request client side"));
 
-    console.log(response);
-    const osmData = await response.data;
+    //console.log(response);
+    //console.log(await Benchmark.getAverageTime(osmtogeojson, [response.data]));
 
     Benchmark.startMeasure("o2geo client");
-    const geoJson = osmtogeojson(osmData);
+    const geoJson = osmtogeojson(response.data);
     Benchmark.stopMeasure("o2geo client");
 
     return geoJson;

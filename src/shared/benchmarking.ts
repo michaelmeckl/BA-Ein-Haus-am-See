@@ -1,5 +1,6 @@
 //import { performance } from "perf_hooks";
 
+const NUMBER_OF_EXECUTIONS = 50;
 /**
  * Singleton-Class for measuring execution time.
  */
@@ -50,6 +51,26 @@ class Benchmark {
     */
     console.timeEnd(actionName);
     return "";
+  }
+
+  public async getAverageTime(
+    fn: (...args: any[]) => any,
+    args: any[],
+    n = NUMBER_OF_EXECUTIONS
+  ): Promise<number> {
+    const times: number[] = [];
+
+    for (let index = 0; index < n; index++) {
+      const start = performance.now();
+      await fn(...args);
+      const taken = performance.now() - start;
+      console.log(taken);
+      times.push(taken);
+    }
+
+    const average = times.reduce((prev, curr) => prev + curr, 0) / times.length;
+    console.log(`Average time taken over ${n} executions: ${average} milliseconds`);
+    return average;
   }
 }
 
