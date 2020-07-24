@@ -1,5 +1,5 @@
 /* eslint-env browser */
-import MapController from "./mapController";
+import MapController from "./map/mapController";
 import Benchmark from "../shared/benchmarking";
 import { fetchOsmData } from "./utils/networkUtils";
 import { Config } from "../shared/config";
@@ -166,7 +166,7 @@ function setupUI(mapController: MapController): void {
 
 async function init(): Promise<void> {
   try {
-    const mapController = new MapController("map");
+    const mapController = new MapController();
     mapController.setupMap(setupUI);
   } catch (error) {
     console.log(error);

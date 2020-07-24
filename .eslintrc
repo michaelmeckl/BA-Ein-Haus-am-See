@@ -20,7 +20,7 @@
     "prettier"
   ],
   "rules": {
-    "block-scoped-var": "error",
+    "block-scoped-var": "warn",
     "camelcase": "warn",
     "comma-dangle": ["warn", "always-multiline"],
     "consistent-return": "error",

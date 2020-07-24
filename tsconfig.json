@@ -12,6 +12,7 @@
     //"allowSyntheticDefaultImports": true,
     "declaration": false,
     "esModuleInterop": true,
+    "importHelpers": true,
     "importsNotUsedAsValues": "error",
     "moduleResolution": "node",
     /* noEmit - We only use TypeScript for type checking not compiling. */

@@ -2,42 +2,89 @@
  * Utility-Methods for working with Mapbox Gl.
  */
 import mapboxgl, { GeoJSONSource } from "mapbox-gl";
+import { map } from "../map/mapConfig";
+import { parameterSelection } from "../main";
+import { chunk } from "lodash";
+import cleanCoords from "@turf/clean-coords";
+import { addTurfCircle } from "../map/mapFunctions";
 
-/**
- * Utility function to check whether MapboxGl (and WebGL) are supported in the browser.
- */
-export function checkGLSupport(): void {
-  if (!mapboxgl.supported()) {
-    throw new Error("Your browser does not support Mapbox GL!");
+export function getDataforFeaturesInSelection() {
+  console.log(parameterSelection.entries);
+
+  const allGeoData: mapboxgl.MapboxGeoJSONFeature[] = [];
+  for (const el of parameterSelection) {
+    const features = map.querySourceFeatures(el);
+    allGeoData.push(...features);
   }
+
+  //TODO: doesn'T work
+  console.log(allGeoData);
+  allGeoData.forEach((li) => {
+    const newData = cleanCoords(li);
+    console.log(newData);
+  });
+  //const newData = cleanCoords(allGeoData);
+  //console.log(newData);
+
+  return allGeoData;
 }
 
-//TODO: get all points in a distance around click
-export function getPointsInRadius(map: mapboxgl.Map) {
-  // map click handler
-  map.on("click", (e) => {
-    /*
-    const cluster: mapboxgl.MapboxGeoJSONFeature[] = this.map.queryRenderedFeatures(e.point, {
-      layers: ["points-l1"],
-    });
-    */
-    const cluster: mapboxgl.MapboxGeoJSONFeature[] = map.queryRenderedFeatures(e.point);
+export function getDataFromMap() {
+  const allGeoData = getDataforFeaturesInSelection();
+  console.log("QuerySourceFeatures: ");
+  console.log(allGeoData);
 
-    console.log(cluster[0]);
+  //console.log(...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3)));
+  const testData: number[] = [].concat(
+    ...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))
+  );
+  console.log(testData);
+  const newArray = chunk(testData, 2);
+  console.log("newArray after lodash:", newArray);
 
-    if (cluster[0]) {
-      const clusterRadius = 50; //TODO: woher radius?
-
-      const pointsInCluster = features.filter((f) => {
-        const pointPixels = map.project(f.geometry.coordinates);
-        const pixelDistance = Math.sqrt(
-          Math.pow(e.point.x - pointPixels.x, 2) + Math.pow(e.point.y - pointPixels.y, 2)
-        );
-        return Math.abs(pixelDistance) <= clusterRadius;
-      });
-      console.log(cluster, pointsInCluster);
-    }
+  //TODO: remove me later
+  newArray.forEach((element) => {
+    addTurfCircle(element, 0.5);
   });
+
+  const MercatorCoordinates = newArray.map((el) => mapboxgl.MercatorCoordinate.fromLngLat(el));
+  console.log("Mercator:", MercatorCoordinates);
+  /*
+    console.log([].concat(...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))));
+    console.log(allGeoData.flatMap((el) => [].concat(el.geometry.coordinates.flat(3))));
+
+    console.log(allGeoData.flatMap((el) => [].concat(...el.geometry.coordinates.flat(3))));
+    console.log(
+      allGeoData.flatMap((el) =>
+        [].concat(...el.geometry.coordinates.flatMap((li) => [li.x, li.y]))
+      )
+    );
+    */
+
+  //TODO
+  /*
+    allGeoData.forEach((el) => {
+      console.log(el.properties?.type);
+      console.log(el.geometry.coordinates);
+      console.log(...el.geometry.coordinates);
+    });
+
+    for (const el of allGeoData) {
+      console.log(...this.flatten(el.geometry.coordinates));
+    }
+    */
+
+  //const test = mapboxgl.MercatorCoordinate.fromLngLat({geoData});
+
+  /*
+    const data = [uniSouthWest, uniSouthEast, uniNorthWest, uniNorthEast];
+    const flatData = data.flatMap((x) => [x.x, x.y]);
+    */
+
+  //const customData = [uniNorthEast.x, uniNorthEast.y, uniSouthWest.x, uniSouthWest.y];
+  const customData = MercatorCoordinates.flatMap((x) => [x.x, x.y]);
+  console.log(customData);
+  return customData;
 }
 
 function addIconLayer(map: mapboxgl.Map, sourceName: string): void {
@@ -56,65 +103,6 @@ function addIconLayer(map: mapboxgl.Map, sourceName: string): void {
       "icon-allow-overlap": true,
     },
   });
-}
-
-function getNearestPoint(map: mapboxgl.Map): void {
-  map.on("click", function (e: mapboxgl.MapMouseEvent) {
-    const libraryFeatures = map.queryRenderedFeatures(e.point, { layers: ["libraries"] });
-    if (!libraryFeatures.length) {
-      return;
-    }
-
-    const libraryFeature = libraryFeatures[0];
-
-    const nearestHospital = turf.nearest(libraryFeature, hospitals);
-
-    if (nearestHospital !== null) {
-      map.getSource("nearest-hospital").setData({
-        type: "FeatureCollection",
-        features: [nearestHospital],
-      });
-
-      map.addLayer(
-        {
-          id: "nearest-hospital",
-          type: "circle",
-          source: "nearest-hospital",
-          paint: {
-            "circle-radius": 12,
-            "circle-color": "#486DE0",
-          },
-        },
-        "hospitals"
-      );
-    }
-  });
-}
-
-//TODO: or use a set instead
-// called like this:
-/*
-var features = map.queryRenderedFeatures({ layers: ['airport'] });
- 
-if (features) {
-    var uniqueFeatures = getUniqueFeatures(features, 'iata_code');
-}
-*/
-export function getUniqueFeatures(array, comparatorProperty) {
-  const existingFeatureKeys = {};
-  // Because features come from tiled vector data, feature geometries may be split
-  // or duplicated across tile boundaries and, as a result, features may appear
-  // multiple times in query results.
-  const uniqueFeatures = array.filter(function (el) {
-    if (existingFeatureKeys[el.properties[comparatorProperty]]) {
-      return false;
-    } else {
-      existingFeatureKeys[el.properties[comparatorProperty]] = true;
-      return true;
-    }
-  });
-
-  return uniqueFeatures;
 }
 
 /**
