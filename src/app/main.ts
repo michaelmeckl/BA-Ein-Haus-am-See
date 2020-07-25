@@ -1,7 +1,7 @@
 /* eslint-env browser */
 import MapController from "./map/mapController";
 import Benchmark from "../shared/benchmarking";
-import { fetchOsmData } from "./utils/networkUtils";
+import { fetchOsmData } from "./network/networkUtils";
 import { Config } from "../shared/config";
 import OsmTags from "./model/osmTagCollection";
 

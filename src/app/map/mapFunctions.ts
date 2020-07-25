@@ -3,7 +3,7 @@
 import { map } from "./mapConfig";
 import type { Point } from "geojson";
 import shortestPath from "@turf/shortest-path";
-import * as mapboxUtils from "../utils/mapboxUtils";
+import * as mapboxUtils from "./mapboxUtils";
 import sector from "@turf/sector";
 import buffer from "@turf/buffer";
 import circle from "@turf/circle";

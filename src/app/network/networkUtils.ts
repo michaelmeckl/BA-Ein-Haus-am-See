@@ -73,13 +73,13 @@ export async function fetchOsmData(mapBounds: string, query: string): Promise<an
 export async function fetchOsmData(mapBounds: string, query: string): Promise<string | null> {
   try {
     console.log("sending request!");
-    Benchmark.startMeasure("Request client side");
     const params = new URLSearchParams({
       bounds: mapBounds,
       osmQuery: query,
     });
     const url = "/osmRequest?" + params;
 
+    Benchmark.startMeasure("Request client side");
     const response = await fetch(url, {
       method: "GET",
     });

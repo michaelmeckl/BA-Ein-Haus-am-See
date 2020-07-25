@@ -3,17 +3,17 @@
 // e.g. const circle = await import("@turf/circle");
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import { map } from "./mapConfig";
-import * as webglUtils from "../utils/webglUtils";
-import * as mapboxUtils from "../utils/mapboxUtils";
+import * as webglUtils from "../webgl/webglUtils";
+import * as mapboxUtils from "./mapboxUtils";
 import Benchmark from "../../shared/benchmarking";
 import { chunk } from "lodash";
 import FrameRateControl from "../vendors/mapbox-gl-framerate";
 import MapboxFPS = require("../vendors/MapboxFPS");
 import { parameterSelection } from "../main";
 import { Config } from "../../shared/config";
-import { addWebglCircle } from "../utils/webglCircle";
+import { addWebglCircle } from "../webgl/webglCircle";
 import { testTurfFunctions, getPointsInRadius } from "./mapFunctions";
-import { getDataFromMap } from "../utils/mapboxUtils";
+import { getDataFromMap } from "./mapboxUtils";
 import { loadSidebar, sortDistances } from "./mapStoreTest";
 
 export default class MapController {
