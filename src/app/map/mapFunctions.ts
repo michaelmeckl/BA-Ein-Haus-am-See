@@ -41,6 +41,7 @@ function getUniqueFeatures(array, comparatorProperty) {
 }
 */
 
+//TODO duplicate
 function removeData(sourceName: string): void {
   if (!map.getSource(sourceName)) {
     return;

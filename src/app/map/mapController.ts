@@ -14,7 +14,7 @@ import { Config } from "../../shared/config";
 import { addWebglCircle } from "../utils/webglCircle";
 import { testTurfFunctions, getPointsInRadius } from "./mapFunctions";
 import { getDataFromMap } from "../utils/mapboxUtils";
-import { loadSidebar } from "./mapStoreTest";
+import { loadSidebar, sortDistances } from "./mapStoreTest";
 
 export default class MapController {
   setupMap(callbackFunc: (controller: this) => void): void {
@@ -104,6 +104,9 @@ export default class MapController {
 
     map.on("click", (e) => {
       console.log("Click:", e);
+
+      //TODO not working rigth now
+      //sortDistances(e.lngLat);
 
       testTurfFunctions();
       //addWebglCircle(map);

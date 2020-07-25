@@ -1,6 +1,8 @@
 import type { FeatureCollection } from "geojson";
-import mapboxgl from "mapbox-gl";
+import mapboxgl, { LngLatLike, LngLat } from "mapbox-gl";
 import { map } from "./mapConfig";
+import distance from "@turf/distance";
+import * as turfHelpers from "@turf/helpers";
 
 const stores = {
   type: "FeatureCollection",
@@ -318,6 +320,11 @@ function buildLocationList(data) {
       details.innerHTML += " · " + prop.phoneFormatted;
     }
 
+    if (prop.distance) {
+      const roundedDistance = Math.round(prop.distance * 100) / 100;
+      details.innerHTML += "<p><strong>" + roundedDistance + " kilometers away</strong></p>";
+    }
+
     /**
      * Listen to the element and when it is clicked, do four things:
      * 1. Update the `currentFeature` to the store associated with the clicked link
@@ -342,24 +349,86 @@ function buildLocationList(data) {
   });
 }
 
-/**
- * Wait until the map loads to make changes to the map.
- */
+function getBbox(sortedStores, storeIdentifier, searchResult) {
+  const lats = [sortedStores.features[storeIdentifier].geometry.coordinates[1], searchResult.y];
+  const lons = [sortedStores.features[storeIdentifier].geometry.coordinates[0], searchResult.x];
+  const sortedLons = lons.sort(function (a, b) {
+    if (a > b) {
+      return 1;
+    }
+    if (a.distance < b.distance) {
+      return -1;
+    }
+    return 0;
+  });
+  const sortedLats = lats.sort(function (a, b) {
+    if (a > b) {
+      return 1;
+    }
+    if (a.distance < b.distance) {
+      return -1;
+    }
+    return 0;
+  });
+  return [
+    [sortedLons[0], sortedLats[0]],
+    [sortedLons[1], sortedLats[1]],
+  ];
+}
+
+export function sortDistances(point: LngLat): void {
+  console.log(point);
+  const clickedPoint = turfHelpers.point(point);
+  console.log(clickedPoint);
+
+  const options = { units: "kilometers" };
+  stores.features.forEach(function (store) {
+    Object.defineProperty(store.properties, "distance", {
+      //value: distance(clickedPoint, store.geometry, options),
+      value: point.distanceTo(store.geometry.coordinates),
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  });
+
+  stores.features.sort(function (a, b) {
+    if (a.properties.distance > b.properties.distance) {
+      return 1;
+    }
+    if (a.properties.distance < b.properties.distance) {
+      return -1;
+    }
+    return 0; // a must be equal to b
+  });
+
+  //TODO wouldn't sort be enough? instead of rebuilding everything?
+  // then there needs to be a distance property on each geojson from the beginning to be sortable
+  const listings = document.getElementById("listings");
+  while (listings?.firstChild) {
+    listings.removeChild(listings.firstChild);
+  }
+  buildLocationList(stores);
+
+  const bbox = getBbox(stores, 0, point);
+  map.fitBounds(bbox, {
+    padding: 100,
+  });
+
+  createPopUp(stores.features[0]);
+
+  const activeListing = document.getElementById("listing-" + stores.features[0].properties.id);
+  activeListing?.classList.add("active");
+}
+
 export function loadSidebar(): void {
-  /**
-   * This is where your '.addLayer()' used to be, instead
-   * add only the source without styling a layer
-   */
+  assignID();
+
   map.addSource("places", {
     type: "geojson",
     data: stores as FeatureCollection,
   });
 
-  /**
-   * Add all the things to the page:
-   * - The location listings on the side of the page
-   * - The markers onto the map
-   */
   buildLocationList(stores);
   addMarkers();
 }

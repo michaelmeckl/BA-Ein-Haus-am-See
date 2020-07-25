@@ -1,4 +1,4 @@
-import OsmTag from "./OsmTag";
+import type OsmTag from "./OsmTag";
 
 //TODO: anderes format? z.B. as a Map? or a Set?
 const allTags = {
@@ -49,6 +49,30 @@ class TagCollection {
 
   getTag(tag: string): string {
     throw Error("not implemented");
+  }
+
+  getKeyType(val: string): string {
+    switch (val) {
+      case "Bar": // oder club, ...
+      case "Restaurant":
+      case "Cafe":
+        return "amenity";
+
+      case "University":
+        return "building"; // could be amenity too if we want the whole campus
+
+      case "Supermarket":
+        return "shop";
+
+      case "Park": // oder leisure	nature_reserve
+        return "leisure";
+
+      case "River":
+        return "waterway";
+
+      default:
+        throw new Error("Unknown input value! Key couldn't be found!");
+    }
   }
 }
 
