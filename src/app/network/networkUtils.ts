@@ -79,7 +79,7 @@ export async function fetchOsmData(mapBounds: string, query: string): Promise<an
       bounds: mapBounds,
       osmQuery: query,
     });
-    const url = "/osmRequestPbfVersion?" + params;
+    const url = "/osmRequestCacheVersion?" + params;
 
     Benchmark.startMeasure("Request client side");
 

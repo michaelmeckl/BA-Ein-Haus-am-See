@@ -1,4 +1,3 @@
-//import redis from "redis";
 import Redis from "ioredis";
 
 class RedisCache {
@@ -23,14 +22,6 @@ class RedisCache {
     this.redisClient.on("error", function (e) {
       console.error(`Error connecting to redis: "${e}"`);
     });
-
-    /*
-    this.redisClient = redis.createClient(6379);
-
-    this.redisClient.on("error", function (error: any) {
-      console.error(error);
-    });
-    */
   }
 
   async fetchDataFromCache(key: string): Promise<string | null> {
@@ -43,8 +34,9 @@ class RedisCache {
     }
   }
 
-  cacheData(key: string, value: string): void {
-    const expiryTime = 86400; // in seconds: 86400s == 1 day
+  cacheData(key: string, value: string, expiryTime: number): void {
+    //TODO use hset instead to store as a hash for performance reasons
+    //const expiryTime = 86400; // in seconds: 86400s == 1 day
     this.redisClient.setex(key, expiryTime, value);
   }
 }

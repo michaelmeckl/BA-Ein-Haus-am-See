@@ -145,7 +145,9 @@ export default class Server {
 
         if (bounds && query) {
           const compositeKey = (bounds + "/" + query).trim().toLowerCase();
+          Benchmark.startMeasure("Getting data from cache");
           const result = await RedisCache.fetchDataFromCache(compositeKey);
+          Benchmark.stopMeasure("Getting data from cache");
 
           if (result) {
             res.status(OK).send(result);
@@ -160,10 +162,12 @@ export default class Server {
               );
               console.log(Benchmark.stopMeasure("Getting data from osm total"));
 
-              RedisCache.cacheData(compositeKey, geoData.data);
-              //RedisCache.cacheData(compositeKey, JSON.stringify(geoData.data));
+              Benchmark.startMeasure("Caching data");
+              // cache data for one hour
+              RedisCache.cacheData(compositeKey, geoData.data, 3600);
+              Benchmark.stopMeasure("Caching data");
 
-              return res.status(OK).send(geoData.data);
+              return res.status(OK).json(geoData.data);
             } catch (error) {
               if (error.response) {
                 // send error status to client
@@ -248,6 +252,28 @@ export default class Server {
 
     return router;
   }
+
+  //TODO add this to all routes? like: app.get("/osmRequest", checkCache, async (req, res) => {
+  //Middleware Function to Check Cache
+  /*
+  checkCache = (req, res, next) => {
+    const { id } = req.params;
+
+    redis_client.get(id, (err, data) => {
+      if (err) {
+        console.log(err);
+        res.status(500).send(err);
+      }
+      //if no match found
+      if (data != null) {
+        res.send(data);
+      } else {
+        //proceed to next middleware function
+        next();
+      }
+    });
+  };
+  */
 
   errorHandler(
     err: Error,

@@ -15,6 +15,7 @@ import { addWebglCircle } from "../webgl/webglCircle";
 import { testTurfFunctions, getPointsInRadius } from "./mapFunctions";
 import { getDataFromMap } from "./mapboxUtils";
 import { loadSidebar, sortDistances } from "./mapStoreTest";
+import { fetchOsmData } from "../network/networkUtils";
 
 export default class MapController {
   setupMap(callbackFunc: (controller: this) => void): void {
@@ -24,7 +25,14 @@ export default class MapController {
     map.getCanvas().style.cursor = "default";
 
     // Add navigation controls to the map
-    map.addControl(new mapboxgl.NavigationControl());
+    map.addControl(
+      new mapboxgl.NavigationControl({
+        showCompass: false,
+      })
+    );
+    map.addControl(new mapboxgl.FullscreenControl(), "top-right");
+    //map.addControl(new mapboxgl.ScaleControl(), "bottom-left");
+    //map.addControl(new mapboxgl.GeolocateControl(), "bottom-right");
 
     map.on("load", () => {
       console.timeEnd("load map");
@@ -71,7 +79,6 @@ export default class MapController {
         }
         */
 
-        /*
         //TODO: load data new on every move, works but needs another source than overpass api mirror
         parameterSelection.forEach(async (param) => {
           Benchmark.startMeasure("Fetching data on moveend");
@@ -87,6 +94,17 @@ export default class MapController {
             console.log("Finished adding data to map!");
           }
         });
+
+        //TODO use this instead of the code above to reload on every move?
+        /*
+        // after the GeoJSON data is loaded, update markers on the screen and do so on every map move/moveend
+map.on('data', function(e) {
+if (e.sourceId !== 'earthquakes' || !e.isSourceLoaded) return;
+ 
+map.on('move', updateMarkers);
+map.on('moveend', updateMarkers);
+updateMarkers();
+});
         */
 
         getPointsInRadius(map);
