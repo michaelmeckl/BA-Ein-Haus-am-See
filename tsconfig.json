@@ -18,8 +18,8 @@
     /* noEmit - We only use TypeScript for type checking not compiling. */
     "noEmit": true,
     //"noImplicitAny": false
-    "pretty": true,
     "resolveJsonModule": true,
+    "removeComments": true,
     "rootDir": ".",
     "skipLibCheck": true,
     "sourceMap": false,

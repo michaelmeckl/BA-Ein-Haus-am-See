@@ -37,7 +37,10 @@ function buildOverpassQuery(bounds: string, userQuery: string): string {
 }
 
 //TODO: use a webworker instead to load data async? better ux?
-export async function fetchOsmData(mapBounds: string, query: string): Promise<any> {
+export async function fetchOsmDataFromClientVersion(
+  mapBounds: string,
+  query: string
+): Promise<any> {
   try {
     console.log("sending request!");
     const overpassQuery = new URLSearchParams({
@@ -56,6 +59,34 @@ export async function fetchOsmData(mapBounds: string, query: string): Promise<an
 
     //console.log(response);
     //console.log(await Benchmark.getAverageTime(osmtogeojson, [response.data]));
+
+    Benchmark.startMeasure("o2geo client");
+    const geoJson = osmtogeojson(response.data);
+    Benchmark.stopMeasure("o2geo client");
+
+    return geoJson;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+//TODO
+export async function fetchOsmData(mapBounds: string, query: string): Promise<any> {
+  try {
+    console.log("sending request!");
+    const params = new URLSearchParams({
+      bounds: mapBounds,
+      osmQuery: query,
+    });
+    const url = "/osmRequestPbfVersion?" + params;
+
+    Benchmark.startMeasure("Request client side");
+
+    const response = await axios.get(url);
+    console.log(Benchmark.stopMeasure("Request client side"));
+
+    console.log(response.data);
 
     Benchmark.startMeasure("o2geo client");
     const geoJson = osmtogeojson(response.data);
