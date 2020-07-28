@@ -139,43 +139,36 @@ export default class Server {
      */
     router.get(
       "/osmRequestCacheVersion",
+      this.checkCache,
       async (req: Request, res: Response, next: NextFunction) => {
         const bounds = req.query.bounds?.toString();
         const query = req.query.osmQuery?.toString();
 
         if (bounds && query) {
           const compositeKey = (bounds + "/" + query).trim().toLowerCase();
-          Benchmark.startMeasure("Getting data from cache");
-          const result = await RedisCache.fetchDataFromCache(compositeKey);
-          Benchmark.stopMeasure("Getting data from cache");
+          const osmQuery = ServerUtils.buildOverpassQuery(bounds, query);
 
-          if (result) {
-            res.status(OK).send(result);
-          } else {
-            const osmQuery = ServerUtils.buildOverpassQuery(bounds, query);
-            try {
-              Benchmark.startMeasure("Getting data from osm total");
-              const encodedQuery = querystring.stringify({ data: osmQuery });
-              //const geoData = await ServerUtils.performOverpassRequest(encodedQuery);
-              const geoData = await axios.get(
-                `https://overpass-api.de/api/interpreter?${encodedQuery}`
-              );
-              console.log(Benchmark.stopMeasure("Getting data from osm total"));
+          try {
+            Benchmark.startMeasure("Getting data from osm total");
+            const encodedQuery = querystring.stringify({ data: osmQuery });
+            const geoData = await axios.get(
+              `https://overpass-api.de/api/interpreter?${encodedQuery}`
+            );
+            console.log(Benchmark.stopMeasure("Getting data from osm total"));
 
-              Benchmark.startMeasure("Caching data");
-              // cache data for one hour
-              RedisCache.cacheData(compositeKey, geoData.data, 3600);
-              Benchmark.stopMeasure("Caching data");
+            Benchmark.startMeasure("Caching data");
+            // cache data for one hour
+            RedisCache.cacheData(compositeKey, geoData.data, 3600);
+            Benchmark.stopMeasure("Caching data");
 
-              return res.status(OK).json(geoData.data);
-            } catch (error) {
-              if (error.response) {
-                // send error status to client
-                return res.status(error.response.status).send(error.response.statusText);
-              }
-              // if no response property on error (e.g. internal error), pass to error handler
-              return next(error);
+            return res.status(OK).json(geoData.data);
+          } catch (error) {
+            if (error.response) {
+              // send error status to client
+              return res.status(error.response.status).send(error.response.statusText);
             }
+            // if no response property on error (e.g. internal error), pass to error handler
+            return next(error);
           }
         }
         return res.end();
@@ -253,27 +246,25 @@ export default class Server {
     return router;
   }
 
-  //TODO add this to all routes? like: app.get("/osmRequest", checkCache, async (req, res) => {
-  //Middleware Function to Check Cache
-  /*
-  checkCache = (req, res, next) => {
-    const { id } = req.params;
+  //Express middleware function to check Redis Cache
+  checkCache = async (req: Request, res: Response, next: NextFunction) => {
+    const bounds = req.query.bounds?.toString();
+    const query = req.query.osmQuery?.toString();
 
-    redis_client.get(id, (err, data) => {
-      if (err) {
-        console.log(err);
-        res.status(500).send(err);
-      }
-      //if no match found
-      if (data != null) {
-        res.send(data);
-      } else {
-        //proceed to next middleware function
-        next();
-      }
-    });
+    //TODO am besten nicht die exakten Bounds, sondern auf überlappung prüfen und nur nötiges holen?
+    //TODO vllt mit einer geospatial query möglich?? siehe Redis Plugin für Geodaten!
+    const compositeKey = (bounds + "/" + query).trim().toLowerCase();
+    Benchmark.startMeasure("Getting data from cache");
+    const result = await RedisCache.fetchDataFromCache(compositeKey);
+    Benchmark.stopMeasure("Getting data from cache");
+
+    if (result) {
+      res.status(OK).send(result);
+    } else {
+      //if not in cache proceed to next middleware function
+      next();
+    }
   };
-  */
 
   errorHandler(
     err: Error,
