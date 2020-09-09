@@ -27,16 +27,24 @@ module.exports = {
     },
     module: {
         rules: [{
-            test: /\.tsx?$/,
-            use: [{
-                loader: "ts-loader",
-                options: {
-                    transpileOnly: true,
-                    experimentalWatchApi: true,
-                },
-            }],
-            exclude: /node_modules/,
-        }],
+                test: /\.tsx?$/,
+                use: [{
+                    loader: "ts-loader",
+                    options: {
+                        transpileOnly: true,
+                        experimentalWatchApi: true,
+                    },
+                }],
+                exclude: /node_modules/,
+            },
+            /*
+            {
+                // This is required to bundle images in Leaflet's stylesheet.
+                test: /\.png$/,
+                use: 'url-loader'
+            }
+            */
+        ],
     },
     // in order to ignore built-in modules like path, fs, etc. for bundling
     target: "node",

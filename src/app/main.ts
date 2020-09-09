@@ -1,9 +1,10 @@
 /* eslint-env browser */
-import MapController from "./map/mapController";
+import type MapController from "./mapboxMap/mapController";
 import Benchmark from "../shared/benchmarking";
 import { fetchOsmData } from "./network/networkUtils";
 import { Config } from "../shared/config";
 import OsmTags from "./osmModel/osmTagCollection";
+import LeafletController from "./leafletMap/leafletController";
 
 export const parameterSelection: Set<string> = new Set();
 
@@ -191,8 +192,11 @@ function setupUI(mapController: MapController): void {
 }
 
 async function init(): Promise<void> {
+  /*
   const mapController = new MapController();
   mapController.setupMap(setupUI);
+  */
+  const controller = new LeafletController();
 }
 
 init();
