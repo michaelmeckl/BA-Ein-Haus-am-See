@@ -1,8 +1,9 @@
 /* eslint-env browser */
+
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
-import { map } from "./mapConfig";
+import { map } from "./mapboxConfig";
 import * as webglUtils from "../webgl/webglUtils";
 import * as mapboxUtils from "./mapboxUtils";
 import Benchmark from "../../shared/benchmarking";
@@ -12,12 +13,27 @@ import MapboxFPS = require("../vendors/MapboxFPS");
 import { parameterSelection } from "../main";
 import { Config } from "../../shared/config";
 import { addWebglCircle } from "../webgl/webglCircle";
-import { testTurfFunctions, getPointsInRadius } from "./mapFunctions";
+import {
+  testTurfFunctions,
+  getPointsInRadius,
+  addImageOverlay,
+  addCanvasOverlay,
+} from "./testMapFunctionsTODO";
 import { getDataFromMap } from "./mapboxUtils";
 import { loadSidebar, sortDistances } from "./mapStoreTest";
 import { fetchOsmData } from "../network/networkUtils";
+import * as createjs from "createjs-module";
+import {
+  createShader,
+  vertexShaderCanvas,
+  fragmentShaderCanvas,
+  createProgram,
+  resizeCanvas,
+} from "../webgl/webglUtils";
 
 export default class MapController {
+  private mapIsReady: Boolean = false;
+
   setupMap(callbackFunc: (controller: this) => void): void {
     console.time("load map");
 
@@ -34,8 +50,11 @@ export default class MapController {
     //map.addControl(new mapboxgl.ScaleControl(), "bottom-left");
     //map.addControl(new mapboxgl.GeolocateControl(), "bottom-right");
 
+    //map.showTileBoundaries = true;
+
     map.on("load", () => {
       console.timeEnd("load map");
+      this.mapIsReady = true;
 
       // start measuring the frame rate
       this.measureFrameRate();
@@ -118,7 +137,9 @@ updateMarkers();
     });
     */
 
-    //TODO idee: alle häuser in abstand bekommen, indem erst mit tilequery api landuse oder building extrahiert und dann z.b. mit turf distanz oder der LatLng.distanceto()-Methode zu allen queryRendered features bekommen und dann diese gebiete markieren
+    //TODO idee: alle häuser in abstand bekommen, indem erst mit tilequery api landuse oder building extrahiert
+    // und dann z.b. mit turf distanz oder der LatLng.distanceto()-Methode zu allen queryRendered features
+    // bekommen und dann diese gebiete markieren
 
     map.on("click", (e) => {
       console.log("Click:", e);
@@ -131,7 +152,7 @@ updateMarkers();
     });
   }
 
-  //TODO: promisses: await this function at the start
+  //TODO: To use promises instead of callbacks: await this function at the start
   mapLoad(map) {
     return new Promise((resolve, reject) => {
       map.on("load", () => resolve());
@@ -214,6 +235,7 @@ updateMarkers();
   }
 
   // * um ein bestimmtes tile an einer position zu bekommen: https://github.com/mapbox/tilebelt
+
   showData(data: string, sourceName: string): void {
     console.log("now adding to map...");
     console.log(sourceName);
@@ -311,11 +333,14 @@ updateMarkers();
       type: "fill",
       source: sourceName,
       paint: {
-        "fill-color": "#00dd00",
+        //"fill-color": "#00dd00",
+        //TODO this creates a small outline effect, maybe useful?
+        "fill-outline-color": "rgba(0,0,0,0.1)",
+        "fill-color": "rgba(0,0,0,0.1)",
       },
     });
 
-    // with "has", "name" it can be tested if something exists in the properties
+    // with ["has", "name"] it can be tested if something exists in the properties
 
     //TODO: extract types as an enum
 
@@ -429,23 +454,323 @@ updateMarkers();
     */
   }
 
+  // example with createJS (aber vermutlich nicht sonderlich nützlich)
+  handleImageLoad(canvas: HTMLCanvasElement, img: HTMLImageElement) {
+    // create a new stage and point it at our canvas:
+    const exportCanvas = document.getElementById("test_canvas") as HTMLCanvasElement;
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+    const stage = new createjs.Stage(exportCanvas);
+
+    if (stage == null) return;
+
+    var bmp = new createjs.Bitmap(img); //.set({ scaleX: 0.5, scaleY: 0.5 });
+    stage.addChild(bmp);
+
+    /*
+    var colorMatrix = new createjs.ColorMatrix();
+    colorMatrix.adjustSaturation(-100);
+    colorMatrix.adjustContrast(50);
+    */
+
+    var blurFilter = new createjs.BlurFilter(4, 4, 1);
+    bmp = bmp.clone();
+    bmp.filters = [blurFilter];
+    bmp.cache(0, 0, img.width, img.height);
+    //bmp.y = 200;
+    stage.addChild(bmp);
+
+    // draw to the canvas:
+    stage.update();
+
+    canvas.classList.add(Config.CSS_HIDDEN);
+  }
+
+  getBlurFilter(name: string = "gaussianBlur") {
+    // prettier-ignore
+    const kernels = {
+      // Define several convolution kernels
+      gaussianBlur: [
+        0.045, 0.122, 0.045,
+        0.122, 0.332, 0.122,
+        0.045, 0.122, 0.045
+      ],
+      gaussianBlur2: [
+        1, 2, 1,
+        2, 4, 2,
+        1, 2, 1
+      ],
+      gaussianBlur3: [
+        0, 1, 0,
+        1, 1, 1,
+        0, 1, 0
+      ],
+      boxBlur: [
+          0.111, 0.111, 0.111,
+          0.111, 0.111, 0.111,
+          0.111, 0.111, 0.111
+      ],
+      triangleBlur: [
+          0.0625, 0.125, 0.0625,
+          0.125,  0.25,  0.125,
+          0.0625, 0.125, 0.0625
+      ]
+    };
+
+    switch (name) {
+      case "gaussianBlur2":
+        return kernels.gaussianBlur2;
+      case "gaussianBlur3":
+        return kernels.gaussianBlur3;
+      case "boxBlur":
+        return kernels.boxBlur;
+      case "triangleBlur":
+        return kernels.triangleBlur;
+      case "gaussianBlur":
+      default:
+        return kernels.gaussianBlur;
+    }
+  }
+
+  computeKernelWeight(kernel: number[]): number {
+    const weight = kernel.reduce(function (prev: number, curr: number) {
+      return prev + curr;
+    });
+    return weight <= 0 ? 1 : weight;
+  }
+
+  render(image: HTMLImageElement): HTMLCanvasElement | null {
+    const newCanvas = document.querySelector("#test_canvas") as HTMLCanvasElement;
+    // const newCanvas = document.createElement("canvas"); // in-memory canvas
+    const glContext = newCanvas.getContext("webgl");
+
+    if (!glContext) {
+      console.log("No gl context available!");
+      return null;
+    }
+
+    // adjust canvas size to the image size
+    newCanvas.width = image.width;
+    newCanvas.height = image.height;
+
+    const vertexShader = createShader(glContext, glContext.VERTEX_SHADER, vertexShaderCanvas());
+    const fragmentShader = createShader(
+      glContext,
+      glContext.FRAGMENT_SHADER,
+      fragmentShaderCanvas()
+    );
+
+    const program = createProgram(glContext, vertexShader, fragmentShader);
+
+    const positionLocation = glContext.getAttribLocation(program, "a_position");
+    const texcoordLocation = glContext.getAttribLocation(program, "a_texCoord");
+
+    // create and initialize a WebGLBuffer to store vertex and color data
+    const positionBuffer = glContext.createBuffer();
+    // bind buffer (think of it as ARRAY_BUFFER = positionBuffer)
+    glContext.bindBuffer(glContext.ARRAY_BUFFER, positionBuffer);
+    // Set a rectangle the same size as the image at (0, 0). Necessary to show the image on the canvas.
+    this.setRectangle(glContext, 0, 0, image.width, image.height);
+
+    // provide texture coordinates for the rectangle.
+    const texcoordBuffer = glContext.createBuffer();
+    glContext.bindBuffer(glContext.ARRAY_BUFFER, texcoordBuffer);
+    glContext.bufferData(
+      glContext.ARRAY_BUFFER,
+      new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]),
+      glContext.STATIC_DRAW
+    );
+
+    function createTexture() {
+      if (!glContext) return;
+
+      // Create a texture.
+      const texture = glContext.createTexture();
+      glContext.bindTexture(glContext.TEXTURE_2D, texture);
+
+      // Set the parameters so we can render any size image.
+      glContext.texParameteri(
+        glContext.TEXTURE_2D,
+        glContext.TEXTURE_WRAP_S,
+        glContext.CLAMP_TO_EDGE
+      );
+      glContext.texParameteri(
+        glContext.TEXTURE_2D,
+        glContext.TEXTURE_WRAP_T,
+        glContext.CLAMP_TO_EDGE
+      );
+      glContext.texParameteri(
+        glContext.TEXTURE_2D,
+        glContext.TEXTURE_MIN_FILTER,
+        glContext.NEAREST
+      );
+      glContext.texParameteri(
+        glContext.TEXTURE_2D,
+        glContext.TEXTURE_MAG_FILTER,
+        glContext.NEAREST
+      );
+    }
+
+    //TODO var originalImageTexture = createAndSetupTexture(gl);
+
+    // Upload the image into the texture.
+    glContext.texImage2D(
+      glContext.TEXTURE_2D,
+      0,
+      glContext.RGBA,
+      glContext.RGBA,
+      glContext.UNSIGNED_BYTE,
+      image
+    );
+
+    // lookup uniforms
+    const resolutionLocation = glContext.getUniformLocation(program, "u_resolution");
+    const textureSizeLocation = glContext.getUniformLocation(program, "u_textureSize");
+    const kernelLocation = glContext.getUniformLocation(program, "u_kernel[0]");
+    const kernelWeightLocation = glContext.getUniformLocation(program, "u_kernelWeight");
+
+    //const blurKernel = this.getBlurFilter("triangleBlur");
+    const blurKernel = this.getBlurFilter();
+    const kernelWeight = this.computeKernelWeight(blurKernel);
+
+    drawWithKernel();
+
+    function drawWithKernel() {
+      if (!glContext) return;
+
+      resizeCanvas(newCanvas);
+
+      // Tell WebGL how to convert from clip space to pixels
+      glContext.viewport(0, 0, glContext.canvas.width, glContext.canvas.height);
+
+      // Clear the canvas
+      glContext.clearColor(0, 0, 0, 0);
+      glContext.clear(glContext.COLOR_BUFFER_BIT);
+
+      // Tell it to use our program (pair of shaders)
+      glContext.useProgram(program);
+
+      // Turn on the position attribute
+      glContext.enableVertexAttribArray(positionLocation);
+
+      // Bind the position buffer.
+      glContext.bindBuffer(glContext.ARRAY_BUFFER, positionBuffer);
+
+      // Tell the position attribute how to get data out of positionBuffer (ARRAY_BUFFER)
+      var size = 2; // 2 components per iteration
+      var type = glContext.FLOAT; // the data is 32bit floats
+      var normalize = false; // don't normalize the data
+      var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
+      var offset = 0; // start at the beginning of the buffer
+      glContext.vertexAttribPointer(positionLocation, size, type, normalize, stride, offset);
+
+      // Turn on the texcoord attribute
+      glContext.enableVertexAttribArray(texcoordLocation);
+
+      // bind the texcoord buffer.
+      glContext.bindBuffer(glContext.ARRAY_BUFFER, texcoordBuffer);
+
+      // Tell the texcoord attribute how to get data out of texcoordBuffer (ARRAY_BUFFER)
+      var size = 2; // 2 components per iteration
+      var type = glContext.FLOAT; // the data is 32bit floats
+      var normalize = false; // don't normalize the data
+      var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
+      var offset = 0; // start at the beginning of the buffer
+      glContext.vertexAttribPointer(texcoordLocation, size, type, normalize, stride, offset);
+
+      // set the resolution
+      glContext.uniform2f(resolutionLocation, glContext.canvas.width, glContext.canvas.height);
+
+      // set the size of the image
+      glContext.uniform2f(textureSizeLocation, image.width, image.height);
+
+      // set the kernel and it's weight
+      glContext.uniform1fv(kernelLocation, blurKernel);
+      glContext.uniform1f(kernelWeightLocation, kernelWeight);
+
+      // Draw the rectangle.
+      var primitiveType = glContext.TRIANGLES;
+      var offset = 0;
+      var count = 6; // 6 means two triangles
+      glContext.drawArrays(primitiveType, offset, count);
+    }
+
+    return newCanvas;
+  }
+
+  setRectangle(gl: WebGLRenderingContext, x: number, y: number, width: number, height: number) {
+    var x1 = x;
+    var x2 = x + width;
+    var y1 = y;
+    var y2 = y + height;
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
+      gl.STATIC_DRAW
+    );
+  }
+
+  //TODO 1. alternativ kann auch der Canvas weggelassen werden und nur der Weichzeichner auf das Bild angewendet werden, wenn WebGl nicht nötig
+  //TODO 2. oder man nutzt einfach das CustomLayer unten (das ist vermutlich fast am sinnvollsten?)
+  //TODO 3. testen ob zoomen dann überhaupt möglich ist, wenn als canvas / image layer drübergelegt ?? wenn nein bleibt eh nur option 2
+  //  -> zu 3. das overlay muss ja sowieso bei jeder bewegung entfernt und neu geladen werden, also sollte das nicht das problem sein
+  /**
+   * Einen Canvas darüber zu legen ist laut https://github.com/mapbox/mapbox-gl-js/issues/6456 nicht allzu 
+   * gut für die Performance, stattdessen Custom Layer verwenden! Probleme:
+        - Severe performance hit; browsers have a hard time compositing two GL contexts.
+        - You can only draw on top of a Mapbox map — there’s no way to draw something in between
+   */
+
+  //TODO andere Idee: ich will ja die Kreise blurren (die ich mit Turf.js zeichne oder halt direkt mit Canvas?)
+  //TODO  -> d.h. ich kann einfach die Kreise blurren und die dann als Image/canvassource darüberlegen
+
+  /**
+   * Idee (ich glaub die drüber is besser):
+   * 1. vor neuem Layer ein Bild machen und das kurz anzeigen (also diesen canvas visible und die echte karte nicht)
+   * 2. karten kontext clearen und dann neues Layer adden
+   * 3. bild von neuem Layer (mit weißem Hintergrund) und das blurren
+   * 4. dieses dann als image layer auf karte
+   * -> bringt aber nichts weil bild ja nicht interaktiv
+   *
+   * -> karte wieder anzeigen mit geblurrtem CustomLayer stattdessen?
+   * -> irgendwie müsste halt nur der unterschied zw. baselayer und neuem Layer geblurrt werden oder?
+   */
+  blurMap() {
+    if (!map.loaded) {
+      console.error("The map is not ready yet!");
+      return;
+    }
+
+    const mapCanvas = map.getCanvas();
+
+    //const gl = mapCanvas.getContext("webgl");
+    //console.log("Mapbox GL context: ", gl);
+    //console.log("viewport:", gl?.VIEWPORT);
+    //if (!gl) return;
+
+    const img = new Image();
+    img.src = mapCanvas.toDataURL();
+    //console.log(img.src); // um bild anzuschauen copy paste in adress bar in browser
+
+    img.onload = () => {
+      img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
+      img.height = mapCanvas.clientHeight;
+
+      const canvas = this.render(img);
+      /*
+      //TODO:
+      if (canvas) {
+        addCanvasOverlay(canvas);
+      }*/
+    };
+  }
+
+  // * If the layer needs to render to a texture, it should implement the `prerender` method
+  // to do this and only use the `render` method for drawing directly into the main framebuffer.
   addWebGlLayer(): void {
     if (map.getLayer("webglCustom")) {
       map.removeLayer("webglCustom");
     }
-
-    //TODO: test this:
-    const canvasContainer = map.getCanvasContainer();
-    const mapCanvas = map.getCanvas();
-    console.log(canvasContainer);
-    console.log(mapCanvas);
-
-    //TODO: this should work?
-    /*
-    const img = new Image();
-    const canvas = MAP.getCanvas(document.querySelector('.mapboxgl-canvas'));
-    img.src = canvas.toDataURL();
-    */
 
     console.log("adding webgl data...");
 
@@ -460,16 +785,17 @@ updateMarkers();
       type: "custom",
       // method called when the layer is added to the map
       // https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
-      onAdd: (map: mapboxgl.Map, gl: WebGL2RenderingContext) => {
+      onAdd: (map: mapboxgl.Map, gl: WebGLRenderingContext) => {
         const vertexSource = webglUtils.createVertexShaderSource();
         const fragmentSource = webglUtils.createFragmentShaderSource();
 
-        //TODO: test what i can do here!
-        console.log(gl.canvas);
+        //console.log("in onAdd: ", gl.canvas);
 
         // create a vertex and a fragment shader
         const vertexShader = webglUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
         const fragmentShader = webglUtils.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+
+        //TODO: die vertex und fragment shader sollten nachdem sie nicht mehr benutzt werden, sofort gelöscht werden, s. WebGL Best Practices
 
         // link the two shaders into a WebGL program
         program = webglUtils.createProgram(gl, vertexShader, fragmentShader);
@@ -485,7 +811,9 @@ updateMarkers();
 
       // method fired on each animation frame
       // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
-      render: function (gl: WebGL2RenderingContext, matrix: number[]): void {
+      render: function (gl: WebGLRenderingContext, matrix: number[]): void {
+        //console.log("in render: ", gl.canvas);
+
         gl.useProgram(program);
         gl.uniformMatrix4fv(gl.getUniformLocation(program, "u_matrix"), false, matrix);
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);

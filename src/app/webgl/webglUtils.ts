@@ -29,7 +29,110 @@ export function createFragmentShaderSource(): string {
   return fragmentSource;
 }
 
-//TODO: Blur - Filter
+/**
+ * This multiplies two canvases:
+ * call this like:
+   function updateTextureFromCanvas(tex, canvas, textureUnit) {
+      gl.activeTexture(gl.TEXTURE0 + textureUnit);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    }
+
+    var tex1 = setupTexture(canvas1, 0, program, "u_canvas1");
+    var tex2 = setupTexture(canvas2, 1, program, "u_canvas2");
+ */
+export function multiplyCanvasFragmentShader() {
+  return `
+  precision mediump float;
+
+  // our 2 canvases
+  uniform sampler2D u_canvas1;
+  uniform sampler2D u_canvas2;
+
+  // the texCoords passed in from the vertex shader.
+  // note: we're only using 1 set of texCoords which means
+  //   we're assuming the canvases are the same size.
+  varying vec2 v_texCoord;
+
+  void main() {
+      // Look up a pixel from first canvas
+      vec4 color1 = texture2D(u_canvas1, v_texCoord);
+
+      // Look up a pixel from second canvas
+      vec4 color2 = texture2D(u_canvas2, v_texCoord);
+
+      // return the 2 colors multiplied
+      gl_FragColor = color1 * color2;
+  }
+  `;
+}
+
+export function vertexShaderCanvas(): string {
+  return `
+    // an attribute will receive data from a buffer
+    attribute vec2 a_position;
+    attribute vec2 a_texCoord;
+ 
+    uniform vec2 u_resolution;
+
+    varying vec2 v_texCoord;
+  
+    void main() {
+      // convert the position from pixels to 0.0 to 1.0
+      vec2 zeroToOne = a_position / u_resolution;
+  
+      // convert from 0->1 to 0->2
+      vec2 zeroToTwo = zeroToOne * 2.0;
+  
+      // convert from 0->2 to -1->+1 (clip space)
+      vec2 clipSpace = zeroToTwo - 1.0;
+    
+      // sets the top left corner to (0, 0)
+      gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+
+      // pass the texCoord to the fragment shader
+      // The GPU will interpolate this value between points
+      v_texCoord = a_texCoord;
+    }
+  `;
+}
+
+export function fragmentShaderCanvas(): string {
+  return `
+    precision mediump float;
+ 
+    // our texture
+    uniform sampler2D u_image;
+    uniform vec2 u_textureSize;
+    uniform float u_kernel[9];
+    uniform float u_kernelWeight;
+    
+    // the texCoords passed in from the vertex shader.
+    varying vec2 v_texCoord;
+    
+    void main() {
+      // compute 1 pixel in texture coordinates.
+      vec2 onePixel = vec2(1.0, 1.0) / u_textureSize;
+
+      // sum up all 8 neigboring pixel values
+      vec4 colorSum =
+          texture2D(u_image, v_texCoord + onePixel * vec2(-1, -1)) * u_kernel[0] +
+          texture2D(u_image, v_texCoord + onePixel * vec2( 0, -1)) * u_kernel[1] +
+          texture2D(u_image, v_texCoord + onePixel * vec2( 1, -1)) * u_kernel[2] +
+          texture2D(u_image, v_texCoord + onePixel * vec2(-1,  0)) * u_kernel[3] +
+          texture2D(u_image, v_texCoord + onePixel * vec2( 0,  0)) * u_kernel[4] +
+          texture2D(u_image, v_texCoord + onePixel * vec2( 1,  0)) * u_kernel[5] +
+          texture2D(u_image, v_texCoord + onePixel * vec2(-1,  1)) * u_kernel[6] +
+          texture2D(u_image, v_texCoord + onePixel * vec2( 0,  1)) * u_kernel[7] +
+          texture2D(u_image, v_texCoord + onePixel * vec2( 1,  1)) * u_kernel[8] ;
+
+      gl_FragColor = vec4((colorSum / u_kernelWeight).rgb, 1);
+      //gl_FragColor = vec4(1,0,0,1);
+    }
+  `;
+}
+
+//TODO Blur - Filter
 export function createBlurFragmentSource(): string {
   const blurSource = `
     precision highp float;
@@ -96,12 +199,13 @@ export function createBlurFragmentSource(): string {
   return blurSource;
 }
 
+export function bindFramebufferAndSetViewport(gl: WebGLRenderingContext, fb, width, height) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.viewport(0, 0, width, height);
+}
+
 // see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
-export function createShader(
-  gl: WebGL2RenderingContext,
-  type: number,
-  source: string
-): WebGLShader {
+export function createShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader {
   // Create the shader object
   const shader = gl.createShader(type);
   if (!shader) {
@@ -126,7 +230,7 @@ export function createShader(
  * see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
  */
 export function createProgram(
-  gl: WebGL2RenderingContext,
+  gl: WebGLRenderingContext,
   vertexShader: WebGLShader,
   fragmentShader: WebGLShader
 ): WebGLProgram {
@@ -152,11 +256,11 @@ export function createProgram(
 // see. https://webgl2fundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
 /**
  * Usage just before rendering:
- * resize(gl.canvas);
- * // Tell WebGL how to convert from clip space to pixels
- * gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+ *    resize(gl.canvas);
+ *    // Tell WebGL how to convert from clip space to pixels
+ *    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
  */
-export function resize(canvas: HTMLCanvasElement): void {
+export function resizeCanvas(canvas: HTMLCanvasElement): void {
   // Lookup the size the browser is displaying the canvas.
   const displayWidth = canvas.clientWidth;
   const displayHeight = canvas.clientHeight;
@@ -169,7 +273,7 @@ export function resize(canvas: HTMLCanvasElement): void {
   }
 }
 
-function resetDepth(gl: WebGL2RenderingContext): void {
+function resetDepth(gl: WebGLRenderingContext): void {
   gl.clearDepth(1.0); // Clear depth
   gl.enable(gl.DEPTH_TEST); // Enable depth testing
   gl.depthFunc(gl.LEQUAL); // Near things obscure far things
@@ -178,8 +282,15 @@ function resetDepth(gl: WebGL2RenderingContext): void {
 /**
  * Clear the canvas and reset depth.
  */
-export function clearCanvas(gl: WebGL2RenderingContext): void {
+export function clearCanvas(gl: WebGLRenderingContext): void {
   gl.clearColor(0, 0, 0, 0);
   resetDepth(gl);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+}
+
+//TODO delete me later
+// simple function that sets a color to a gl context, can be usefult for troubleshooting
+export function setColor(gl: WebGLRenderingContext) {
+  gl.clearColor(1, 0, 1, 1); // magenta
+  gl.clear(gl.COLOR_BUFFER_BIT);
 }

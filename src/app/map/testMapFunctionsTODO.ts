@@ -1,6 +1,6 @@
 //Test-Methods //TODO delete this file for production!!
 
-import { map } from "./mapConfig";
+import { map } from "./mapboxConfig";
 import type { Point } from "geojson";
 import shortestPath from "@turf/shortest-path";
 import * as mapboxUtils from "./mapboxUtils";
@@ -128,6 +128,105 @@ export function testX(): void {
         "line-color": "#ff69b4",
       },
     });*/
+}
+
+function getResolutions() {
+  // Calculation of resolutions that match zoom levels 1, 3, 5, 7, 9, 11, 13, 15.
+  var resolutions = [];
+  for (var i = 0; i <= 8; ++i) {
+    resolutions.push(156543.03392804097 / Math.pow(2, i * 2));
+  }
+  return resolutions;
+}
+
+export function addImageOverlay(image: HTMLImageElement) {
+  // wait till map is loaded, then add a imageSource (or a canvas source alternatively)
+  if (!map.loaded()) return;
+
+  map.addSource("myImageSource", {
+    type: "image",
+    url: image.src,
+    /*
+    coordinates: [
+      [-80.425, 46.437],
+      [-71.516, 46.437],
+      [-71.516, 37.936],
+      [-80.425, 37.936],
+    ],*/
+  });
+
+  map.addLayer({
+    id: "overlay",
+    source: "myImageSource",
+    type: "raster",
+    paint: {
+      "raster-opacity": 0.85,
+    },
+  });
+}
+
+export function blurImage(image: HTMLImageElement) {
+  image.style.filter = "blur(20px)";
+}
+
+export function blurCanvas(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.filter = "blur(20px)";
+    //TODO oder: ctx.shadowBlur = 20;
+  }
+}
+
+export function clearCanvasRect(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  ctx.clearRect(0, 0, width, height);
+}
+
+// vgl. https://stackoverflow.com/questions/13422917/get-elements-from-canvas
+export function drawImageToHiddenCanvas() {
+  // make a hidden canvas:
+  var hiddenCanvas = document.createElement("canvas");
+  var hCtx = hiddenCanvas.getContext("2d");
+  // First you round the corners permanently by making a clipping region:
+  ctx.roundedRect(etc);
+  ctx.clip();
+  //then a user draws something onto HIDDEN canvas, like an image
+  // This image never gets its corners cut
+  hCtx.drawImage(myImage, 0, 0);
+  // Then you draw the hidden canvas onto your normal one:
+  ctx.drawImage(hiddenCanvas, 0, 0);
+}
+
+export function addCanvasOverlay(canvas: HTMLCanvasElement) {
+  // wait till map is loaded, then add a imageSource (or a canvas source alternatively)
+  if (!map.loaded()) return;
+
+  map.addSource("canvasSource", {
+    type: "canvas",
+    canvas: canvas,
+    animate: true, // TODO turn off for better performance if not needed!
+    coordinates: [
+      [-76.54, 39.18],
+      [-76.52, 39.18],
+      [-76.52, 39.17],
+      [-76.54, 39.17],
+    ],
+    /*
+    coordinates: [
+      [-80.425, 46.437],
+      [-71.516, 46.437],
+      [-71.516, 37.936],
+      [-80.425, 37.936],
+    ],*/
+  });
+
+  map.addLayer({
+    id: "overlay",
+    source: "canvasSource",
+    type: "raster",
+    paint: {
+      "raster-opacity": 0.85,
+    },
+  });
 }
 
 function addTurfBuffer(p): void {

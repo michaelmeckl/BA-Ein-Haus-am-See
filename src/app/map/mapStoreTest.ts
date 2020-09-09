@@ -1,6 +1,6 @@
 import type { FeatureCollection } from "geojson";
 import mapboxgl, { LngLatLike, LngLat } from "mapbox-gl";
-import { map } from "./mapConfig";
+import { map } from "./mapboxConfig";
 import distance from "@turf/distance";
 import * as turfHelpers from "@turf/helpers";
 
