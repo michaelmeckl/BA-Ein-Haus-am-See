@@ -39,7 +39,7 @@ function getCircleFragmentSource(): string {
 // Initialize the buffers we'll need. For this demo, we just
 // have one object -- a simple two-dimensional square.
 //
-function initBuffers(gl: WebGL2RenderingContext, startingPosition: mapboxgl.MercatorCoordinate) {
+function initBuffers(gl: WebGLRenderingContext, startingPosition: mapboxgl.MercatorCoordinate) {
   // Create a buffer for the square's positions.
   const positionBuffer = gl.createBuffer();
 
@@ -90,7 +90,7 @@ function initBuffers(gl: WebGL2RenderingContext, startingPosition: mapboxgl.Merc
   };
 }
 
-function createPerspectiveMatrix(gl: WebGL2RenderingContext, programInfo): any {
+function createPerspectiveMatrix(gl: WebGLRenderingContext, programInfo): any {
   // Create a perspective matrix, a special matrix that is
   // used to simulate the distortion of perspective in a camera.
   // Our field of view is 45 degrees, with a width/height
@@ -127,7 +127,7 @@ function createPerspectiveMatrix(gl: WebGL2RenderingContext, programInfo): any {
   };
 }
 
-function setPositionInformation(gl: WebGL2RenderingContext, programInfo, buffers): void {
+function setPositionInformation(gl: WebGLRenderingContext, programInfo, buffers): void {
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute
   const numComponents = 2;
@@ -147,7 +147,7 @@ function setPositionInformation(gl: WebGL2RenderingContext, programInfo, buffers
   gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
 }
 
-function setColorInformation(gl: WebGL2RenderingContext, programInfo, buffers): void {
+function setColorInformation(gl: WebGLRenderingContext, programInfo, buffers): void {
   // Tell WebGL how to pull out the colors from the color buffer
   // into the vertexColor attribute.
   const numComponents = 2;
@@ -170,7 +170,7 @@ function setColorInformation(gl: WebGL2RenderingContext, programInfo, buffers): 
 //
 // Draw the scene.
 //
-function drawScene(gl: WebGL2RenderingContext, programInfo, buffers) {
+function drawScene(gl: WebGLRenderingContext, programInfo, buffers) {
   //webglUtils.clearCanvas(gl);
 
   const matrices = createPerspectiveMatrix(gl, programInfo);
@@ -231,7 +231,7 @@ export function addWebglCircle(map: mapboxgl.Map): void {
     id: "colorCircle",
     type: "custom",
 
-    onAdd: (map: mapboxgl.Map, gl: WebGL2RenderingContext) => {
+    onAdd: (map: mapboxgl.Map, gl: WebGLRenderingContext) => {
       const vertexSource = getCircleVertexSource();
       const fragmentSource = getCircleFragmentSource();
       // create a vertex and a fragment shader
@@ -260,7 +260,7 @@ export function addWebglCircle(map: mapboxgl.Map): void {
       //buffers = initBuffers(gl, vertices[0]);
     },
 
-    render: function (gl: WebGL2RenderingContext, matrix: number[]): void {
+    render: function (gl: WebGLRenderingContext, matrix: number[]): void {
       vertices.forEach((element: mapboxgl.MercatorCoordinate) => {
         buffers = initBuffers(gl, element);
         drawScene(gl, programInfo, buffers);
