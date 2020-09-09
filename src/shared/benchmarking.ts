@@ -4,6 +4,7 @@
 // node server than on the client, which might make measurements inaccurate?? -> Test more with this!
 
 const NUMBER_OF_EXECUTIONS = 50;
+
 /**
  * Singleton-Class for measuring execution time.
  */
@@ -12,6 +13,10 @@ class Benchmark {
 
   private timeStamps: Map<string, number>;
   private accuracy: number;
+
+  public loggingFunction = function (name: string, time: number) {
+    console.log(`${name} took ${time} ms.`);
+  };
 
   // the constructor has to be explicitly marked as private
   private constructor() {
@@ -57,7 +62,7 @@ class Benchmark {
     return 0;
   }
 
-  //TODO performance.now() only when the others use it too!
+  //TODO use performance.now() here only when the others use it too!
   // but performance.now() is necessary as console.time() doesn't return its value
   public async getAverageTime(
     fn: (...args: any[]) => any,
@@ -77,6 +82,22 @@ class Benchmark {
     const average = times.reduce((prev, curr) => prev + curr, 0) / times.length;
     console.log(`Average time taken over ${n} executions: ${average} milliseconds`);
     return average;
+  }
+
+  /**
+   * Util-Function to measure execution time for the given function and return its result if any.
+   */
+  public measureTimeForFunction<T>(
+    loggingFunction: (name: string, time: number) => void,
+    fn: (...args: any[]) => T,
+    args: any[]
+  ): T {
+    const startTime = performance.now();
+    const result: T = fn(...args);
+    const taken = performance.now() - startTime;
+    loggingFunction(name, taken);
+
+    return result;
   }
 }
 

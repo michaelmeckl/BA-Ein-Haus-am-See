@@ -17,7 +17,7 @@ import through from "through2";
 import * as ServerUtils from "./serverUtils";
 //import pg from "pg";  //postgres
 
-//TODO handle crashes?
+//TODO handle crashes better?
 process.on("uncaughtException", (e) => {
   console.log(e);
   process.exit(1);
@@ -155,6 +155,8 @@ export default class Server {
               `https://overpass-api.de/api/interpreter?${encodedQuery}`
             );
             console.log(Benchmark.stopMeasure("Getting data from osm total"));
+
+            //TODO redis spatial features genauer anschauen, die könnten das hier um einiges verbessern vllt
 
             Benchmark.startMeasure("Caching data");
             // cache data for one hour
