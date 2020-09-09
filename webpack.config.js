@@ -45,6 +45,8 @@ module.exports = {
             }
             */
         ],
+        // Apply `noParse` to Tangram to prevent mangling of UMD boilerplate
+        noParse: /tangram\/dist\/tangram/
     },
     // in order to ignore built-in modules like path, fs, etc. for bundling
     target: "node",
