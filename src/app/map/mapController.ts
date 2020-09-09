@@ -765,10 +765,22 @@ updateMarkers();
     };
   }
 
+  /**
+   * TODO statt dem Custom Layer wäre es vllt sinnvoller auf events wie load, render oder layer added zu lauschen 
+   * und bevor es gezeichnet wird in dem Moment dann das mit dem Canvas und dem Blurren etc. zu machen?
+   * Beispiel:
+   map.on("render", function() {
+    if(map.loaded()) {
+      map.featuresIn(...);
+    }
+   });
+   */
+
   // * If the layer needs to render to a texture, it should implement the `prerender` method
   // to do this and only use the `render` method for drawing directly into the main framebuffer.
   addWebGlLayer(): void {
     if (map.getLayer("webglCustom")) {
+      // the layer exists already; remove it
       map.removeLayer("webglCustom");
     }
 
