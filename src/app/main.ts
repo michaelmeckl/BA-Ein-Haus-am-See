@@ -3,11 +3,12 @@ import MapController from "./map/mapController";
 import Benchmark from "../shared/benchmarking";
 import { fetchOsmData } from "./network/networkUtils";
 import { Config } from "../shared/config";
-import OsmTags from "./model/osmTagCollection";
+import OsmTags from "./osmModel/osmTagCollection";
 
 export const parameterSelection: Set<string> = new Set();
 
-// const enum inlines the elements at runtime, so the whole enum isn't needed at runtime
+// const enum instead of enum as this inlines the elements at runtime
+// -> not the enum as a whole is needed at runtime
 const enum HtmlElements {
   LIST_TEMPLATE_ID = "#li-template",
   // heading buttons
@@ -145,6 +146,12 @@ function setupUI(mapController: MapController): void {
   const showLocationsButtton = document.querySelector(HtmlElements.SHOW_LOCATIONS_BUTTON_ID);
   if (showLocationsButtton) {
     showLocationsButtton.addEventListener("click", showLocations);
+  }
+
+  //TODO
+  const blurButtton = document.querySelector("#blurButton");
+  if (blurButtton) {
+    blurButtton.addEventListener("click", mapController.blurMap.bind(mapController));
   }
 
   //testVectorTileAPI(mapController);

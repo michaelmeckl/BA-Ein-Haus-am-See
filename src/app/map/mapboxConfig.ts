@@ -30,6 +30,8 @@ const map = new mapboxgl.Map({
   center: defaultCoordinates, // starting position: [lng, lat]
   zoom: defaultZoom, // starting zoom
   antialias: false, // set to true for antialiasing custom layers but has a negative impact on performance
+  //TODO nicht so toll für performance -> gibt es eine bessere Lösung?
+  preserveDrawingBuffer: true, // necessary to be able to export the map canvas as an image
 });
 
 export { map };

@@ -196,6 +196,10 @@ body {
 .hidden {
     display: none;
     opacity: 0;
+
+    /* TODO better performance than display: none as transform can use hardware acceleration 
+    but unfortunately leaves the space
+    transform: scale(0);*/
 }
 
 #sidebar {

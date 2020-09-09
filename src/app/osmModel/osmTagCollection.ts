@@ -1,4 +1,4 @@
-import type OsmTag from "./OsmTag";
+import type OsmTag from "./osmTag";
 
 //TODO: anderes format? z.B. as a Map? or a Set?
 const allTags = {

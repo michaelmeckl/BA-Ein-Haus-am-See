@@ -2,17 +2,24 @@
  * Utility-Methods for working with Mapbox Gl.
  */
 import mapboxgl, { GeoJSONSource } from "mapbox-gl";
-import { map } from "./mapConfig";
+import { map } from "./mapboxConfig";
 import { parameterSelection } from "../main";
 import { chunk } from "lodash";
 import cleanCoords from "@turf/clean-coords";
-import { addTurfCircle } from "./mapFunctions";
+import { addTurfCircle } from "./testMapFunctionsTODO";
 
 export function getDataforFeaturesInSelection() {
   console.log(parameterSelection.entries);
 
   const allGeoData: mapboxgl.MapboxGeoJSONFeature[] = [];
   for (const el of parameterSelection) {
+    //TODO
+    // With features[0].geometry.coordinates you will receive all points along the LineString
+    /**
+    var features = map.queryRenderedFeatures({
+    layers:['roads-bm6ga5'],
+    filter: ["==", "id", 1]
+     */
     const features = map.querySourceFeatures(el);
     allGeoData.push(...features);
   }
