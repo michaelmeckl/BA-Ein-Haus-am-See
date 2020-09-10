@@ -21,7 +21,7 @@ body {
 
 .heading {
     background-color: lavender;
-    z-index: 2;
+    z-index: 402;
     height: 50px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .6);
     display: flex;
@@ -70,7 +70,8 @@ body {
 
 #overpass-api-controls {
     position: absolute;
-    z-index: 1;
+    /* > 400 necessary for leaflet maps so it will be shown in front of leaflet-pane*/
+    z-index: 401;
     padding: 8px;
     margin-left: 2px;
     background-color: rgb(255, 255, 255);
@@ -202,6 +203,7 @@ body {
     transform: scale(0);*/
 }
 
+/* Sidebar with list items */
 #sidebar {
     position: fixed;
     height: calc(100% - 50px);
