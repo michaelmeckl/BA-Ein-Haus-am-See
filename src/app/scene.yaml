@@ -1,6 +1,14 @@
+styles:
+  buildings:
+    base: polygons
+    shaders:
+      blocks:
+        color: |
+          color.rgb *= vec3(min((v_world_position.z*.001 + .6),1.));
+
 scene:
   background:
-    color: "#ddddee"
+    color: grey
 
 sources:
   nextzen:
@@ -17,7 +25,7 @@ layers:
     draw:
       polygons:
         order: function() { return feature.sort_rank; }
-        color: lightgreen
+        color: orange
 
   water:
     data: { source: nextzen }
@@ -53,11 +61,11 @@ layers:
               h = (h - 0.4) * -1 + 1; // flip brightness
               return [h, h * 0.4, h * 0.7];
           }
-    3d-buildings:
-      filter: { $zoom: { min: 15 } }
+    extruded:
       draw:
         polygons:
-          extrude: function () { return feature.height > 20 || $zoom >= 16; }
+          style: buildings
+          extrude: function () { return feature.height > 0 || $zoom >= 16; }
 
   places:
     data: { source: nextzen }

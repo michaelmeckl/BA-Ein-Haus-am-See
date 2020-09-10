@@ -66,20 +66,20 @@ async function showLocations(): Promise<void> {
   openSidebar();
 }
 
-function selectData(e: Event, mapController: MapController): void {
+function selectData(e: Event, mapController: LeafletController): void {
   e.stopPropagation();
   e.preventDefault();
 
   const queryInput = document.querySelector(HtmlElements.QUERY_INPUT_ID) as HTMLInputElement;
   const value = (e.target as HTMLAnchorElement).innerText;
-  const key = OsmTags.getKeyType(value); //TODO: flexibler machen!
+  const key = OsmTags.getKeyType(value); //TODO flexibler machen!
   const query = key + "=" + value;
   queryInput.value = query;
 
   const selectionBox = document.querySelector(HtmlElements.SELECTION_BOX_CLASS) as HTMLDivElement;
   const list = document.querySelector(HtmlElements.SELECTION_LIST_ID) as HTMLUListElement;
 
-  //TODO: actually the visible features on the map should be shown in the box (not what is clicked!)
+  //TODO actually the visible features on the map should be shown in the box (not what is clicked!)
 
   // check if that list element already exists to prevent adding it twice
   for (const el of list.getElementsByTagName("li")) {
@@ -122,8 +122,11 @@ function selectData(e: Event, mapController: MapController): void {
   selectionBox.classList.remove(Config.CSS_HIDDEN);
 }
 
-async function performOsmQuery(mapController: MapController, inputQuery: string): Promise<void> {
-  //TODO: let user choose bounding box?
+async function performOsmQuery(
+  mapController: LeafletController,
+  inputQuery: string
+): Promise<void> {
+  //TODO let user choose bounding box?
   //ganz Regensburg: 12.028,48.966,12.192,49.076
   //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
   const bounds = mapController.getViewportBounds();
@@ -135,7 +138,7 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
 
   if (data) {
     const t0 = performance.now();
-    mapController.showData(data, inputQuery);
+    mapController.addGeoJsonLayer(data, inputQuery);
     const t1 = performance.now();
     console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 
@@ -143,7 +146,7 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   }
 }
 
-function setupUI(mapController: MapController): void {
+function setupUI(mapController: LeafletController): void {
   const showLocationsButtton = document.querySelector(HtmlElements.SHOW_LOCATIONS_BUTTON_ID);
   if (showLocationsButtton) {
     showLocationsButtton.addEventListener("click", showLocations);
@@ -152,15 +155,8 @@ function setupUI(mapController: MapController): void {
   //TODO
   const blurButtton = document.querySelector("#blurButton");
   if (blurButtton) {
-    blurButtton.addEventListener("click", mapController.blurMap.bind(mapController));
+    blurButtton.addEventListener("click", mapController.addBlur.bind(mapController));
   }
-
-  //testVectorTileAPI(mapController);
-  /*
-  mapController.addVectorData(
-    "http://localhost:8080/data/countries/{z}/{x}/{y}.pbf"
-  );
-  */
 
   const closeSidebarButtton = document.querySelector(HtmlElements.CLOSE_SIDEBAR_BUTTON_CLASS);
   if (closeSidebarButtton) {
@@ -176,10 +172,11 @@ function setupUI(mapController: MapController): void {
 
   const showWebGLButton = document.querySelector(HtmlElements.SHOW_CUSTOM_DATA_ID);
   if (showWebGLButton) {
+    /*
     showWebGLButton.addEventListener(
       "click",
       mapController.addWebGlLayer.bind(mapController) // necessary to bind as the this context would be different in the addWebGL method otherwise
-    );
+    );*/
   }
 
   const queryInput = document.querySelector(HtmlElements.QUERY_INPUT_ID) as HTMLInputElement;
@@ -191,12 +188,13 @@ function setupUI(mapController: MapController): void {
   }
 }
 
-async function init(): Promise<void> {
-  /*
-  const mapController = new MapController();
-  mapController.setupMap(setupUI);
-  */
-  const controller = new LeafletController();
+function init(): void {
+  const mapController = new LeafletController();
+  // wait until the map is ready, then setup the rest of the UI
+  // to prevent bugs because of an unfinished map load
+  mapController.mapInstance.whenReady(() => {
+    setupUI(mapController);
+  });
 }
 
 init();
