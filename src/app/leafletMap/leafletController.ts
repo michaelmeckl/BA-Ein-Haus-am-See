@@ -74,7 +74,31 @@ export default class LeafletController {
     };
 
     this.tangramLayer = Tangram.leafletLayer({
-      scene: "../scene.yaml",
+      //scene: "../nextzen_scene.yaml",
+      scene: {
+        import: [
+          // Bubble Wrap Style
+          //"https://www.nextzen.org/carto/bubble-wrap-style/10/bubble-wrap-style.zip",
+          //"https://www.nextzen.org/carto/bubble-wrap-style/10/themes/bubble-wrap-road-shields-international.zip",
+          //"https://www.nextzen.org/carto/bubble-wrap-style/10/themes/label-10.zip",
+
+          // Cinnabar Style
+          "https://www.nextzen.org/carto/cinnabar-style/10/cinnabar-style.zip",
+          "https://www.nextzen.org/carto/cinnabar-style/10/themes/label-10.zip",
+          //"https://www.nextzen.org/carto/cinnabar-style/10/themes/cinnabar-road-shields-international.zip",
+        ],
+        sources: {
+          mapzen: {
+            type: "MVT",
+            url: "https://{s}.tile.nextzen.org/tilezen/vector/v1/512/all/{z}/{x}/{y}.mvt",
+            url_subdomains: ["a", "b", "c", "d"],
+            url_params: { api_key: "NaqqS33fTUmyQcvbuIUCKA" },
+            tile_size: 512,
+            max_zoom: 16,
+          },
+        },
+      },
+
       events: {
         //hover: onHover, // hover event (defined below)
         //click: onClick, // click event (defined below)
@@ -88,8 +112,9 @@ export default class LeafletController {
         preserveDrawingBuffer: true,
         antialias: false
       },*/
+
       attribution:
-        '<a href="https://mapzen.com/tangram" target="_blank">Tangram</a> | &copy; OSM contributors',
+        '<a href="https://github.com/tangrams" target="_blank">Tangram</a> | <a href="http://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a> | <a href="https://www.nextzen.org/" target="_blank">Nextzen</a>',
     });
     this.scene = this.tangramLayer.scene;
 

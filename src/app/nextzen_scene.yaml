@@ -1,0 +1,19 @@
+# unfinished
+import:
+  - https://www.nextzen.org/carto/bubble-wrap-style/10/bubble-wrap-style.zip
+  - https://www.nextzen.org/carto/bubble-wrap-style/10/themes/bubble-wrap-road-shields-usa.zip
+  - https://www.nextzen.org/carto/bubble-wrap-style/10/themes/bubble-wrap-road-shields-international.zip
+  - https://www.nextzen.org/carto/bubble-wrap-style/10/themes/label-10.zip
+
+sources:
+  mapzen:
+    url: https://{s}.tile.nextzen.org/tilezen/vector/v1/512/all/{z}/{x}/{y}.mvt
+    url_subdomains:
+      - a
+      - b
+      - c
+      - d
+    url_params:
+      api_key: NaqqS33fTUmyQcvbuIUCKA
+    tile_size: 512
+    max_zoom: 16
