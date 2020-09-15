@@ -165,15 +165,15 @@ export function addImageOverlay(image: HTMLImageElement) {
   });
 }
 
-export function blurImage(image: HTMLImageElement) {
-  image.style.filter = "blur(20px)";
+export function blurImage(image: HTMLImageElement, blurAmount: number) {
+  image.style.filter = `blur(${blurAmount}px)`;
 }
 
-export function blurCanvas(canvas: HTMLCanvasElement) {
+export function blurCanvas(canvas: HTMLCanvasElement, blurAmount: number) {
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    ctx.filter = "blur(20px)";
-    //TODO oder: ctx.shadowBlur = 20;
+    ctx.filter = `blur(${blurAmount}px)`;
+    //TODO oder: ctx.shadowBlur = blurAmount;
   }
 }
 

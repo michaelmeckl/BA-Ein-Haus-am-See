@@ -15,7 +15,14 @@ import RedisCache from "./redisCache";
 import pbf2json from "pbf2json";
 import through from "through2";
 import * as ServerUtils from "./serverUtils";
+/*
+import webpack from "webpack";
+import webpackDevMiddleware from "webpack-dev-middleware";
+import webpackHotMiddleware from "webpack-hot-middleware";
+*/
 //import pg from "pg";  //postgres
+
+//const webpackConfig = require("../../webpack.config");
 
 //TODO handle crashes better?
 process.on("uncaughtException", (e) => {
@@ -55,6 +62,8 @@ export default class Server {
     //this.app.use(bodyParser.text());
     this.app.use(bodyParser.json());
 
+    //this.setupWebpackDevMiddleware();
+
     // serve front-end content
     //TODO actually it would be better for performance not to send it from the node server as it is single-threaded (maybe use nginx instead?)
     this.app.use(express.static(publicDir));
@@ -92,6 +101,21 @@ export default class Server {
       return console.log(`Server started at http://localhost:${port}`);
     });
   }
+
+  /*
+  setupWebpackDevMiddleware() {
+    const compiler = webpack(webpackConfig);
+    // Tell express to use the webpack-dev-middleware and use the webpack.config.js
+    // configuration file as a base.
+    this.app.use(
+      webpackDevMiddleware(compiler, {
+        publicPath: webpackConfig.output.publicPath,
+      })
+    );
+
+    //enable Hot-Module-Replacement
+    this.app.use(webpackHotMiddleware(compiler));
+  }*/
 
   /**
    * Init the express router and setup routes.

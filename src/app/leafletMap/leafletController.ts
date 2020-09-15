@@ -9,8 +9,10 @@ import type {
   Layer,
 } from "leaflet";
 import Tangram from "tangram";
-import { Config } from "../../shared/config";
 import type { GeoJsonObject } from "geojson";
+import Benchmark from "../../shared/benchmarking";
+import { blurCanvas } from "../mapboxMap/testMapFunctionsTODO";
+import "leaflet-maskcanvas";
 
 /**
  * TODO 0: wie blur effekte mit Tangram?
@@ -28,10 +30,7 @@ export default class LeafletController {
   private activeLayers: Map<string, Layer> = new Map();
 
   constructor() {
-    const initialZoom = 12;
-    const coordinatesRegensburg: LatLngExpression = [49.008, 12.1];
-    this.map = L.map("map", { zoomControl: false }).setView(coordinatesRegensburg, initialZoom);
-
+    this.map = L.map("map", { zoomControl: false });
     new L.Control.Zoom({ position: "topright" }).addTo(this.map); // move the zoom control to the right
 
     this.handleEvents();
@@ -43,7 +42,7 @@ export default class LeafletController {
   }
 
   setupMap() {
-    const osmLayer = L.tileLayer(
+    const mapboxLayer = L.tileLayer(
       "https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}",
       {
         attribution:
@@ -52,10 +51,10 @@ export default class LeafletController {
         id: "mapbox/streets-v11",
         tileSize: 512,
         zoomOffset: -1,
-        accessToken: Config.MAPBOX_TOKEN,
+        accessToken: process.env.MapboxToken,
       }
     );
-    //this.addLayer("osmLayer", osmLayer);
+    //this.addLayer("osmLayer", mapboxLayer);
 
     const configJson = {
       //TODO not working, probably because i dont have a nextzen account
@@ -98,7 +97,6 @@ export default class LeafletController {
           },
         },
       },
-
       events: {
         //hover: onHover, // hover event (defined below)
         //click: onClick, // click event (defined below)
@@ -123,10 +121,9 @@ export default class LeafletController {
 
     // Useful events to subscribe to
     this.tangramLayer.scene.subscribe({
-      load: (msg: any) => {
+      load: (config: any) => {
         // scene was loaded
-        this.getVisibleFeatures();
-        this.showMajorRoads();
+        console.log("scene loaded:", config);
       },
       update: function (msg: any) {
         // scene updated
@@ -137,8 +134,9 @@ export default class LeafletController {
       post_update: function (will_render: any) {
         // after scene update
       },
-      view_complete: function (msg: any) {
+      view_complete: (config: any) => {
         // new set of map tiles was rendered
+        //this.showMajorRoads();    // TODO damit laggts gewaltig lol
       },
       error: function (msg: any) {
         // on error
@@ -147,6 +145,16 @@ export default class LeafletController {
         // on warning
       },
     });
+
+    const initialZoom = 12;
+    const coordinatesRegensburg: LatLngExpression = [49.008, 12.1];
+    this.map.setView(coordinatesRegensburg, initialZoom);
+  }
+
+  getFeaturesFromMap() {
+    Benchmark.startMeasure("Tangram - getVisibleFeatures");
+    this.getVisibleFeatures();
+    Benchmark.stopMeasure("Tangram - getVisibleFeatures");
   }
 
   // Util-Method that adds a layer to the Leaflet map as well as the activeLayers map
@@ -173,62 +181,80 @@ export default class LeafletController {
         geometry: true,
       })
       .then((results: any[]) => {
-        results.forEach((feature: GeoJsonObject | undefined) =>
+        results.forEach((feature: GeoJsonObject | undefined) => {
           L.geoJSON(feature, {
             style: function () {
               return { color: "red" };
             },
-          }).addTo(this.map)
-        );
+          }).addTo(this.map);
+        });
       });
   }
 
-  //TODO funktioniert noch nicht!
+  //TODO bei jedem move machen !!
   getVisibleFeatures() {
     // signature: queryFeatures({ filter = null, visible = null, unique = true, group_by = null, geometry = false })
 
+    // get all
+    this.scene
+      .queryFeatures({ unique: true, geometry: true })
+      .then((features: any) => console.log(features));
+
+    /*
     //This example will return all restaurants in the pois layer in the visible tiles:
     this.scene
       .queryFeatures({ filter: { $layer: "pois", kind: "restaurant" } })
       .then((features: any) => console.log(features));
 
-    // remove all duplicates
-    this.scene
-      .queryFeatures({ unique: true, geometry: true })
-      .then((features: any) => console.log(features));
-
     // group
     this.scene
-      .queryFeatures({ filter: { $layer: "pois", kind: "restaurant" }, group_by: "kind" })
+      .queryFeatures({ filter: { $layer: "pois" }, group_by: "kind" })
       .then((features: any) => console.log(features));
+    */
 
-    // get geometry information as well by setting geometry to true!
-    this.scene
-      .queryFeatures({ filter: { $layer: "pois", kind: "restaurant" }, geometry: true })
-      .then((features: any) => console.log(features));
+    const layer = "pois";
+    const kind = "mall";
 
-    // get all
-    this.scene.queryFeatures().then((features: any) => console.log(features));
-
-    //Add Leaflet markers for visible restaurant POIs
+    Benchmark.startMeasure("Tangram - addOverlay");
+    Benchmark.startMeasure("Tangram - addOverlay_2");
     this.scene
       .queryFeatures({
-        filter: { $layer: "pois", kind: "restaurant" },
-        visible: true,
+        filter: { $layer: layer, kind: kind },
         geometry: true,
+        unique: true,
+        //this would prevent it from working for some reason: visible: true,
       })
-      .then((results: any[]) => {
-        results.forEach((feature: { geometry: { coordinates: number[] } }) => {
-          const marker = L.marker([
+      .then((features: any) => {
+        console.log(features);
+        const allPoints: L.Point[] = [];
+        const allLatLngs: any = [];
+
+        features.forEach((feature: { geometry: { coordinates: number[] } }) => {
+          allLatLngs.push(feature.geometry.coordinates);
+
+          const latLng = [
             feature.geometry.coordinates[1],
             feature.geometry.coordinates[0],
-          ]);
-          marker.addTo(this.map);
+          ] as LatLngExpression;
+
+          //* circle Marker scales on zoom, circle does not!
+          //L.circleMarker(latLng, { radius: 10 }).addTo(this.map);
+          //L.circle(latLng, { radius: 700 }).addTo(this.map);
+
+          const point = this.map.latLngToLayerPoint(latLng);
+          allPoints.push(point);
         });
+        //console.log("allPoints: ", allPoints);
+
+        //this.addGridLayer(allPoints);
+        //this.addImageLayer(allPoints);
+        //this.addCanvasLayer(allPoints);
+        this.addMaskLayer(allLatLngs);
+        Benchmark.stopMeasure("Tangram - addOverlay_2");
       });
   }
 
-  addBlur() {
+  takeScreenshot() {
     // make a canvas screenshot
     this.scene
       .screenshot({ background: "transparent" })
@@ -238,7 +264,20 @@ export default class LeafletController {
       });
   }
 
+  /**
+   * Adds a new source or updates an already existing one
+   */
+  addNewSource(geojson_data: GeoJsonObject) {
+    this.scene.setDataSource("osm", {
+      type: "TopoJSON",
+      url: "https://tile.nextzen.org/tilezen/vector/v1/256/all/{z}/{x}/{y}.topojson",
+    });
+
+    //this.scene.setDataSource("dynamic_data", { type: "GeoJSON", data: geojson_data });
+  }
+
   addGeoJsonLayer(data: GeoJsonObject, queryInput: string) {
+    Benchmark.startMeasure("Tangram - addGeojsonLayer");
     const geojsonLayer = L.geoJSON(data, {
       style: function (feature) {
         return { color: feature?.properties.color };
@@ -247,16 +286,129 @@ export default class LeafletController {
         //A Function that will be called once for each created Feature, after it has been created and styled.
         // Useful for attaching events and popups to features.
         //TODO draw circle and blur here?
+        //console.log(feature);
+        //console.log(feature.properties);
+        //console.log(feature.geometry);
       },
     });
 
     this.addLayer(queryInput, geojsonLayer);
+    Benchmark.stopMeasure("Tangram - addGeojsonLayer");
   }
 
-  addCanvasLayer() {
-    //TODO wie benutze ich das? iwie createTile function? oder kann ich das canvas layer jetzt als neuen Type nehmen?
+  addImageLayer(allPoints: L.Point[]) {
+    const canvas = document.createElement("canvas"); // in-memory canvas
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      console.log("No context available!");
+      return;
+    }
+
+    const size = this.map.getSize();
+    canvas.width = size.x;
+    canvas.height = size.y;
+
+    // clear canvas
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    blurCanvas(canvas, 9);
+
+    for (let point of allPoints) {
+      //draw a circle
+      this.renderCircle(context, point, 30);
+    }
+
+    const bounds = this.map.getBounds();
+    const image = new Image();
+
+    image.src = canvas.toDataURL();
+
+    image.onload = () => {
+      console.log(image.src);
+      L.imageOverlay(image.src, bounds).addTo(this.map);
+    };
+  }
+
+  addGridLayer(allPoints: L.Point[]) {
     const canvasLayer = L.GridLayer.extend({
-      createTile: function (coords: any) {
+      createTile: function (coords: any, error: any) {
+        // create a <canvas> element for drawing
+        var tile = L.DomUtil.create("canvas", "leaflet-tile") as HTMLCanvasElement;
+
+        // setup tile width and height according to the options
+        var size = this.getTileSize();
+        tile.width = size.x;
+        tile.height = size.y;
+
+        // get a canvas context and draw something on it using coords.x, coords.y and coords.z
+        var context = tile.getContext("2d");
+
+        if (!context) return;
+
+        // clear canvas
+        context.clearRect(0, 0, tile.width, tile.height);
+
+        /*
+        var error; 
+        //* asynchron für bessere Performance?
+        // draw something asynchronously and pass the tile to the done() callback
+        setTimeout(function() {
+            done(error, tile);
+        }, 1000);
+        */
+
+        blurCanvas(tile as HTMLCanvasElement, 9);
+
+        const radius = 30;
+        for (let point of allPoints) {
+          //draw a circle
+          context.fillStyle = "rgba(60, 60, 60, 0.4)";
+          context.strokeStyle = "rgba(150, 150, 150, 0.9)";
+          context.beginPath();
+          context.arc(point.x, point.y, radius, 0, 2 * Math.PI);
+          context.closePath();
+          context.fill();
+          context.stroke();
+        }
+
+        console.log(tile);
+
+        // return the tile so it can be rendered on screen
+        return tile;
+      },
+    });
+
+    const layer = new canvasLayer();
+    this.addLayer("gridLayer", layer);
+  }
+
+  addCanvasLayer(allPoints: L.Point[]) {
+    //TODO
+  }
+
+  addMaskLayer(allPoints: any) {
+    //delete old layer first
+    this.removeData("maskLayer");
+
+    // typescript isn't able to detect this without a correct typings file so just cast it to any as a dirty solution
+    const maskLayer = new (L.GridLayer as any).MaskCanvas({
+      opacity: 0.5,
+      radius: 70,
+      useAbsoluteRadius: true, // in meter, if false in pixel
+      color: "#000", // the color of the layer
+      noMask: false, // true results in normal (filled) circled, instead masked circles
+      lineColor: "#A00", // color of the circle outline if noMask is true
+    });
+
+    //* auch individuelle Radien können gesetzt werden!
+    const data = allPoints.map((el: number[]) => [el[1], el[0]]);
+    maskLayer.setData(data);
+
+    //TODO wie blurren? vllt mit canvas blur wie oben in beispielen? layer to canvas?
+    /*
+    const newLayer = maskLayer.extend({
+      createTile: function (coords: any, error: any) {
         // create a <canvas> element for drawing
         var tile = L.DomUtil.create("canvas", "leaflet-tile");
 
@@ -266,14 +418,38 @@ export default class LeafletController {
         tile.height = size.y;
 
         // get a canvas context and draw something on it using coords.x, coords.y and coords.z
-        var ctx = tile.getContext("2d");
+        var context = tile.getContext("2d");
+
+        blurCanvas(tile as HTMLCanvasElement, 9);
+
+        console.log(tile);
 
         // return the tile so it can be rendered on screen
         return tile;
       },
     });
+    const newMaskLayer = new newLayer();
+    */
 
-    //this.addLayer("canvasLayer", canvasLayer);
+    this.addLayer("maskLayer", maskLayer);
+    //this.map.fitBounds(maskLayer.bounds);
+
+    Benchmark.stopMeasure("Tangram - addOverlay");
+  }
+
+  //! eigentlich mit webgl machen, auch den blur oben
+  renderCircle(context: CanvasRenderingContext2D, point: L.Point, radius: number = 20) {
+    context.fillStyle = "rgba(60, 60, 60, 0.4)";
+    context.strokeStyle = "rgba(150, 150, 150, 0.9)";
+    //context.fillStyle = "white";
+    //context.strokeStyle = "white";
+
+    context.beginPath();
+    context.arc(point.x, point.y, radius, 0, 2 * Math.PI);
+    //context.closePath();
+    context.fill();
+    //context.fill('evenodd');
+    context.stroke();
   }
 
   removeData(layerName: string) {

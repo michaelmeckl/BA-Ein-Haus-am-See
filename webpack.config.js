@@ -1,22 +1,27 @@
 const path = require("path");
 const webpack = require("webpack");
+const Dotenv = require('dotenv-webpack');
 const nodeExternals = require("webpack-node-externals");
+//const {CleanWebpackPlugin} = require('clean-webpack-plugin');
 /*
-//TODO:
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 */
 
 module.exports = {
     mode: "development",
     devtool: "none",
     entry: [
+        // Add the client which connects to our middleware
+        //"webpack-hot-middleware/client",
         "./src/app/main.ts",
     ],
     output: {
+        //publicPath: "http://localhost:8000/dist",
         filename: "bundle.js",
         path: path.resolve(__dirname, "./public/dist"),
         pathinfo: false,
+        //hotUpdateChunkFilename: 'hot/hot-update.js',
+        //hotUpdateMainFilename: 'hot/hot-update.json'
     },
     resolve: {
         extensions: [".tsx", ".ts", ".js"],
@@ -39,11 +44,9 @@ module.exports = {
             },
             /*
             {
-                // This is required to bundle images in Leaflet's stylesheet.
-                test: /\.png$/,
-                use: 'url-loader'
-            }
-            */
+                test: /\.css$/,
+                use: ['style-loader', 'css-loader'],
+            },*/
         ],
         // Apply `noParse` to Tangram to prevent mangling of UMD boilerplate
         noParse: /tangram\/dist\/tangram/
@@ -57,7 +60,12 @@ module.exports = {
     })],
     */
     plugins: [
+        // Enables reading mapbox token from .env file
+        new Dotenv({
+            path: path.resolve(__dirname, './.env'), // Path to .env file
+        }),
         //new CleanWebpackPlugin(),
+        //new webpack.HotModuleReplacementPlugin(),
         /*
         new HtmlWebpackPlugin({
             title: "Ein Haus am See im Browser",

@@ -97,6 +97,7 @@ _blurCanvas = function (viewportCanvas, size) {
     ctx.putImageData(imgData, 0, 0);
 };
 
+//starting point
 function blur() {
     console.time('draw Canvas');
     var viewportCanvas = that._getDrawnViewportCanvas(bufferedFtColl, zoom, requiredTilesInfo);

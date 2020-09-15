@@ -1,5 +1,4 @@
 import mapboxgl, { LngLatLike } from "mapbox-gl";
-import { Config } from "../../shared/config";
 
 // make sure that MapboxGl (and WebGL) are supported in the browser
 if (!mapboxgl.supported()) {
@@ -7,7 +6,10 @@ if (!mapboxgl.supported()) {
 }
 
 // provide Mapbox accessToken
-mapboxgl.accessToken = Config.MAPBOX_TOKEN;
+if (!process.env.MapboxToken) {
+  throw new Error("No valid Mapbox Token was provided!");
+}
+mapboxgl.accessToken = process.env.MapboxToken;
 
 // default api to request tiles, styles, ...
 // TODO could be used to load tiles from own tileserver

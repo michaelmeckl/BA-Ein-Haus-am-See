@@ -1,5 +1,4 @@
 /* eslint-env browser */
-import type MapController from "./mapboxMap/mapController";
 import Benchmark from "../shared/benchmarking";
 import { fetchOsmData } from "./network/networkUtils";
 import { Config } from "../shared/config";
@@ -152,10 +151,9 @@ function setupUI(mapController: LeafletController): void {
     showLocationsButtton.addEventListener("click", showLocations);
   }
 
-  //TODO
   const blurButtton = document.querySelector("#blurButton");
   if (blurButtton) {
-    blurButtton.addEventListener("click", mapController.addBlur.bind(mapController));
+    blurButtton.addEventListener("click", mapController.takeScreenshot.bind(mapController));
   }
 
   const closeSidebarButtton = document.querySelector(HtmlElements.CLOSE_SIDEBAR_BUTTON_CLASS);
@@ -172,11 +170,7 @@ function setupUI(mapController: LeafletController): void {
 
   const showWebGLButton = document.querySelector(HtmlElements.SHOW_CUSTOM_DATA_ID);
   if (showWebGLButton) {
-    /*
-    showWebGLButton.addEventListener(
-      "click",
-      mapController.addWebGlLayer.bind(mapController) // necessary to bind as the this context would be different in the addWebGL method otherwise
-    );*/
+    showWebGLButton.addEventListener("click", mapController.getFeaturesFromMap.bind(mapController));
   }
 
   const queryInput = document.querySelector(HtmlElements.QUERY_INPUT_ID) as HTMLInputElement;
