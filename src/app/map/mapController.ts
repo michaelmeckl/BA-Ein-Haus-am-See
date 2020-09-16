@@ -20,7 +20,7 @@ import {
   addCanvasOverlay,
 } from "./testMapFunctionsTODO";
 import { getDataFromMap } from "./mapboxUtils";
-import { loadSidebar, sortDistances } from "./mapStoreTest";
+import { loadSidebar, sortDistances } from "./mapTutorialStoreTest";
 import { fetchOsmData } from "../network/networkUtils";
 import * as createjs from "createjs-module";
 import {

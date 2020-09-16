@@ -190,7 +190,7 @@ function setupUI(mapController: MapController): void {
   }
 }
 
-async function init(): Promise<void> {
+function init(): void {
   const mapController = new MapController();
   mapController.setupMap(setupUI);
 }
