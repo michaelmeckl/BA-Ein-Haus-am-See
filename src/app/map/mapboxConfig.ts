@@ -1,5 +1,4 @@
 import mapboxgl, { LngLatLike } from "mapbox-gl";
-import { Config } from "../../shared/config";
 
 // make sure that MapboxGl (and WebGL) are supported in the browser
 if (!mapboxgl.supported()) {

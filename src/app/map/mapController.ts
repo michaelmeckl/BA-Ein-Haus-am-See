@@ -32,14 +32,32 @@ import {
 } from "../webgl/webglUtils";
 
 export default class MapController {
-  private mapIsReady: Boolean = false;
+  //private mapIsReady: Boolean = false;
 
-  setupMap(callbackFunc: (controller: this) => void): void {
+  setupMap(): Promise<void> {
     console.time("load map");
 
     //set cursor style to mouse pointer
     map.getCanvas().style.cursor = "default";
 
+    this.addMapControls();
+
+    //map.showTileBoundaries = true;
+
+    return new Promise((resolve, reject) => {
+      map.on("load", () => {
+        console.timeEnd("load map");
+        //this.mapIsReady = true;
+
+        this.initMapState();
+
+        resolve();
+      });
+      map.on("error", () => reject());
+    });
+  }
+
+  addMapControls() {
     // Add navigation controls to the map
     map.addControl(
       new mapboxgl.NavigationControl({
@@ -49,23 +67,16 @@ export default class MapController {
     map.addControl(new mapboxgl.FullscreenControl(), "top-right");
     //map.addControl(new mapboxgl.ScaleControl(), "bottom-left");
     //map.addControl(new mapboxgl.GeolocateControl(), "bottom-right");
+  }
 
-    //map.showTileBoundaries = true;
+  initMapState() {
+    // start measuring the frame rate
+    this.measureFrameRate();
 
-    map.on("load", () => {
-      console.timeEnd("load map");
-      this.mapIsReady = true;
+    //TODO
+    loadSidebar();
 
-      // start measuring the frame rate
-      this.measureFrameRate();
-
-      // call the callbackFunction after the map has loaded
-      callbackFunc(this);
-
-      //TODO
-      loadSidebar();
-
-      /*
+    /*
       map.on("sourcedata", function (e) {
         console.log(e.source);
         if (e.isSourceLoaded) {
@@ -78,64 +89,36 @@ export default class MapController {
       });
       */
 
-      map.on("movestart", () => {
-        console.log("Move start event fired!");
-      });
+    map.on("movestart", () => {
+      //console.log("Move start event fired!");
+    });
 
-      map.on("moveend", async () => {
-        console.log("Move end event fired!");
-        // show current zoom level
-        console.log("ZoomLevel:");
-        console.log(map.getZoom());
+    map.on("moveend", async () => {
+      //console.log("Move end event fired!");
 
-        /*
-        //TODO: test
-        const features = map.queryRenderedFeatures({ layers: ["points-l1"] });
+      // show current zoom level
+      console.log("ZoomLevel:");
+      console.log(map.getZoom());
 
-        if (features) {
-          const uniqueFeatures = this.getUniqueFeatures(features, "id");
-          console.table(uniqueFeatures);
-        }
-        */
+      /*
+      //TODO: test
+      const features = map.queryRenderedFeatures({ layers: ["points-l1"] });
 
-        //TODO: load data new on every move, works but needs another source than overpass api mirror
-        parameterSelection.forEach(async (param) => {
-          Benchmark.startMeasure("Fetching data on moveend");
-          const data = await fetchOsmData(this.getViewportBounds(), param);
-          console.log(Benchmark.stopMeasure("Fetching data on moveend"));
+      if (features) {
+        const uniqueFeatures = this.getUniqueFeatures(features, "id");
+        console.table(uniqueFeatures);
+      }
+      */
 
-          if (data) {
-            const t0 = performance.now();
-            this.showData(data, param);
-            const t1 = performance.now();
-            console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
-
-            console.log("Finished adding data to map!");
-          }
-        });
-
-        //TODO use this instead of the code above to reload on every move?
-        /*
-        // after the GeoJSON data is loaded, update markers on the screen and do so on every map move/moveend
-map.on('data', function(e) {
-if (e.sourceId !== 'earthquakes' || !e.isSourceLoaded) return;
- 
-map.on('move', updateMarkers);
-map.on('moveend', updateMarkers);
-updateMarkers();
-});
-        */
-
-        getPointsInRadius(map);
-      });
+      this.reloadData();
     });
 
     // fired when any map data begins loading or changing asynchronously.
     /*
-    map.on("dataloading", () => {
-      console.log("A dataloading event occurred.");
-    });
-    */
+      map.on("dataloading", () => {
+        console.log("A dataloading event occurred.");
+      });
+      */
 
     //TODO idee: alle häuser in abstand bekommen, indem erst mit tilequery api landuse oder building extrahiert
     // und dann z.b. mit turf distanz oder der LatLng.distanceto()-Methode zu allen queryRendered features
@@ -143,6 +126,8 @@ updateMarkers();
 
     map.on("click", (e) => {
       console.log("Click:", e);
+
+      getPointsInRadius(map);
 
       //TODO not working rigth now
       //sortDistances(e.lngLat);
@@ -152,11 +137,34 @@ updateMarkers();
     });
   }
 
-  //TODO: To use promises instead of callbacks: await this function at the start
-  mapLoad(map) {
-    return new Promise((resolve, reject) => {
-      map.on("load", () => resolve());
+  reloadData() {
+    //TODO: load data new on every move, works but needs another source than overpass api mirror
+    parameterSelection.forEach(async (param) => {
+      Benchmark.startMeasure("Fetching data on moveend");
+      const data = await fetchOsmData(this.getViewportBounds(), param);
+      console.log(Benchmark.stopMeasure("Fetching data on moveend"));
+
+      if (data) {
+        const t0 = performance.now();
+        this.showData(data, param);
+        const t1 = performance.now();
+        console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
+
+        console.log("Finished adding data to map!");
+      }
     });
+
+    //TODO use this instead of the code above to reload on every move?
+    /*
+    // after the GeoJSON data is loaded, update markers on the screen and do so on every map move/moveend
+    map.on('data', function(e) {
+    if (e.sourceId !== 'earthquakes' || !e.isSourceLoaded) return;
+
+    map.on('move', updateMarkers);
+    map.on('moveend', updateMarkers);
+    updateMarkers();
+    });
+    */
   }
 
   measureFrameRate(): void {

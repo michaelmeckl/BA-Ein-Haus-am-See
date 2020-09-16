@@ -192,7 +192,16 @@ function setupUI(mapController: MapController): void {
 
 function init(): void {
   const mapController = new MapController();
-  mapController.setupMap(setupUI);
+  mapController
+    .setupMap()
+    .then(() => {
+      // map loaded sucessfully
+      setupUI(mapController);
+    })
+    .catch((error) => {
+      // an error occured while loading the map, the application cannot be used
+      throw new Error(error);
+    });
 }
 
 init();
