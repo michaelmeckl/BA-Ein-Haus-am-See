@@ -7,7 +7,10 @@ if (!mapboxgl.supported()) {
 }
 
 // provide Mapbox accessToken
-mapboxgl.accessToken = Config.MAPBOX_TOKEN;
+if (!process.env.MapboxToken) {
+  throw new Error("No valid Mapbox Token was provided!");
+}
+mapboxgl.accessToken = process.env.MapboxToken;
 
 // default api to request tiles, styles, ...
 // TODO could be used to load tiles from own tileserver
