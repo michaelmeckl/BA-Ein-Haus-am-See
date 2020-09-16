@@ -6,7 +6,8 @@ cameras:
 
 scene:
   background:
-    color: transparent
+    color: transparent # map background color
+    #animated: true
 
 styles:
   buildings:
@@ -17,31 +18,32 @@ styles:
           color.rgb *= vec3(min((v_world_position.z*.001 + .6),1.));
 
 sources:
-  nextzen:
+  mapbox:
     type: MVT
-    url: https://tile.nextzen.org/tilezen/vector/v1/512/all/{z}/{x}/{y}.mvt
-    url_params:
-      api_key: NaqqS33fTUmyQcvbuIUCKA
+    #url: https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/{z}/{x}/{y}.mvt
+    url: https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/{z}/{x}/{y}.mvt?access_token=pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ
     tile_size: 512
-    max_zoom: 16
+    max_zoom: 18
 
 layers:
   landuse:
-    data: { source: nextzen }
+    data: { source: mapbox }
+    #filter:
+    #kind: [residential, commercial]
     draw:
       polygons:
         order: function() { return feature.sort_rank; }
         color: grey
 
   water:
-    data: { source: nextzen }
+    data: { source: mapbox }
     draw:
       polygons:
         order: function() { return feature.sort_rank; }
         color: lightblue
 
   roads:
-    data: { source: nextzen }
+    data: { source: mapbox }
     filter:
       not: { kind: [path, rail, ferry] }
     draw:
@@ -55,7 +57,7 @@ layers:
           order: 350
 
   buildings:
-    data: { source: nextzen }
+    data: { source: mapbox }
     draw:
       polygons:
         order: function() { return feature.sort_rank; }
@@ -74,7 +76,7 @@ layers:
           extrude: function () { return feature.height > 0 || $zoom >= 16; }
 
   places:
-    data: { source: nextzen }
+    data: { source: mapbox }
     filter: function() { return ($zoom >= feature.min_zoom && (feature.max_zoom == null || $zoom <= feature.max_zoom)); }
     draw:
       text:

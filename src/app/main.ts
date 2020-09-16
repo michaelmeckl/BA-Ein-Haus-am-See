@@ -137,7 +137,11 @@ async function performOsmQuery(
 
   if (data) {
     const t0 = performance.now();
-    mapController.addGeoJsonLayer(data, inputQuery);
+
+    //TODO measure time!
+    //mapController.addGeoJsonLayer(data, inputQuery);
+    mapController.addGeoJsonAndBlurLayer(data, inputQuery);
+
     const t1 = performance.now();
     console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 

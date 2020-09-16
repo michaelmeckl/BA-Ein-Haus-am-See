@@ -28,6 +28,7 @@
   },
   "homepage": "https://github.com/michaelmeckl/BA-Ein-Haus-am-See#readme",
   "dependencies": {
+    "@mapbox/geojson-coords": "0.0.0",
     "@turf/buffer": "^5.1.5",
     "@turf/circle": "^6.0.1",
     "@turf/clean-coords": "^6.0.1",
@@ -47,6 +48,7 @@
     "easeljs": "^1.0.2",
     "express": "^4.17.1",
     "helmet": "^3.23.2",
+    "html2canvas": "^1.0.0-rc.7",
     "http-status-codes": "^1.4.0",
     "ioredis": "^4.17.3",
     "leaflet": "^1.7.1",
@@ -57,6 +59,7 @@
     "pbf2json": "^6.6.0",
     "query-string": "^6.13.1",
     "redis": "^3.0.2",
+    "stackblur-canvas": "^2.4.0",
     "tangram": "^0.21.0",
     "tslib": "^2.0.0",
     "twgl.js": "^4.16.0",

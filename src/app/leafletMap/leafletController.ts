@@ -1,5 +1,5 @@
 /* eslint-env browser */
-import L from "leaflet";
+import L, { LatLng } from "leaflet";
 import type {
   LatLngExpression,
   Map as LeafletMap, // rename to prevent clashes with the ES6 built-in Map
@@ -9,17 +9,35 @@ import type {
   Layer,
 } from "leaflet";
 import Tangram from "tangram";
-import type { GeoJsonObject } from "geojson";
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonObject,
+  GeoJsonProperties,
+  Geometry,
+  Point,
+  Polygon,
+} from "geojson";
 import Benchmark from "../../shared/benchmarking";
-import { blurCanvas } from "../mapboxMap/testMapFunctionsTODO";
+import { blurCanvas, blurImage } from "../mapboxMap/testMapFunctionsTODO";
 import "leaflet-maskcanvas";
+import * as StackBlur from "stackblur-canvas";
+import html2canvas from "html2canvas";
+import geojsonCoords from "@mapbox/geojson-coords";
+import "../vendors/fast-gauss-blur.js";
 
 /**
- * TODO 0: wie blur effekte mit Tangram?
- * TODO 1: kann ich Blur effekte, bzw. alles, besser mit Leaflet + Tangram umsetzen?
- * TODO 2: Zeit messen, wie schnell Leaflet + Tangram ist (v.a. beim laden und zeigen von geojson von overpass)
- * TODO 3: bringen mir einige der Leaflet Plugins was?
+ * TODO wie blur effekte mit Tangram?
+ *    -> man kann in der scene custom shader einbauen und die auch dynamisch setzen
+ *    -> bzw. wäre der Ablauf: blur-shader in custom style oben in scene file deklarieren, dann zur Laufzeit
+ *       in der sceneFile durch die updateConfig - Methode unten ein neues Layer einzufügen in den layers-block
+ *       (mit den Daten die geblurrt werden sollen) oder alternativ ein bestehendes Layer filtern durch Hinzufügen
+ *       eines Filters, dann diesem layer den eigenen custom style zuweisen (damit dieses layer geblurred wird)
  */
+
+//TODO 2: Zeit messen, wie schnell Leaflet + Tangram ist (v.a. beim laden und zeigen von geojson von overpass)
+// und beim image canvas overlay
+
 export default class LeafletController {
   // readonly local map instance which is accessible from outside only via getter
   private readonly map: LeafletMap;
@@ -30,7 +48,11 @@ export default class LeafletController {
   private activeLayers: Map<string, Layer> = new Map();
 
   constructor() {
-    this.map = L.map("map", { zoomControl: false });
+    Benchmark.startMeasure("load map");
+
+    const initialZoom = 12;
+    const coordinatesRegensburg: LatLngExpression = [49.008, 12.1];
+    this.map = L.map("map", { zoomControl: false }).setView(coordinatesRegensburg, initialZoom);
     new L.Control.Zoom({ position: "topright" }).addTo(this.map); // move the zoom control to the right
 
     this.handleEvents();
@@ -42,6 +64,7 @@ export default class LeafletController {
   }
 
   setupMap() {
+    /*
     const mapboxLayer = L.tileLayer(
       "https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}",
       {
@@ -55,6 +78,7 @@ export default class LeafletController {
       }
     );
     //this.addLayer("osmLayer", mapboxLayer);
+    */
 
     const configJson = {
       //TODO not working, probably because i dont have a nextzen account
@@ -73,7 +97,7 @@ export default class LeafletController {
     };
 
     this.tangramLayer = Tangram.leafletLayer({
-      //scene: "../nextzen_scene.yaml",
+      //scene: "../scene.yaml",
       scene: {
         import: [
           // Bubble Wrap Style
@@ -96,6 +120,20 @@ export default class LeafletController {
             max_zoom: 16,
           },
         },
+        /*
+        layers: {
+          pois: {
+            data: { source: "mapzen" },
+            filter: { kind: ["restaurant", "mall", "bus_stop"] },
+            draw: {
+              polygons: {
+                order: 1,
+                color: "yellow",
+              },
+            },
+          },
+        },
+        */
       },
       events: {
         //hover: onHover, // hover event (defined below)
@@ -124,6 +162,7 @@ export default class LeafletController {
       load: (config: any) => {
         // scene was loaded
         console.log("scene loaded:", config);
+        Benchmark.stopMeasure("load map");
       },
       update: function (msg: any) {
         // scene updated
@@ -137,6 +176,19 @@ export default class LeafletController {
       view_complete: (config: any) => {
         // new set of map tiles was rendered
         //this.showMajorRoads();    // TODO damit laggts gewaltig lol
+        console.log("scene loaded_view_complete:", this.scene.config);
+        var results = [];
+
+        var toSearch = "mall";
+
+        for (var i = 0; i < this.scene.config.length; i++) {
+          for (var key in this.scene.config[i]) {
+            if (this.scene.config[i][key].indexOf(toSearch) != -1) {
+              results.push(this.scene.config[i]);
+            }
+          }
+        }
+        console.log(results);
       },
       error: function (msg: any) {
         // on error
@@ -146,9 +198,11 @@ export default class LeafletController {
       },
     });
 
-    const initialZoom = 12;
-    const coordinatesRegensburg: LatLngExpression = [49.008, 12.1];
-    this.map.setView(coordinatesRegensburg, initialZoom);
+    //TODO show blur layer after every move ?
+    /*
+    this.map.on("moveend", (e) => {
+      this.getFeaturesFromMap();
+    });*/
   }
 
   getFeaturesFromMap() {
@@ -163,7 +217,7 @@ export default class LeafletController {
     this.map.addLayer(layer);
   }
 
-  updateLayer() {
+  updateScene() {
     //TODO update objects simply by assigning new values
     //this.scene.config.styles. ... = ...;
 
@@ -191,7 +245,6 @@ export default class LeafletController {
       });
   }
 
-  //TODO bei jedem move machen !!
   getVisibleFeatures() {
     // signature: queryFeatures({ filter = null, visible = null, unique = true, group_by = null, geometry = false })
 
@@ -212,6 +265,7 @@ export default class LeafletController {
       .then((features: any) => console.log(features));
     */
 
+    //TODO restaurants etc. sind offenbar nicht vorhanden oder erst auf niedrigeren Zoom-Leveln??
     const layer = "pois";
     const kind = "mall";
 
@@ -247,9 +301,8 @@ export default class LeafletController {
         //console.log("allPoints: ", allPoints);
 
         //this.addGridLayer(allPoints);
-        //this.addImageLayer(allPoints);
-        //this.addCanvasLayer(allPoints);
-        this.addMaskLayer(allLatLngs);
+        this.addImageLayer(allPoints);
+        //this.addMaskLayer(allLatLngs);
         Benchmark.stopMeasure("Tangram - addOverlay_2");
       });
   }
@@ -259,8 +312,29 @@ export default class LeafletController {
     this.scene
       .screenshot({ background: "transparent" })
       .then((screenshot: { url: string | undefined }) => {
+        if (!screenshot.url) return;
+
         //window.open(screenshot.url);
         console.log(screenshot.url);
+
+        /*
+        const newCanvas = document.createElement("canvas"); // in-memory canvas
+        const size = this.map.getSize();
+        newCanvas.width = size.x;
+        newCanvas.height = size.y;
+
+        const bounds = this.map.getBounds();
+        const image = new Image();
+
+        image.src = screenshot.url;
+
+        StackBlur.image(image, newCanvas, 8);
+
+        image.onload = () => {
+          console.log("blurred canvas: ", image.src);
+          L.imageOverlay(image.src, bounds).addTo(this.map);
+        };
+        */
       });
   }
 
@@ -278,6 +352,8 @@ export default class LeafletController {
 
   addGeoJsonLayer(data: GeoJsonObject, queryInput: string) {
     Benchmark.startMeasure("Tangram - addGeojsonLayer");
+    console.log(data);
+
     const geojsonLayer = L.geoJSON(data, {
       style: function (feature) {
         return { color: feature?.properties.color };
@@ -285,8 +361,7 @@ export default class LeafletController {
       onEachFeature: function (feature, layer) {
         //A Function that will be called once for each created Feature, after it has been created and styled.
         // Useful for attaching events and popups to features.
-        //TODO draw circle and blur here?
-        //console.log(feature);
+        console.log(feature);
         //console.log(feature.properties);
         //console.log(feature.geometry);
       },
@@ -296,7 +371,33 @@ export default class LeafletController {
     Benchmark.stopMeasure("Tangram - addGeojsonLayer");
   }
 
+  addGeoJsonAndBlurLayer(data: FeatureCollection, queryInput: string) {
+    Benchmark.startMeasure("Tangram - addGeojsonAndBlurLayer");
+    const allGeoData: number[][] = geojsonCoords(data);
+    /*
+    data.features.forEach((el: Feature<Geometry, GeoJsonProperties>) => {
+      const geom = el.geometry;
+      if (!geom.coordinates) return;
+      for (let coords of geom.coordinates) {
+        console.log(coords);
+      }
+    });
+    */
+
+    const allPoints: L.Point[] = [];
+    for (const el of allGeoData) {
+      const latLng = [el[1], el[0]] as LatLngExpression;
+
+      const point = this.map.latLngToLayerPoint(latLng);
+      allPoints.push(point);
+    }
+
+    this.addImageLayer(allPoints);
+  }
+
   addImageLayer(allPoints: L.Point[]) {
+    this.removeData("imageLayer");
+
     const canvas = document.createElement("canvas"); // in-memory canvas
     const context = canvas.getContext("2d");
 
@@ -309,15 +410,33 @@ export default class LeafletController {
     canvas.width = size.x;
     canvas.height = size.y;
 
+    //context.globalCompositeOperation = "source-over";
+    //context.globalCompositeOperation = "xor"; //TODO funtioniert so nicht
+
     // clear canvas
     context.clearRect(0, 0, canvas.width, canvas.height);
 
+    /*
+    context.fillStyle = "black";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "white";
+    context.strokeStyle = "white";
+    */
+    context.fillStyle = "rgba(60, 60, 60, 0.4)";
+    context.strokeStyle = "rgba(150, 150, 150, 0.9)";
+    //context.fillStyle = "white";
+    //context.strokeStyle = "white";
+
     blurCanvas(canvas, 9);
 
+    Benchmark.startMeasure(`Rendering ${allPoints.length} Circles took `);
     for (let point of allPoints) {
       //draw a circle
       this.renderCircle(context, point, 30);
     }
+    Benchmark.stopMeasure(`Rendering ${allPoints.length} Circles took `);
+
+    //sthis._blurCanvas(canvas, 3);
 
     const bounds = this.map.getBounds();
     const image = new Image();
@@ -325,11 +444,48 @@ export default class LeafletController {
     image.src = canvas.toDataURL();
 
     image.onload = () => {
-      console.log(image.src);
-      L.imageOverlay(image.src, bounds).addTo(this.map);
+      //console.log(image.src);
+      const imageOverlay = L.imageOverlay(image.src, bounds);
+      this.addLayer("imageLayer", imageOverlay);
+      //this.blurMap();
+
+      Benchmark.stopMeasure("Tangram - addGeojsonAndBlurLayer");
     };
   }
 
+  _blurCanvas = function (viewportCanvas, size) {
+    var ctx = viewportCanvas.getContext("2d");
+    var imgData = ctx.getImageData(0, 0, viewportCanvas.width, viewportCanvas.height);
+
+    var redChannel = [];
+
+    for (var i = 0; i < imgData.data.length; i += 4) {
+      redChannel.push(imgData.data[i]);
+    }
+
+    var blurredRedChannel = [];
+
+    console.time("fastgaussblur");
+    window.FastGaussBlur.apply(
+      redChannel,
+      blurredRedChannel,
+      viewportCanvas.width,
+      viewportCanvas.height,
+      size
+    );
+    console.timeEnd("fastgaussblur");
+
+    for (var i = 0; i < imgData.data.length; i += 4) {
+      var colorValue = blurredRedChannel[i / 4];
+      imgData.data[i] = colorValue;
+      imgData.data[i + 1] = colorValue;
+      imgData.data[i + 2] = colorValue;
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  };
+
+  //! dieses layer bringt nichts, da hier nur für jedes Tile separat und nicht das gesamte bild
   addGridLayer(allPoints: L.Point[]) {
     const canvasLayer = L.GridLayer.extend({
       createTile: function (coords: any, error: any) {
@@ -367,7 +523,7 @@ export default class LeafletController {
           context.strokeStyle = "rgba(150, 150, 150, 0.9)";
           context.beginPath();
           context.arc(point.x, point.y, radius, 0, 2 * Math.PI);
-          context.closePath();
+          //context.closePath();
           context.fill();
           context.stroke();
         }
@@ -379,12 +535,50 @@ export default class LeafletController {
       },
     });
 
-    const layer = new canvasLayer();
+    const layer = new canvasLayer() as L.GridLayer;
     this.addLayer("gridLayer", layer);
   }
 
-  addCanvasLayer(allPoints: L.Point[]) {
-    //TODO
+  blurMap() {
+    const mapID = document.getElementById("map");
+    if (!mapID) return;
+
+    html2canvas(mapID, {
+      useCORS: true,
+      logging: true,
+    }).then((canvas) => {
+      console.log("snapshot taken with html2canvas");
+      var ocanvas = document.createElement("canvas");
+
+      const size = this.map.getSize();
+      const w = size.x;
+      const h = size.y;
+
+      ocanvas.width = w;
+      ocanvas.height = h;
+      ocanvas.style.left = 0 + "px";
+      ocanvas.style.top = 0 + "px";
+      ocanvas.id = "blurred";
+
+      var ctx = ocanvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.drawImage(canvas, 0, 0, w, h, 0, 0, w, h);
+
+      const radius = 6;
+      StackBlur.canvasRGB(ocanvas, 0, 0, w, h, radius);
+
+      console.log("at the end");
+      const bounds = this.map.getBounds();
+      const image = new Image();
+
+      image.src = ocanvas.toDataURL();
+
+      image.onload = () => {
+        console.log("blurred canvas: ", image.src);
+        L.imageOverlay(image.src, bounds).addTo(this.map);
+      };
+    });
   }
 
   addMaskLayer(allPoints: any) {
@@ -394,7 +588,7 @@ export default class LeafletController {
     // typescript isn't able to detect this without a correct typings file so just cast it to any as a dirty solution
     const maskLayer = new (L.GridLayer as any).MaskCanvas({
       opacity: 0.5,
-      radius: 70,
+      radius: 500,
       useAbsoluteRadius: true, // in meter, if false in pixel
       color: "#000", // the color of the layer
       noMask: false, // true results in normal (filled) circled, instead masked circles
@@ -404,8 +598,9 @@ export default class LeafletController {
     //* auch individuelle Radien können gesetzt werden!
     const data = allPoints.map((el: number[]) => [el[1], el[0]]);
     maskLayer.setData(data);
+    console.log(maskLayer);
 
-    //TODO wie blurren? vllt mit canvas blur wie oben in beispielen? layer to canvas?
+    //TODO wie blurren?
     /*
     const newLayer = maskLayer.extend({
       createTile: function (coords: any, error: any) {
@@ -439,16 +634,11 @@ export default class LeafletController {
 
   //! eigentlich mit webgl machen, auch den blur oben
   renderCircle(context: CanvasRenderingContext2D, point: L.Point, radius: number = 20) {
-    context.fillStyle = "rgba(60, 60, 60, 0.4)";
-    context.strokeStyle = "rgba(150, 150, 150, 0.9)";
-    //context.fillStyle = "white";
-    //context.strokeStyle = "white";
-
     context.beginPath();
     context.arc(point.x, point.y, radius, 0, 2 * Math.PI);
     //context.closePath();
-    context.fill();
-    //context.fill('evenodd');
+    //context.fill();
+    context.fill("evenodd");
     context.stroke();
   }
 
@@ -497,7 +687,30 @@ export default class LeafletController {
   }
 
   onLayerAdded(e: LayerEvent) {
-    console.log("new layer added!");
+    //console.log("new layer added: ", e.layer);
+    /*
+    //* hier nicht!
+    this.scene
+      .screenshot({ background: "transparent" })
+      .then((screenshot: { url: string | undefined }) => {
+        console.log("after screenshot");
+        if (!screenshot.url) return;
+
+        console.log("Screenshot: ", screenshot.url);
+
+        const bounds = this.map.getBounds();
+        const image = new Image();
+
+        image.src = screenshot.url;
+
+        blurImage(image, 40);
+
+        image.onload = () => {
+          console.log("Image.Src", image.src);
+          L.imageOverlay(image.src, bounds).addTo(this.map);
+        };
+      });
+      */
   }
 
   onAdded(e: LeafletEvent) {
