@@ -1,6 +1,7 @@
 import Benchmark from "../../shared/benchmarking";
 import osmtogeojson from "osmtogeojson";
 import axios from "axios";
+import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 
 export async function testGuide(): Promise<any> {
   try {
@@ -28,6 +29,12 @@ export async function testGuide(): Promise<any> {
     console.error(error);
     return null;
   }
+}
+
+export async function getGeocoderResults(query: string): Promise<FeatureCollection> {
+  const result = await axios.get(query);
+  console.log(result);
+  return result.data as FeatureCollection<Geometry, GeoJsonProperties>;
 }
 
 //TODO:

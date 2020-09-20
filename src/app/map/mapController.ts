@@ -2,7 +2,7 @@
 
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
-import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
+import mapboxgl, { CustomLayerInterface, GeoJSONSource } from "mapbox-gl";
 import { geocoder, map } from "./mapboxConfig";
 import * as webglUtils from "../webgl/webglUtils";
 import * as mapboxUtils from "./mapboxUtils";
@@ -21,7 +21,7 @@ import {
 } from "./testMapFunctionsTODO";
 import { getDataFromMap } from "./mapboxUtils";
 import { loadSidebar, sortDistances } from "./mapTutorialStoreTest";
-import { fetchOsmData } from "../network/networkUtils";
+import { fetchOsmData, getGeocoderResults } from "../network/networkUtils";
 import * as createjs from "createjs-module";
 import {
   createShader,
@@ -30,6 +30,7 @@ import {
   createProgram,
   resizeCanvas,
 } from "../webgl/webglUtils";
+import Axios from "axios";
 
 export default class MapController {
   //private mapIsReady: Boolean = false;
@@ -170,14 +171,140 @@ export default class MapController {
     */
   }
 
-  setupGeocoding() {
+  setupGeocoding(): void {
     const marker = new mapboxgl.Marker({ color: "#008000" }); // Create a new green marker
 
-    geocoder.on("result", (data: any) => {
-      // When the geocoder returns a result
-      const point = data.result.center; // Capture the result coordinates
+    //console.log(geocoder.getCountries());
+    //console.log(geocoder.getTypes());
+
+    // Fired when the geocoder returns a result
+    geocoder.on("result", async (data: any) => {
+      const point = data.result.center; // capture the result coordinates
+      console.log(data);
 
       marker.setLngLat(point).addTo(map); // Add the marker to the map at the result coordinates
+
+      map.addSource("tilequery", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: [],
+        },
+      });
+
+      map.addLayer({
+        id: "tilequery-points",
+        type: "circle",
+        source: "tilequery", // Set the layer source
+        paint: {
+          "circle-stroke-color": "white",
+          "circle-stroke-width": {
+            // Set the stroke width of each circle: https://docs.mapbox.com/mapbox-gl-js/style-spec/#paint-circle-circle-stroke-width
+            stops: [
+              [0, 0.1],
+              [18, 3],
+            ],
+            base: 5,
+          },
+          "circle-radius": {
+            // Set the radius of each circle, as well as its size at each zoom level: https://docs.mapbox.com/mapbox-gl-js/style-spec/#paint-circle-circle-radius
+            stops: [
+              [12, 5],
+              [22, 180],
+            ],
+            base: 5,
+          },
+          "circle-color": [
+            // Specify the color each circle should be
+            "match", // Use the 'match' expression: https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-match
+            ["get", "STORE_TYPE"], // Use the result 'STORE_TYPE' property
+            "Convenience Store",
+            "#FF8C00",
+            "Convenience Store With Gas",
+            "#FF8C00",
+            "Pharmacy",
+            "#FF8C00",
+            "Specialty Food Store",
+            "#9ACD32",
+            "Small Grocery Store",
+            "#008000",
+            "Supercenter",
+            "#008000",
+            "Superette",
+            "#008000",
+            "Supermarket",
+            "#008000",
+            "Warehouse Club Store",
+            "#008000",
+            "#FF0000", // any other store type
+          ],
+        },
+      });
+
+      const tileset = "mapbox.mapbox-streets-v8"; // tileset id
+      const radius = 2500; // in meters
+      const limit = 50; // the maximum amount of results to return
+
+      const query = `https://api.mapbox.com/v4/${tileset}/tilequery/${point[0]},${point[1]}.json?radius=${radius}&limit=${limit}&access_token=${mapboxgl.accessToken}`;
+      const q = "& dedupe & geometry=point &layers=poi_label";
+      //* limit is max. 50
+      //Query multiple maps
+
+      //curl "https://api.mapbox.com/v4/{tileset_id_1},{tileset_id_2},{tileset_id_3}/tilequery/-122.42901,37.80633.json&access_token=YOUR_MAPBOX_ACCESS_TOKEN"
+
+      // Return only results from the poi_label and building layers within a 30 meter radius of the specified location
+
+      // curl "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/-122.42901,37.80633.json?radius=30&layers=poi_label,building&access_token=YOUR_MAPBOX_ACCESS_TOKEN"
+
+      //* immer nur points als antwort: The Tilequery API does not return the full geometry of a feature. Instead, it returns the closest point ({longitude},{latitude}) of a feature.
+
+      const result = await getGeocoderResults(query);
+      console.log(result);
+
+      const source = map.getSource("tilequery");
+      (source as GeoJSONSource).setData(data);
+
+      const popup = new mapboxgl.Popup(); // Initialize a new popup
+
+      map.on("mouseenter", "tilequery-points", function (e) {
+        if (!e.features || !e.features[0].properties) {
+          return;
+        }
+
+        map.getCanvas().style.cursor = "pointer"; // When the cursor enters a feature, set it to a pointer
+
+        const title = "<h3>" + e.features[0].properties.STORE_NAME + "</h3>"; // Set the store name
+        const storeType = "<h4>" + e.features[0].properties.STORE_TYPE + "</h4>"; // Set the store type
+        const storeAddress = "<p>" + e.features[0].properties.ADDRESS_LINE1 + "</p>"; // Set the store address
+        const obj = JSON.parse(e.features[0].properties.tilequery); // Get the feature's tilequery object (https://docs.mapbox.com/api/maps/#response-retrieve-features-from-vector-tiles)
+        const distance =
+          "<p>" + (obj.distance / 1609.344).toFixed(2) + " mi. from location" + "</p>"; // Take the distance property, convert it to miles, and truncate it at 2 decimal places
+
+        const lon = e.features[0].properties.longitude;
+        const lat = e.features[0].properties.latitude;
+        const coordinates = new mapboxgl.LngLat(lon, lat); // Create a new LngLat object (https://docs.mapbox.com/mapbox-gl-js/api/#lnglatlike)
+        const content = title + storeType + storeAddress + distance; // All the HTML elements
+
+        popup
+          .setLngLat(coordinates) // Set the popup at the given coordinates
+          .setHTML(content) // Set the popup contents equal to the HTML elements you created
+          .addTo(map); // Add the popup to the map
+      });
+
+      map.on("mouseleave", "tilequery-points", function () {
+        map.getCanvas().style.cursor = ""; // Reset the cursor when it leaves the point
+        popup.remove(); // Remove the popup when the cursor leaves the point
+      });
+    });
+
+    // Fired when the geocoder returns a response
+    geocoder.on("results", (data: any) => {
+      //console.log("all results from geocoder: ", data);
+    });
+
+    // Emitted when the geocoder is looking up a query
+    geocoder.on("loading", (data: any) => {
+      //console.log("loading results");
     });
   }
 
