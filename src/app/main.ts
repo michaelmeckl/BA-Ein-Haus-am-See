@@ -1,7 +1,7 @@
 /* eslint-env browser */
 import MapController from "./map/mapController";
 import Benchmark from "../shared/benchmarking";
-import { fetchOsmData } from "./network/networkUtils";
+import { fetchOsmData, testGuide } from "./network/networkUtils";
 import { Config } from "../shared/config";
 import OsmTags from "./osmModel/osmTagCollection";
 
@@ -132,6 +132,11 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   const data = await fetchOsmData(bounds, inputQuery);
   console.log(Benchmark.stopMeasure("Fetching data from osm"));
 
+  /*
+  const data = await testGuide();
+  console.log(data);
+  */
+
   if (data) {
     const t0 = performance.now();
     mapController.showData(data, inputQuery);
@@ -191,11 +196,14 @@ function setupUI(mapController: MapController): void {
 }
 
 function init(): void {
+  console.time("load map");
+
   const mapController = new MapController();
   mapController
     .setupMap()
     .then(() => {
       // map loaded sucessfully
+      console.timeEnd("load map");
       setupUI(mapController);
     })
     .catch((error) => {

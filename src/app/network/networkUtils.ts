@@ -2,6 +2,34 @@ import Benchmark from "../../shared/benchmarking";
 import osmtogeojson from "osmtogeojson";
 import axios from "axios";
 
+export async function testGuide(): Promise<any> {
+  try {
+    Benchmark.startMeasure("Request client side");
+    const url = `http://127.0.0.1:8553/v1/guide?radius=${5000}&limit=${50}&poitype=${"bar"}&lng=${12.1}&lat=${49.008}`;
+    //* diese query funktioniert: (limit ist nötig, sonst ist default 50)
+    // http://localhost:8553/v1/guide?radius=20000&limit=200&poitype=bar&lng=12.1&lat=49.008
+
+    //* search bringt eher nichts
+    //http://localhost:8553/v1/search?limit=100&search=park
+
+    const response = await axios.get(url);
+    console.log(Benchmark.stopMeasure("Request client side"));
+
+    console.log("resonse:", response);
+    console.log("resonse.data.results:", response.data.results);
+
+    Benchmark.startMeasure("o2geo client");
+    //TODO das ergebnis von guide ist kein json, das mit osmtogeojson in geojson umgewandelt werden könnte
+    const geoJson = osmtogeojson(response.data.results);
+    Benchmark.stopMeasure("o2geo client");
+
+    return geoJson;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
 //TODO:
 //- Laden von Daten über die Overpass API dem Anwender anzeigen, z.B. mit einem Ladebalken oder einer snackbar
 //- Fehlerbehandlung, falls die Overpass API einen Timeout wegen zu großer Datenmenge erzeugt
@@ -58,6 +86,7 @@ export async function fetchOsmDataFromClientVersion(
     console.log(Benchmark.stopMeasure("Request client side"));
 
     //console.log(response);
+    // * measure time over 50 trials with this:
     //console.log(await Benchmark.getAverageTime(osmtogeojson, [response.data]));
 
     Benchmark.startMeasure("o2geo client");
