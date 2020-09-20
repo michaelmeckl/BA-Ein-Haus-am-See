@@ -72,7 +72,7 @@ export default class MapController {
     // start measuring the frame rate
     this.measureFrameRate();
 
-    this.setupGeocoder();
+    this.setupGeocoding();
 
     //TODO
     loadSidebar();
@@ -170,12 +170,12 @@ export default class MapController {
     */
   }
 
-  setupGeocoder() {
-    var marker = new mapboxgl.Marker({ color: "#008000" }); // Create a new green marker
+  setupGeocoding() {
+    const marker = new mapboxgl.Marker({ color: "#008000" }); // Create a new green marker
 
     geocoder.on("result", (data: any) => {
       // When the geocoder returns a result
-      var point = data.result.center; // Capture the result coordinates
+      const point = data.result.center; // Capture the result coordinates
 
       marker.setLngLat(point).addTo(map); // Add the marker to the map at the result coordinates
     });
