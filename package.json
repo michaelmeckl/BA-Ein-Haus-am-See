@@ -28,6 +28,7 @@
   "homepage": "https://github.com/michaelmeckl/BA-Ein-Haus-am-See#readme",
   "dependencies": {
     "@mapbox/geojson-coords": "0.0.0",
+    "@mapbox/mapbox-gl-geocoder": "^4.7.0",
     "@turf/buffer": "^5.1.5",
     "@turf/circle": "^6.0.1",
     "@turf/clean-coords": "^6.0.1",
@@ -80,6 +81,7 @@
     "@typescript-eslint/parser": "^2.33.0",
     "concurrently": "^5.2.0",
     "dotenv-webpack": "^2.0.0",
+    "electron": "^10.1.2",
     "eslint": "^7.3.1",
     "eslint-config-prettier": "^6.11.0",
     "mapbox-gl": "^1.11.0",

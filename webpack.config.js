@@ -20,6 +20,7 @@ module.exports = {
         pathinfo: false,
     },
     resolve: {
+        // Bundle '.ts' files as well as '.js' files.
         extensions: [".tsx", ".ts", ".js"],
         alias: {
             //Required for non-browserify bundlers (like webpack):
@@ -46,13 +47,27 @@ module.exports = {
             */
         ],
     },
-    // in order to ignore built-in modules like path, fs, etc. for bundling
-    target: "node",
+    // use target: "node" in order to ignore built-in modules like path, fs, etc. for bundling
+    target: "web",
     /*
-    // TODO: don't bundle node_modules except for the mapbox-gl module to decrease bundle size
-    externals: [nodeExternals({
+    externals: [
+        (function () {
+            var IGNORES = [
+                'electron'
+            ];
+            return function (context, request, callback) {
+                if (IGNORES.indexOf(request) >= 0) {
+                    return callback(null, "require('" + request + "')");
+                }
+                return callback();
+            };
+        })()
+        
+        nodeExternals({
         whitelist: ["mapbox-gl"],
-    })],
+        })
+        
+    ],
     */
     plugins: [
         // Enables reading secret keys from .env file

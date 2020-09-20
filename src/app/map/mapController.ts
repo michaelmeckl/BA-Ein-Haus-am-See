@@ -3,7 +3,7 @@
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
-import { map } from "./mapboxConfig";
+import { geocoder, map } from "./mapboxConfig";
 import * as webglUtils from "../webgl/webglUtils";
 import * as mapboxUtils from "./mapboxUtils";
 import Benchmark from "../../shared/benchmarking";
@@ -35,8 +35,6 @@ export default class MapController {
   //private mapIsReady: Boolean = false;
 
   setupMap(): Promise<void> {
-    console.time("load map");
-
     //set cursor style to mouse pointer
     map.getCanvas().style.cursor = "default";
 
@@ -46,9 +44,7 @@ export default class MapController {
 
     return new Promise((resolve, reject) => {
       map.on("load", () => {
-        console.timeEnd("load map");
         //this.mapIsReady = true;
-
         this.initMapState();
 
         resolve();
@@ -67,11 +63,16 @@ export default class MapController {
     map.addControl(new mapboxgl.FullscreenControl(), "top-right");
     //map.addControl(new mapboxgl.ScaleControl(), "bottom-left");
     //map.addControl(new mapboxgl.GeolocateControl(), "bottom-right");
+
+    // Add the geocoder to the map
+    map.addControl(geocoder, "bottom-left");
   }
 
   initMapState() {
     // start measuring the frame rate
     this.measureFrameRate();
+
+    this.setupGeocoder();
 
     //TODO
     loadSidebar();
@@ -110,7 +111,9 @@ export default class MapController {
       }
       */
 
-      this.reloadData();
+      //TODO test tilequery API
+
+      //this.reloadData();
     });
 
     // fired when any map data begins loading or changing asynchronously.
@@ -165,6 +168,17 @@ export default class MapController {
     updateMarkers();
     });
     */
+  }
+
+  setupGeocoder() {
+    var marker = new mapboxgl.Marker({ color: "#008000" }); // Create a new green marker
+
+    geocoder.on("result", (data: any) => {
+      // When the geocoder returns a result
+      var point = data.result.center; // Capture the result coordinates
+
+      marker.setLngLat(point).addTo(map); // Add the marker to the map at the result coordinates
+    });
   }
 
   measureFrameRate(): void {
