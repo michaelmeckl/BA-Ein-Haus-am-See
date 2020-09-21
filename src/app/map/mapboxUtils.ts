@@ -1,8 +1,8 @@
 /**
  * Utility-Methods for working with Mapbox Gl.
  */
-import type mapboxgl from "mapbox-gl";
 import type { GeoJSONSource } from "mapbox-gl";
+import { map } from "./mapboxConfig";
 import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
 
 export async function testTilequeryAPI(): Promise<void> {
@@ -89,6 +89,15 @@ export function removeAllLayersForSource(map: mapboxgl.Map, sourceID: string): b
     */
 
   return false;
+}
+
+export function removeSource(sourceName: string): void {
+  if (!map.getSource(sourceName)) {
+    console.warn(`Couldn't remove source ${sourceName}`);
+    return;
+  }
+  removeAllLayersForSource(map, sourceName);
+  map.removeSource(sourceName);
 }
 
 /**

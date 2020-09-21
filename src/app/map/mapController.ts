@@ -10,13 +10,13 @@ import { fetchOsmData } from "../network/networkUtils";
 import { render as renderAndBlur } from "../webgl/blurFilter";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { addWebglCircle } from "../webgl/webglCircle";
-import { getDataFromMap } from "./featureUtils";
+import { getDataFromMap, getPointsInRadius } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
-import { getPointsInRadius, testTurfFunctions } from "./turfUtils";
+import { testTurfFunctions } from "./turfUtils";
 
 /**
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
@@ -242,12 +242,7 @@ export default class MapController {
   }
 
   removeData(sourceName: string): void {
-    if (!map.getSource(sourceName)) {
-      console.warn(`Couldn't remove source ${sourceName}`);
-      return;
-    }
-    mapboxUtils.removeAllLayersForSource(map, sourceName);
-    map.removeSource(sourceName);
+    mapboxUtils.removeSource(sourceName);
   }
 
   // * um ein bestimmtes tile an einer position zu bekommen: https://github.com/mapbox/tilebelt

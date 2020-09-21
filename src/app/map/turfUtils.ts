@@ -8,15 +8,6 @@ import type { Point } from "geojson";
 import { map } from "./mapboxConfig";
 import * as mapboxUtils from "./mapboxUtils";
 
-//TODO duplicate implementation
-function removeData(sourceName: string): void {
-  if (!map.getSource(sourceName)) {
-    return;
-  }
-  mapboxUtils.removeAllLayersForSource(map, sourceName);
-  map.removeSource(sourceName);
-}
-
 export function getNearestPoint(map: mapboxgl.Map): void {
   map.on("click", function (e: mapboxgl.MapMouseEvent) {
     const libraryFeatures = map.queryRenderedFeatures(e.point, { layers: ["libraries"] });
@@ -55,7 +46,7 @@ function addTurfBuffer(p): void {
   const buff = buffer(p, 1.4, { units: "kilometers" });
   console.log(buff);
   const source = "turfBuffer";
-  removeData(source);
+  mapboxUtils.removeSource(source);
 
   map.addSource(source, {
     type: "geojson",
@@ -83,7 +74,7 @@ function addTurfBuffer(p): void {
 export function addTurfCircle(p: Point, radius: number): void {
   const kreis = circle(p, radius);
   const source = "turfCircle" + p;
-  removeData(source);
+  mapboxUtils.removeSource(source);
 
   map.addSource(source, {
     type: "geojson",
@@ -113,7 +104,7 @@ function addTurfIntersection(s1, s2): void {
   //TODO: doesn't work for some reason
   const intersection = intersect(s1, s2);
   const source = "turfIntersection";
-  removeData(source);
+  mapboxUtils.removeSource(source);
 
   map.addSource(source, {
     type: "geojson",
@@ -146,7 +137,7 @@ function addTurfSector(center, radius, name): any {
   const circle = sector(center, radius, bearing1, bearing2);
 
   const source = name;
-  removeData(source);
+  mapboxUtils.removeSource(source);
 
   map.addSource(source, {
     type: "geojson",
@@ -178,7 +169,7 @@ function addTurfPath(start, end): void {
   };
   const path = shortestPath(start, end, options);
   const sourceLine = "turfShortestPath";
-  removeData(sourceLine);
+  mapboxUtils.removeSource(sourceLine);
 
   map.addSource(sourceLine, {
     type: "geojson",
