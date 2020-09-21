@@ -20,6 +20,15 @@ export async function testTilequeryAPI(): Promise<void> {
   const queryResultGeom = await queryGeometry([12.1, 49.008], "polygon", 3000, 50);
 }
 
+function getResolutions() {
+  // Calculation of resolutions that match zoom levels 1, 3, 5, 7, 9, 11, 13, 15.
+  var resolutions = [];
+  for (let i = 0; i <= 8; ++i) {
+    resolutions.push(156543.03392804097 / Math.pow(2, i * 2));
+  }
+  return resolutions;
+}
+
 function addIconLayer(map: mapboxgl.Map, sourceName: string): void {
   map.addLayer({
     id: sourceName + "-symbol",

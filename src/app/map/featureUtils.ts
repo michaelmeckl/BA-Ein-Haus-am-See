@@ -102,6 +102,65 @@ export function getDataforFeaturesInSelection() {
   return allGeoData;
 }
 
+//TODO get unique features from a geojson source:
+/*
+//TODO: or use a set instead
+var features = map.queryRenderedFeatures({layers: ['my_layer']});
+if (features) {
+    var uniqueFeatures = getUniqueFeatures(features, "icon"); 
+
+    uniqueFeatures.forEach(function(feature) {
+            var prop = feature.properties;
+            console.log(prop.icon);
+    })
+}
+
+function getUniqueFeatures(array, comparatorProperty) {
+    var existingFeatureKeys = {};
+    // Because features come from tiled vector data, feature geometries may be split
+    // or duplicated across tile boundaries and, as a result, features may appear
+    // multiple times in query results.
+    var uniqueFeatures = array.filter(function(el) {
+        if (existingFeatureKeys[el.properties[comparatorProperty]]) {
+            return false;
+        } else {
+            existingFeatureKeys[el.properties[comparatorProperty]] = true;
+            return true;
+        }
+    });
+
+    return uniqueFeatures;
+}
+*/
+
+//TODO get all points in a distance around click
+export function getPointsInRadius(map: mapboxgl.Map) {
+  // map click handler
+  map.on("click", (e) => {
+    /*
+		const cluster: mapboxgl.MapboxGeoJSONFeature[] = this.map.queryRenderedFeatures(e.point, {
+		  layers: ["points-l1"],
+		});
+		*/
+    const cluster: mapboxgl.MapboxGeoJSONFeature[] = map.queryRenderedFeatures(e.point);
+
+    console.log(cluster[0]);
+
+    if (cluster[0]) {
+      const clusterRadius = 50; //TODO woher radius?
+
+      const pointsInCluster = features.filter((f) => {
+        const pointPixels = map.project(f.geometry.coordinates);
+        const pixelDistance = Math.sqrt(
+          Math.pow(e.point.x - pointPixels.x, 2) + Math.pow(e.point.y - pointPixels.y, 2)
+        );
+        return Math.abs(pixelDistance) <= clusterRadius;
+      });
+      console.log(cluster, pointsInCluster);
+    }
+  });
+}
+
 export function getDataFromMap() {
   const allGeoData = getDataforFeaturesInSelection();
   console.log("QuerySourceFeatures: ");

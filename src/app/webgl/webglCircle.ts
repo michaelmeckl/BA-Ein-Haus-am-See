@@ -15,8 +15,8 @@ function getCircleVertexSource(): string {
     varying lowp vec4 vColor;
 
     void main(void) {
-    gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-    vColor = aVertexColor;
+      gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+      vColor = aVertexColor;
     }
     `;
 }
@@ -50,9 +50,11 @@ function initBuffers(gl: WebGLRenderingContext, startingPosition: mapboxgl.Merca
 
   const positions = [startingPosition.x, startingPosition.y];
 
-  for (let i = 0; i <= 100; i++) {
-    positions.push(Math.cos((i * 2 * Math.PI) / 100));
-    positions.push(Math.sin((i * 2 * Math.PI) / 100));
+  // use 100 points to draw the circle
+  const totalPoints = 100;
+  for (let i = 0; i <= totalPoints; i++) {
+    positions.push(Math.cos((i * 2 * Math.PI) / totalPoints));
+    positions.push(Math.sin((i * 2 * Math.PI) / totalPoints));
   }
 
   //console.log(positions);
@@ -104,8 +106,6 @@ function createPerspectiveMatrix(gl: WebGLRenderingContext, programInfo): any {
   const zFar = 100.0;
   const projectionMatrix = mat4.create();
 
-  // note: glmatrix.js always has the first argument
-  // as the destination to receive the result.
   mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
 
   // Set the drawing position to the "identity" point, which is
@@ -270,3 +270,108 @@ export function addWebglCircle(map: mapboxgl.Map): void {
 
   map.addLayer(glCircleLayer);
 }
+
+//Alternative funktion für circle in fragment shader:
+/*
+function main() {
+  const gl = document.querySelector("canvas").getContext("webgl");
+  const ext = gl.getExtension("ANGLE_instanced_arrays");
+  if (!ext) {
+    return alert("need ANGLE_instanced_arrays");
+  }
+  twgl.addExtensionsToContext(gl);
+
+  const vs = `
+  attribute float id;
+  attribute vec4 position;
+  attribute vec2 texcoord;
+  
+  uniform float time;
+  
+  varying vec2 v_texcoord;
+  varying vec4 v_color;
+  
+  void main() {
+    float o = id + time;
+    gl_Position = position + vec4(
+        vec2(
+             fract(o * 0.1373),
+             fract(o * 0.5127)) * 2.0 - 1.0,
+        0, 0);
+        
+    v_texcoord = texcoord;
+    v_color = vec4(fract(vec3(id) * vec3(0.127, 0.373, 0.513)), 1);
+  }`;
+
+  const fs = `
+  precision mediump float;
+  varying vec2 v_texcoord;
+  varying vec4 v_color;
+  void main() {
+    gl_FragColor = mix(
+       v_color, 
+       vec4(0), 
+       step(1.0, length(v_texcoord.xy * 2. - 1.)));
+  }
+  `;
+
+  // compile shaders, link program, look up locations
+  const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
+
+  const maxCount = 250000;
+  const ids = new Float32Array(maxCount);
+  for (let i = 0; i < ids.length; ++i) {
+    ids[i] = i;
+  }
+  const x = (16 / 300) * 2;
+  const y = (16 / 150) * 2;
+
+  const bufferInfo = twgl.createBufferInfoFromArrays(gl, {
+    position: {
+      numComponents: 2,
+      data: [-x, -y, x, -y, -x, y, -x, y, x, -y, x, y],
+    },
+    texcoord: [0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0],
+    id: {
+      numComponents: 1,
+      data: ids,
+      divisor: 1,
+    },
+  });
+  twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
+
+  const fpsElem = document.querySelector("#fps");
+  const countElem = document.querySelector("#count");
+
+  let count;
+  function getCount() {
+    count = Math.min(maxCount, parseInt(countElem.value));
+  }
+
+  countElem.addEventListener("input", getCount);
+  getCount();
+
+  const maxHistory = 60;
+  const fpsHistory = new Array(maxHistory).fill(0);
+  let historyNdx = 0;
+  let historyTotal = 0;
+
+  let then = 0;
+  function render(now) {
+    const deltaTime = now - then;
+    then = now;
+
+    historyTotal += deltaTime - fpsHistory[historyNdx];
+    fpsHistory[historyNdx] = deltaTime;
+    historyNdx = (historyNdx + 1) % maxHistory;
+
+    fpsElem.textContent = (1000 / (historyTotal / maxHistory)).toFixed(1);
+
+    gl.useProgram(programInfo.program);
+    twgl.setUniforms(programInfo, { time: now * 0.001 });
+    ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, 6, count);
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+}
+*/

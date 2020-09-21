@@ -29,8 +29,42 @@ export function createFragmentShaderSource(): string {
   return fragmentSource;
 }
 
+export function applyKawaseBloomFilter() {
+  //TODO wie wird kawaseBloom aufgerufen?
+  const source = `
+    vec4 kawaseBloom( sampler2D texture, vec2 uv, float texturesize, float iteration ) {
+      vec2 texelSize = vec2( 1.0 / texturesize );
+      vec2 texelSize05 = texelSize * 0.5;
+      
+      vec2 uvOffset = texelSize.xy * vec2( iteration, iteration ) + texelSize05;
+      
+      vec2 texCoordSample;
+      vec4 color;
+      
+      texCoordSample.x = uv.x - uvOffset.x;
+      texCoordSample.y = uv.y + uvOffset.y;
+      color = texture2D( texture, texCoordSample );
+
+      texCoordSample.x = uv.x + uvOffset.x;
+      texCoordSample.y = uv.y + uvOffset.y;
+      color += texture2D( texture, texCoordSample );
+      
+      texCoordSample.x = uv.x + uvOffset.x;
+      texCoordSample.y = uv.y - uvOffset.y;
+      color += texture2D( texture, texCoordSample );
+      
+      texCoordSample.x = uv.x - uvOffset.x;
+      texCoordSample.y = uv.y - uvOffset.y;
+      color += texture2D( texture, texCoordSample );
+      
+      return color * 0.25;
+  }`;
+
+  return source;
+}
+
 /**
- * This multiplies two canvases:
+ * * This multiplies two canvases:
  * call this like:
    function updateTextureFromCanvas(tex, canvas, textureUnit) {
       gl.activeTexture(gl.TEXTURE0 + textureUnit);
@@ -337,7 +371,8 @@ function resetDepth(gl: WebGLRenderingContext): void {
  */
 export function clearCanvas(gl: WebGLRenderingContext): void {
   gl.clearColor(0, 0, 0, 0);
-  resetDepth(gl);
+  //TODO ? resetDepth(gl);
+  gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 

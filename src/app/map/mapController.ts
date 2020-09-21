@@ -16,7 +16,7 @@ import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
-import { getPointsInRadius, testTurfFunctions } from "./testMapFunctionsTODO";
+import { getPointsInRadius, testTurfFunctions } from "./turfUtils";
 
 /**
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
@@ -202,6 +202,24 @@ export default class MapController {
         "line-color": "#ff69b4",
       },
     });
+  }
+
+  addLocalVectorSource(): void {
+    map.addSource("vector", {
+      type: "vector",
+      tiles: ["./assets/ny_extract.osm.pbf"],
+    });
+
+    /*
+      map.addLayer({
+        id: "vector",
+        type: "line",
+        source: "vector",
+        "source-layer": "state",
+        paint: {
+          "line-color": "#ff69b4",
+        },
+      });*/
   }
 
   addMapboxStreetsVectorData(): void {
@@ -436,8 +454,6 @@ export default class MapController {
    * * bei polygon entweder auch das oder vllt das zentrum der umschließenden bounding box nehmen?
    */
 
-  // * If the layer needs to render to a texture, it should implement the `prerender` method
-  // to do this and only use the `render` method for drawing directly into the main framebuffer.
   addWebGlLayer(): void {
     if (map.getLayer("webglCustomLayer")) {
       // the layer exists already; remove it

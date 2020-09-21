@@ -6,6 +6,8 @@ export class MapboxCustomLayer {
   type: string;
   renderingMode: string;
 
+  // definite assignment assertion (!) is fine here as the custom layer interface implementation
+  // makes sure the methods are called in correct order.
   program!: WebGLProgram;
   aPos!: number;
   buffer: WebGLBuffer | null;
@@ -20,13 +22,13 @@ export class MapboxCustomLayer {
     this.buffer = null;
   }
 
-  // method called when the layer is added to the map
-  // https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
+  /**
+   * method called when the layer is added to the map,
+   * see https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
+   */
   onAdd(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
     const vertexSource = webglUtils.createVertexShaderSource();
     const fragmentSource = webglUtils.createFragmentShaderSource();
-
-    //console.log("in onAdd: ", gl.canvas);
 
     // create a vertex and a fragment shader
     const vertexShader = webglUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
@@ -46,8 +48,12 @@ export class MapboxCustomLayer {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.data), gl.STATIC_DRAW);
   }
 
-  // method fired on each animation frame
-  // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
+  /**
+   * method fired on each animation frame, see https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
+   * @param matrix The map's camera matrix. It projects spherical mercator coordinates to gl
+   *               coordinates. The mercator coordinate  [0, 0] represents the top left corner of
+   *               the mercator world and  [1, 1] represents the bottom right corner.
+   */
   render(gl: WebGLRenderingContext, matrix: number[]): void {
     //console.log("in render: ", gl.canvas);
 
@@ -76,5 +82,24 @@ export class MapboxCustomLayer {
     // eslint-disable-next-line no-magic-numbers
     const count = this.data.length / 2;
     gl.drawArrays(primitiveType, offset, count);
+  }
+
+  /**
+   * Optional method called when the layer has been removed from the Map with Map#removeLayer.
+   * This gives the layer a chance to clean up gl resources and event listeners.
+   */
+  onRemove(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
+    //TODO cleanup resources ?
+  }
+
+  /**
+   * Optional method called during a render frame to allow a layer to prepare resources
+   * or render into a texture.
+   * The layer cannot make any assumptions about the current GL state and must bind a framebuffer
+   * before rendering.
+   */
+  prerender(gl: WebGLRenderingContext, matrix: number[]): void {
+    //TODO If the layer needs to render to a texture, it should implement the `prerender` method
+    // to do this and only use the `render` method for drawing directly into the main framebuffer.
   }
 }
