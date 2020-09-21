@@ -67,3 +67,15 @@ export function getAllRenderedFeaturesIn(
     });
   }
 }
+
+export function getFeaturesOnce() {
+  //TODO test
+  const features = map.queryRenderedFeatures({ layers: ["points-l1"] });
+
+  if (features) {
+    //TODO
+    const uniqueFeatures = getUniqueFeatures(features, "id");
+    console.table(uniqueFeatures);
+  }
+  return features;
+}

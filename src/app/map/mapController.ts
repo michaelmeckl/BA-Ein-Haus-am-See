@@ -21,6 +21,13 @@ import { getPointsInRadius, testTurfFunctions } from "./testMapFunctionsTODO";
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
  */
 export default class MapController {
+  //private mapData = new Map<string, number[]>(); // type as key, array of all points as value
+  //TODO oder so:
+  //private mapData = new Map<string, Map<string, number[]>>(); // sourcename as key, value: map from above
+  //TODO oder so:
+  private mapData = new Map<string, number[] | number[][]>(); // sourcename as key, array of all points as value or array of
+  // array for polygon and linestring?? (basically do i want to flatten it??)
+
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
    * This should be the very first function to call to make sure all code later on
@@ -70,17 +77,8 @@ export default class MapController {
     });
 
     map.on("moveend", async () => {
-      //console.log("Move end event fired!");
-      /*
-      //TODO: test
-      const features = map.queryRenderedFeatures({ layers: ["points-l1"] });
-
-      if (features) {
-        const uniqueFeatures = this.getUniqueFeatures(features, "id");
-        console.table(uniqueFeatures);
-      }
-      */
-      //TODO test tilequery API
+      //use tilequery API
+      //mapboxUtils.testTilequeryAPI();
       //this.reloadData();
     });
 
@@ -205,7 +203,7 @@ export default class MapController {
     });
   }
 
-  addMapboxStreetsVectorData() {
+  addMapboxStreetsVectorData(): void {
     // Add a circle layer with a vector source
     map.addLayer({
       id: "points-of-interest",
@@ -238,6 +236,10 @@ export default class MapController {
   showData(data: string, sourceName: string): void {
     console.log("now adding to map...");
     console.log(sourceName);
+
+    //TODO hier schon das geojson parsen und lokal speichern, damit später gequeriet werden kann?
+    //TODO reex oder programm zum parsen finden!
+    //this.mapData.set("point", [1, 2]);
 
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapboxUtils.removeAllLayersForSource(map, sourceName);
@@ -421,6 +423,18 @@ export default class MapController {
    });
    */
 
+  /**
+   * TODO 21.09
+   * 1. geojson daten speichern bevor zu layer hinzufügen, am besten separat pro layer und per type (point, linestring, polygon)
+   * 2. diese dann an vertex shader übergeben
+   * 3. in fragment shader dann kreis um alle punkte zeichnen -> fill gray -> am ende dann blur
+   */
+
+  /**
+   * * für linestring könnte man einen buffer mit der vom nutzer angegebenen breite an beide seiten des linestrings anfügen und den blurren?
+   * * bei polygon entweder auch das oder vllt das zentrum der umschließenden bounding box nehmen?
+   */
+
   // * If the layer needs to render to a texture, it should implement the `prerender` method
   // to do this and only use the `render` method for drawing directly into the main framebuffer.
   addWebGlLayer(): void {
@@ -470,6 +484,10 @@ export default class MapController {
       // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
       render: function (gl: WebGLRenderingContext, matrix: number[]): void {
         //console.log("in render: ", gl.canvas);
+
+        //TODO
+        //webglUtils.clearCanvas(gl); // clear canvas color and depth
+        //gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);   //resize canvas
 
         gl.useProgram(program);
         gl.uniformMatrix4fv(gl.getUniformLocation(program, "u_matrix"), false, matrix);

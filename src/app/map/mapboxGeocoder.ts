@@ -1,7 +1,7 @@
 import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import mapboxgl, { Control, GeoJSONSource } from "mapbox-gl";
 import { initialZoomLevel, map } from "./mapboxConfig";
-import { queryTiles } from "./tilequeryApi";
+import { queryAllTiles } from "./tilequeryApi";
 
 type mapboxGeocoder = Control;
 
@@ -118,7 +118,7 @@ class Geocoder {
         },
       });
 
-      const results = await queryTiles(point);
+      const results = await queryAllTiles(point);
 
       const source = map.getSource("tilequery");
       (source as GeoJSONSource).setData(results);

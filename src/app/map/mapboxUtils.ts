@@ -7,6 +7,7 @@ import mapboxgl, { GeoJSONSource } from "mapbox-gl";
 import { parameterSelection } from "../main";
 import { map } from "./mapboxConfig";
 import { addTurfCircle } from "./testMapFunctionsTODO";
+import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
 
 export function getDataforFeaturesInSelection() {
   console.log(parameterSelection.entries);
@@ -34,6 +35,24 @@ export function getDataforFeaturesInSelection() {
   //console.log(newData);
 
   return allGeoData;
+}
+
+export async function testTilequeryAPI(): Promise<void> {
+  const queryResult = await queryAllTiles([12.1, 49.008], 3000, 50);
+  queryResult.features.forEach((f) => {
+    console.log(f.properties?.type);
+  });
+
+  const queryResultLayer = await queryLayers([12.1, 49.008], ["poi_label", "building"], 3000, 50);
+  queryResultLayer.features.forEach((f) => {
+    console.log("Class: ", f.properties?.class);
+    console.log("Type: ", f.properties?.type);
+  });
+
+  const queryResultGeom = await queryGeometry([12.1, 49.008], "polygon", 3000, 50);
+  queryResultGeom.features.forEach((f) => {
+    console.log(f.geometry?.type);
+  });
 }
 
 export function getDataFromMap() {
