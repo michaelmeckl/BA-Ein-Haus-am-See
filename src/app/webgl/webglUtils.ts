@@ -29,35 +29,24 @@ export function createFragmentShaderSource(): string {
   return fragmentSource;
 }
 
-export function applyKawaseBloomFilter() {
-  //TODO wie wird kawaseBloom aufgerufen?
+// see https://www.shadertoy.com/view/MdyBzG
+export function applyKawaseBlurFilter() {
+  //TODO hier wird webgl 2 verwendet -> umschreiben
   const source = `
-    vec4 kawaseBloom( sampler2D texture, vec2 uv, float texturesize, float iteration ) {
-      vec2 texelSize = vec2( 1.0 / texturesize );
-      vec2 texelSize05 = texelSize * 0.5;
+  void mainImage( out vec4 fragColor, in vec2 fragCoord )
+  {
+      vec2 uv = fragCoord / iResolution.xy;
+      vec2 res = iChannelResolution[0].xy;
+    
+      float i = 5.5;
       
-      vec2 uvOffset = texelSize.xy * vec2( iteration, iteration ) + texelSize05;
-      
-      vec2 texCoordSample;
-      vec4 color;
-      
-      texCoordSample.x = uv.x - uvOffset.x;
-      texCoordSample.y = uv.y + uvOffset.y;
-      color = texture2D( texture, texCoordSample );
-
-      texCoordSample.x = uv.x + uvOffset.x;
-      texCoordSample.y = uv.y + uvOffset.y;
-      color += texture2D( texture, texCoordSample );
-      
-      texCoordSample.x = uv.x + uvOffset.x;
-      texCoordSample.y = uv.y - uvOffset.y;
-      color += texture2D( texture, texCoordSample );
-      
-      texCoordSample.x = uv.x - uvOffset.x;
-      texCoordSample.y = uv.y - uvOffset.y;
-      color += texture2D( texture, texCoordSample );
-      
-      return color * 0.25;
+      vec3 col = texture( iChannel0, uv + vec2( i, i ) / res ).rgb;
+      col += texture( iChannel0, uv + vec2( i, -i ) / res ).rgb;
+      col += texture( iChannel0, uv + vec2( -i, i ) / res ).rgb;
+      col += texture( iChannel0, uv + vec2( -i, -i ) / res ).rgb;
+      col /= 4.0;
+  
+      fragColor = vec4( col, 1.0 );
   }`;
 
   return source;

@@ -29,6 +29,8 @@ export class MapboxCustomLayer {
   onAdd(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
     const vertexSource = webglUtils.createVertexShaderSource();
     const fragmentSource = webglUtils.createFragmentShaderSource();
+    //TODO add blur shader instead:
+    //const fragmentSource = webglUtils.fragmentShaderCanvas();
 
     // create a vertex and a fragment shader
     const vertexShader = webglUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
@@ -76,6 +78,7 @@ export class MapboxCustomLayer {
     //enable alpha blending
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    //TODO andere blend Functions benutzen? z.B. gl.depthFunc(gl.LESS);
 
     const primitiveType = gl.TRIANGLE_STRIP;
     const offset = 0; // 0 for offset means start at the beginning of the buffer.
