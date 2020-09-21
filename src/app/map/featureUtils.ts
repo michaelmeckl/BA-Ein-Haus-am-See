@@ -1,12 +1,10 @@
 /**
  * This file provides mapbox util and helper functions to query and extract features from sources and layers.
  */
-import cleanCoords from "@turf/clean-coords";
 import { chunk } from "lodash";
 import mapboxgl from "mapbox-gl";
 import { parameterSelection } from "../main";
 import { map } from "./mapboxConfig";
-import { addTurfCircle } from "./testMapFunctionsTODO";
 
 //TODO has to be called after layer is loaded!
 export function getAllPoints(src: string, layerName: string) {
@@ -90,11 +88,14 @@ export function getDataforFeaturesInSelection() {
   }
 
   //TODO: doesn'T work
+  /*
   console.log(allGeoData);
   allGeoData.forEach((li) => {
     const newData = cleanCoords(li);
     console.log(newData);
   });
+  */
+
   //const newData = cleanCoords(allGeoData);
   //console.log(newData);
 
@@ -116,7 +117,7 @@ export function getDataFromMap() {
 
   //TODO: remove me later
   newArray.forEach((element) => {
-    addTurfCircle(element, 0.5);
+    //addTurfCircle(element, 0.5);
   });
 
   const MercatorCoordinates = newArray.map((el) => mapboxgl.MercatorCoordinate.fromLngLat(el));

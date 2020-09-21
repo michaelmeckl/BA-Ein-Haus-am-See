@@ -1,51 +1,80 @@
-// Custom layer implemented as ES6 class
-class NullIslandLayer {
-  renderingMode: string;
+import * as webglUtils from "./webglUtils";
+
+// Mapbox Custom layer implemented as ES6 class
+export class MapboxCustomLayer {
   id: string;
   type: string;
-  program: WebGLProgram | undefined;
+  renderingMode: string;
 
-  constructor() {
-    this.id = "null-island";
+  program!: WebGLProgram;
+  aPos!: number;
+  buffer: WebGLBuffer | null;
+  data: number[];
+
+  constructor(customData: number[]) {
+    this.id = "webglCustomLayer";
     this.type = "custom";
     this.renderingMode = "2d";
+    this.data = customData;
+
+    this.buffer = null;
   }
 
-  onAdd(map, gl) {
-    const vertexSource = `
-             uniform mat4 u_matrix;
-             void main() {
-                 gl_Position = u_matrix  vec4(0.5, 0.5, 0.0, 1.0);
-                 gl_PointSize = 20.0;
-             }`;
+  // method called when the layer is added to the map
+  // https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
+  onAdd(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
+    const vertexSource = webglUtils.createVertexShaderSource();
+    const fragmentSource = webglUtils.createFragmentShaderSource();
 
-    const fragmentSource = `
-             void main() {
-                 gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-             }`;
+    //console.log("in onAdd: ", gl.canvas);
 
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, vertexSource);
-    gl.compileShader(vertexShader);
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, fragmentSource);
-    gl.compileShader(fragmentShader);
+    // create a vertex and a fragment shader
+    const vertexShader = webglUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = webglUtils.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
 
-    this.program = gl.createProgram();
-    gl.attachShader(this.program, vertexShader);
-    gl.attachShader(this.program, fragmentShader);
-    gl.linkProgram(this.program);
+    //TODO die vertex und fragment shader sollten nachdem sie nicht mehr benutzt werden, sofort gelöscht werden, s. WebGL Best Practices
+
+    // link the two shaders into a WebGL program
+    this.program = webglUtils.createProgram(gl, vertexShader, fragmentShader);
+
+    // look up where the vertex data needs to go.
+    this.aPos = gl.getAttribLocation(this.program, "a_pos");
+
+    // create and initialize a WebGLBuffer to store vertex and color data
+    this.buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.data), gl.STATIC_DRAW);
   }
 
-  render(gl, matrix) {
+  // method fired on each animation frame
+  // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
+  render(gl: WebGLRenderingContext, matrix: number[]): void {
+    //console.log("in render: ", gl.canvas);
+
+    //TODO cleart die ganze map
+    //webglUtils.clearCanvas(gl); // clear canvas color and depth
+    //gl.viewport(0, 0, gl.canvas.width, gl.canvas.height); //resize canvas
+
     gl.useProgram(this.program);
+
     gl.uniformMatrix4fv(gl.getUniformLocation(this.program, "u_matrix"), false, matrix);
-    gl.drawArrays(gl.POINTS, 0, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    gl.enableVertexAttribArray(this.aPos); // this command tells WebGL we want to supply data from a buffer.
+
+    const size = 2; // always 1 to 4
+    const stride = 0; // stride = how many bytes to skip to get from one piece of data to the next piece of data)
+    // 0 for stride means "use a stride that matches the type and size".
+    const normalized = false;
+    //this command tells WebGL to get data from the buffer that was last bound with gl.bindBuffer,
+    gl.vertexAttribPointer(this.aPos, size, gl.FLOAT, normalized, stride, 0);
+    //enable alpha blending
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    const primitiveType = gl.TRIANGLE_STRIP;
+    const offset = 0; // 0 for offset means start at the beginning of the buffer.
+    // eslint-disable-next-line no-magic-numbers
+    const count = this.data.length / 2;
+    gl.drawArrays(primitiveType, offset, count);
   }
 }
-
-/*
-map.on("load", function () {
-  map.addLayer(new NullIslandLayer());
-});
-*/

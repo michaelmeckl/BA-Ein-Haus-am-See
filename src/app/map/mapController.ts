@@ -8,7 +8,8 @@ import Benchmark from "../../shared/benchmarking";
 import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
 import { render as renderAndBlur } from "../webgl/blurFilter";
-import * as webglUtils from "../webgl/webglUtils";
+import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
+import { addWebglCircle } from "../webgl/webglCircle";
 import { getDataFromMap } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -100,7 +101,7 @@ export default class MapController {
       //sortDistances(e.lngLat);
 
       testTurfFunctions();
-      //addWebglCircle(map);
+      addWebglCircle(map);
     });
   }
 
@@ -438,83 +439,20 @@ export default class MapController {
   // * If the layer needs to render to a texture, it should implement the `prerender` method
   // to do this and only use the `render` method for drawing directly into the main framebuffer.
   addWebGlLayer(): void {
-    if (map.getLayer("webglCustom")) {
+    if (map.getLayer("webglCustomLayer")) {
       // the layer exists already; remove it
-      map.removeLayer("webglCustom");
+      map.removeLayer("webglCustomLayer");
     }
 
     console.log("adding webgl data...");
 
-    let program: WebGLProgram;
-    let aPos: number;
-    let buffer: WebGLBuffer | null;
-
-    const customData = getDataFromMap();
-
-    const glCustomLayer: CustomLayerInterface = {
-      id: "webglCustom",
-      type: "custom",
-      // method called when the layer is added to the map
-      // https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
-      onAdd: (map: mapboxgl.Map, gl: WebGLRenderingContext) => {
-        const vertexSource = webglUtils.createVertexShaderSource();
-        const fragmentSource = webglUtils.createFragmentShaderSource();
-
-        //console.log("in onAdd: ", gl.canvas);
-
-        // create a vertex and a fragment shader
-        const vertexShader = webglUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
-        const fragmentShader = webglUtils.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-
-        //TODO: die vertex und fragment shader sollten nachdem sie nicht mehr benutzt werden, sofort gelöscht werden, s. WebGL Best Practices
-
-        // link the two shaders into a WebGL program
-        program = webglUtils.createProgram(gl, vertexShader, fragmentShader);
-
-        // look up where the vertex data needs to go.
-        aPos = gl.getAttribLocation(program, "a_pos");
-
-        // create and initialize a WebGLBuffer to store vertex and color data
-        buffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(customData), gl.STATIC_DRAW);
-      },
-
-      // method fired on each animation frame
-      // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
-      render: function (gl: WebGLRenderingContext, matrix: number[]): void {
-        //console.log("in render: ", gl.canvas);
-
-        //TODO
-        //webglUtils.clearCanvas(gl); // clear canvas color and depth
-        //gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);   //resize canvas
-
-        gl.useProgram(program);
-        gl.uniformMatrix4fv(gl.getUniformLocation(program, "u_matrix"), false, matrix);
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.enableVertexAttribArray(aPos); // this command tells WebGL we want to supply data from a buffer.
-
-        const size = 2; // always 1 to 4
-        const stride = 0; // stride = how many bytes to skip to get from one piece of data to the next piece of data)
-        // 0 for stride means "use a stride that matches the type and size".
-        const normalized = false;
-        //this command tells WebGL to get data from the buffer that was last bound with gl.bindBuffer,
-        gl.vertexAttribPointer(aPos, size, gl.FLOAT, normalized, stride, 0);
-        //enable alpha blending
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-        const primitiveType = gl.TRIANGLE_STRIP;
-        const offset = 0; // 0 for offset means start at the beginning of the buffer.
-        const count = customData.length / 2;
-        gl.drawArrays(primitiveType, offset, count);
-      },
-    };
+    const mapData = getDataFromMap();
+    const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
 
     //const firstSymbolId = mapboxUtils.findLayerByType(map, "symbol");
     // Insert the layer beneath the first symbol layer in the layer stack if one exists.
-    //map.addLayer(glCustomLayer, firstSymbolId);
-    map.addLayer(glCustomLayer);
+    //map.addLayer(customLayer, firstSymbolId);
+    map.addLayer(customLayer);
 
     console.log("Finished adding webgl data!");
   }
