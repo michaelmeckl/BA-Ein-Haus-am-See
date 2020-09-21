@@ -7,12 +7,12 @@ import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
-import { render } from "../webgl/blurFilter";
+import { render as renderAndBlur } from "../webgl/blurFilter";
 import * as webglUtils from "../webgl/webglUtils";
+import { getDataFromMap } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
-import { getDataFromMap } from "./mapboxUtils";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
 import { getPointsInRadius, testTurfFunctions } from "./testMapFunctionsTODO";
@@ -403,7 +403,7 @@ export default class MapController {
       img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
       img.height = mapCanvas.clientHeight;
 
-      const canvas = render(img);
+      const canvas = renderAndBlur(img);
       /*
         //TODO:
         if (canvas) {

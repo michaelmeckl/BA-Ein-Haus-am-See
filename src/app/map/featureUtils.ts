@@ -1,7 +1,12 @@
 /**
  * This file provides mapbox util and helper functions to query and extract features from sources and layers.
  */
+import cleanCoords from "@turf/clean-coords";
+import { chunk } from "lodash";
+import mapboxgl from "mapbox-gl";
+import { parameterSelection } from "../main";
 import { map } from "./mapboxConfig";
+import { addTurfCircle } from "./testMapFunctionsTODO";
 
 //TODO has to be called after layer is loaded!
 export function getAllPoints(src: string, layerName: string) {
@@ -68,14 +73,88 @@ export function getAllRenderedFeaturesIn(
   }
 }
 
-export function getFeaturesOnce() {
-  //TODO test
-  const features = map.queryRenderedFeatures({ layers: ["points-l1"] });
+export function getDataforFeaturesInSelection() {
+  console.log(parameterSelection.entries);
 
-  if (features) {
+  const allGeoData: mapboxgl.MapboxGeoJSONFeature[] = [];
+  for (const el of parameterSelection) {
     //TODO
-    const uniqueFeatures = getUniqueFeatures(features, "id");
-    console.table(uniqueFeatures);
+    // With features[0].geometry.coordinates you will receive all points along the LineString
+    /**
+	  var features = map.queryRenderedFeatures({
+	  layers:['roads-bm6ga5'],
+	  filter: ["==", "id", 1]
+	   */
+    const features = map.querySourceFeatures(el);
+    allGeoData.push(...features);
   }
-  return features;
+
+  //TODO: doesn'T work
+  console.log(allGeoData);
+  allGeoData.forEach((li) => {
+    const newData = cleanCoords(li);
+    console.log(newData);
+  });
+  //const newData = cleanCoords(allGeoData);
+  //console.log(newData);
+
+  return allGeoData;
+}
+
+export function getDataFromMap() {
+  const allGeoData = getDataforFeaturesInSelection();
+  console.log("QuerySourceFeatures: ");
+  console.log(allGeoData);
+
+  //console.log(...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3)));
+  const testData: number[] = [].concat(
+    ...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))
+  );
+  console.log(testData);
+  const newArray = chunk(testData, 2);
+  console.log("newArray after lodash:", newArray);
+
+  //TODO: remove me later
+  newArray.forEach((element) => {
+    addTurfCircle(element, 0.5);
+  });
+
+  const MercatorCoordinates = newArray.map((el) => mapboxgl.MercatorCoordinate.fromLngLat(el));
+  console.log("Mercator:", MercatorCoordinates);
+  /*
+	  console.log([].concat(...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))));
+	  console.log(allGeoData.flatMap((el) => [].concat(el.geometry.coordinates.flat(3))));
+  
+	  console.log(allGeoData.flatMap((el) => [].concat(...el.geometry.coordinates.flat(3))));
+	  console.log(
+		allGeoData.flatMap((el) =>
+		  [].concat(...el.geometry.coordinates.flatMap((li) => [li.x, li.y]))
+		)
+	  );
+	  */
+
+  //TODO
+  /*
+	  allGeoData.forEach((el) => {
+		console.log(el.properties?.type);
+		console.log(el.geometry.coordinates);
+		console.log(...el.geometry.coordinates);
+	  });
+  
+	  for (const el of allGeoData) {
+		console.log(...this.flatten(el.geometry.coordinates));
+	  }
+	  */
+
+  //const test = mapboxgl.MercatorCoordinate.fromLngLat({geoData});
+
+  /*
+	  const data = [uniSouthWest, uniSouthEast, uniNorthWest, uniNorthEast];
+	  const flatData = data.flatMap((x) => [x.x, x.y]);
+	  */
+
+  //const customData = [uniNorthEast.x, uniNorthEast.y, uniSouthWest.x, uniSouthWest.y];
+  const customData = MercatorCoordinates.flatMap((x) => [x.x, x.y]);
+  console.log(customData);
+  return customData;
 }
