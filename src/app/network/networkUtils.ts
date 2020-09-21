@@ -31,9 +31,8 @@ export async function testGuide(): Promise<any> {
   }
 }
 
-export async function getGeocoderResults(query: string): Promise<FeatureCollection> {
+export async function getTilequeryResults(query: string): Promise<FeatureCollection> {
   const result = await axios.get(query);
-  console.log(result);
   return result.data as FeatureCollection<Geometry, GeoJsonProperties>;
 }
 

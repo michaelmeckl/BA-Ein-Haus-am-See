@@ -199,7 +199,60 @@ export function createBlurFragmentSource(): string {
   return blurSource;
 }
 
-export function bindFramebufferAndSetViewport(gl: WebGLRenderingContext, fb, width, height) {
+export function getBlurFilterKernel(name = "gaussianBlur"): number[] {
+  // prettier-ignore
+  const kernels = {
+    // Define several convolution kernels
+    gaussianBlur: [
+      0.045, 0.122, 0.045,
+      0.122, 0.332, 0.122,
+      0.045, 0.122, 0.045,
+    ],
+    gaussianBlur2: [
+      1, 2, 1,
+      2, 4, 2,
+      1, 2, 1,
+    ],
+    gaussianBlur3: [
+      0, 1, 0,
+      1, 1, 1,
+      0, 1, 0,
+    ],
+    boxBlur: [
+        0.111, 0.111, 0.111,
+        0.111, 0.111, 0.111,
+        0.111, 0.111, 0.111,
+    ],
+    triangleBlur: [
+        0.0625, 0.125, 0.0625,
+        0.125, 0.25, 0.125,
+        0.0625, 0.125, 0.0625,
+    ],
+  };
+
+  switch (name) {
+    case "gaussianBlur2":
+      return kernels.gaussianBlur2;
+    case "gaussianBlur3":
+      return kernels.gaussianBlur3;
+    case "boxBlur":
+      return kernels.boxBlur;
+    case "triangleBlur":
+      return kernels.triangleBlur;
+    case "gaussianBlur":
+    default:
+      return kernels.gaussianBlur;
+  }
+}
+
+export function computeKernelWeight(kernel: number[]): number {
+  const weight = kernel.reduce(function (prev: number, curr: number) {
+    return prev + curr;
+  });
+  return weight <= 0 ? 1 : weight;
+}
+
+export function bindFramebufferAndSetViewport(gl: WebGLRenderingContext, fb, width, height): void {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   gl.viewport(0, 0, width, height);
 }

@@ -1,11 +1,11 @@
 /**
  * Utility-Methods for working with Mapbox Gl.
  */
-import mapboxgl, { GeoJSONSource } from "mapbox-gl";
-import { map } from "./mapboxConfig";
-import { parameterSelection } from "../main";
-import { chunk } from "lodash";
 import cleanCoords from "@turf/clean-coords";
+import { chunk } from "lodash";
+import mapboxgl, { GeoJSONSource } from "mapbox-gl";
+import { parameterSelection } from "../main";
+import { map } from "./mapboxConfig";
 import { addTurfCircle } from "./testMapFunctionsTODO";
 
 export function getDataforFeaturesInSelection() {

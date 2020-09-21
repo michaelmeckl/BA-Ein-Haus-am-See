@@ -125,7 +125,7 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   //TODO: let user choose bounding box?
   //ganz Regensburg: 12.028,48.966,12.192,49.076
   //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
-  const bounds = mapController.getViewportBounds();
+  const bounds = mapController.getViewportBoundsString();
 
   Benchmark.startMeasure("Fetching data from osm");
   // request data from osm
@@ -200,7 +200,7 @@ function init(): void {
 
   const mapController = new MapController();
   mapController
-    .setupMap()
+    .init()
     .then(() => {
       // map loaded sucessfully
       console.timeEnd("load map");

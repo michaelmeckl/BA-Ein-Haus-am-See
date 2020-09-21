@@ -29,7 +29,7 @@
     "eqeqeq": "error",
     "guard-for-in": "error",
     "no-alert": "error",
-    "no-console": "warn",
+    "no-console": "off",
     "no-debugger": "warn",
     "no-else-return": "error",
     "no-empty-function": "warn",

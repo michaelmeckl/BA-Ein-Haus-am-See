@@ -2,51 +2,35 @@
 
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
-import mapboxgl, { CustomLayerInterface, GeoJSONSource } from "mapbox-gl";
-import { geocoder, map } from "./mapboxConfig";
-import * as webglUtils from "../webgl/webglUtils";
-import * as mapboxUtils from "./mapboxUtils";
+
+import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
-import { chunk } from "lodash";
-import FrameRateControl from "../vendors/mapbox-gl-framerate";
-import MapboxFPS = require("../vendors/MapboxFPS");
 import { parameterSelection } from "../main";
-import { Config } from "../../shared/config";
-import { addWebglCircle } from "../webgl/webglCircle";
-import {
-  testTurfFunctions,
-  getPointsInRadius,
-  addImageOverlay,
-  addCanvasOverlay,
-} from "./testMapFunctionsTODO";
+import { fetchOsmData } from "../network/networkUtils";
+import { render } from "../webgl/blurFilter";
+import * as webglUtils from "../webgl/webglUtils";
+import { map } from "./mapboxConfig";
+import Geocoder from "./mapboxGeocoder";
+import * as mapboxUtils from "./mapboxUtils";
 import { getDataFromMap } from "./mapboxUtils";
-import { loadSidebar, sortDistances } from "./mapTutorialStoreTest";
-import { fetchOsmData, getGeocoderResults } from "../network/networkUtils";
-import * as createjs from "createjs-module";
-import {
-  createShader,
-  vertexShaderCanvas,
-  fragmentShaderCanvas,
-  createProgram,
-  resizeCanvas,
-} from "../webgl/webglUtils";
-import Axios from "axios";
+import { loadSidebar } from "./mapTutorialStoreTest";
+import { PerformanceMeasurer } from "./performanceMeasurer";
+import { getPointsInRadius, testTurfFunctions } from "./testMapFunctionsTODO";
 
+/**
+ * Main Controller Class for the mapbox map that handles all different aspects of the map.
+ */
 export default class MapController {
-  //private mapIsReady: Boolean = false;
-
-  setupMap(): Promise<void> {
-    //set cursor style to mouse pointer
-    map.getCanvas().style.cursor = "default";
-
-    this.addMapControls();
-
-    //map.showTileBoundaries = true;
-
+  /**
+   * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
+   * This should be the very first function to call to make sure all code later on
+   * can safely assume that the map is ready to be used.
+   */
+  init(): Promise<void> {
     return new Promise((resolve, reject) => {
       map.on("load", () => {
-        //this.mapIsReady = true;
-        this.initMapState();
+        // setup the initial map state
+        this.setupMapState();
 
         resolve();
       });
@@ -54,42 +38,32 @@ export default class MapController {
     });
   }
 
-  addMapControls() {
-    // Add navigation controls to the map
-    map.addControl(
-      new mapboxgl.NavigationControl({
-        showCompass: false,
-      })
-    );
-    map.addControl(new mapboxgl.FullscreenControl(), "top-right");
-    //map.addControl(new mapboxgl.ScaleControl(), "bottom-left");
-    //map.addControl(new mapboxgl.GeolocateControl(), "bottom-right");
+  setupMapState(): void {
+    this.addMapControls();
 
-    // Add the geocoder to the map
-    map.addControl(geocoder, "bottom-left");
-  }
-
-  initMapState() {
     // start measuring the frame rate
-    this.measureFrameRate();
-
-    this.setupGeocoding();
+    const performanceMeasurer = new PerformanceMeasurer();
+    performanceMeasurer.startMeasuring();
 
     //TODO
     loadSidebar();
 
-    /*
-      map.on("sourcedata", function (e) {
+    //map.showTileBoundaries = true;
+
+    map.on("sourcedata", function (e) {
+      /*
+      console.log(e.source);
+      if (e.isSourceLoaded) {
+        // Do something when the source has finished loading
+        console.log(e.sourceId);
         console.log(e.source);
-        if (e.isSourceLoaded) {
-          // Do something when the source has finished loading
-          console.log(e.sourceId);
-          console.log(e.source);
-          console.log(e.coord);
-          console.log(e.tile);
-        }
-      });
+        console.log(e.coord);
+        console.log(e.tile);
+
+       testGetQueryFeatures(e.source.name)
+      }
       */
+    });
 
     map.on("movestart", () => {
       //console.log("Move start event fired!");
@@ -97,11 +71,6 @@ export default class MapController {
 
     map.on("moveend", async () => {
       //console.log("Move end event fired!");
-
-      // show current zoom level
-      console.log("ZoomLevel:");
-      console.log(map.getZoom());
-
       /*
       //TODO: test
       const features = map.queryRenderedFeatures({ layers: ["points-l1"] });
@@ -111,18 +80,14 @@ export default class MapController {
         console.table(uniqueFeatures);
       }
       */
-
       //TODO test tilequery API
-
       //this.reloadData();
     });
 
     // fired when any map data begins loading or changing asynchronously.
-    /*
-      map.on("dataloading", () => {
-        console.log("A dataloading event occurred.");
-      });
-      */
+    map.on("dataloading", () => {
+      //console.log("A dataloading event occurred.");
+    });
 
     //TODO idee: alle häuser in abstand bekommen, indem erst mit tilequery api landuse oder building extrahiert
     // und dann z.b. mit turf distanz oder der LatLng.distanceto()-Methode zu allen queryRendered features
@@ -141,11 +106,26 @@ export default class MapController {
     });
   }
 
-  reloadData() {
-    //TODO: load data new on every move, works but needs another source than overpass api mirror
+  addMapControls(): void {
+    // Add navigation controls to the map
+    map.addControl(
+      new mapboxgl.NavigationControl({
+        showCompass: false,
+      })
+    );
+    map.addControl(new mapboxgl.FullscreenControl(), "top-right");
+    //map.addControl(new mapboxgl.ScaleControl(), "bottom-left");
+    //map.addControl(new mapboxgl.GeolocateControl(), "bottom-right");
+
+    // Add the geocoder to the map
+    map.addControl(Geocoder.geocoderControl, "bottom-left");
+  }
+
+  reloadData(): void {
+    //TODO load data new on every move, works but needs another source than overpass api mirror
     parameterSelection.forEach(async (param) => {
       Benchmark.startMeasure("Fetching data on moveend");
-      const data = await fetchOsmData(this.getViewportBounds(), param);
+      const data = await fetchOsmData(this.getViewportBoundsString(), param);
       console.log(Benchmark.stopMeasure("Fetching data on moveend"));
 
       if (data) {
@@ -171,163 +151,12 @@ export default class MapController {
     */
   }
 
-  setupGeocoding(): void {
-    const marker = new mapboxgl.Marker({ color: "#008000" }); // Create a new green marker
-
-    //console.log(geocoder.getCountries());
-    //console.log(geocoder.getTypes());
-
-    // Fired when the geocoder returns a result
-    geocoder.on("result", async (data: any) => {
-      const point = data.result.center; // capture the result coordinates
-      console.log(data);
-
-      marker.setLngLat(point).addTo(map); // Add the marker to the map at the result coordinates
-
-      map.addSource("tilequery", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [],
-        },
-      });
-
-      map.addLayer({
-        id: "tilequery-points",
-        type: "circle",
-        source: "tilequery", // Set the layer source
-        paint: {
-          "circle-stroke-color": "white",
-          "circle-stroke-width": {
-            // Set the stroke width of each circle: https://docs.mapbox.com/mapbox-gl-js/style-spec/#paint-circle-circle-stroke-width
-            stops: [
-              [0, 0.1],
-              [18, 3],
-            ],
-            base: 5,
-          },
-          "circle-radius": {
-            // Set the radius of each circle, as well as its size at each zoom level: https://docs.mapbox.com/mapbox-gl-js/style-spec/#paint-circle-circle-radius
-            stops: [
-              [12, 5],
-              [22, 180],
-            ],
-            base: 5,
-          },
-          "circle-color": [
-            // Specify the color each circle should be
-            "match", // Use the 'match' expression: https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-match
-            ["get", "STORE_TYPE"], // Use the result 'STORE_TYPE' property
-            "Convenience Store",
-            "#FF8C00",
-            "Convenience Store With Gas",
-            "#FF8C00",
-            "Pharmacy",
-            "#FF8C00",
-            "Specialty Food Store",
-            "#9ACD32",
-            "Small Grocery Store",
-            "#008000",
-            "Supercenter",
-            "#008000",
-            "Superette",
-            "#008000",
-            "Supermarket",
-            "#008000",
-            "Warehouse Club Store",
-            "#008000",
-            "#FF0000", // any other store type
-          ],
-        },
-      });
-
-      const tileset = "mapbox.mapbox-streets-v8"; // tileset id
-      const radius = 2500; // in meters
-      const limit = 50; // the maximum amount of results to return
-
-      const query = `https://api.mapbox.com/v4/${tileset}/tilequery/${point[0]},${point[1]}.json?radius=${radius}&limit=${limit}&access_token=${mapboxgl.accessToken}`;
-      const q = "& dedupe & geometry=point &layers=poi_label";
-      //* limit is max. 50
-      //Query multiple maps
-
-      //curl "https://api.mapbox.com/v4/{tileset_id_1},{tileset_id_2},{tileset_id_3}/tilequery/-122.42901,37.80633.json&access_token=YOUR_MAPBOX_ACCESS_TOKEN"
-
-      // Return only results from the poi_label and building layers within a 30 meter radius of the specified location
-
-      // curl "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/-122.42901,37.80633.json?radius=30&layers=poi_label,building&access_token=YOUR_MAPBOX_ACCESS_TOKEN"
-
-      //* immer nur points als antwort: The Tilequery API does not return the full geometry of a feature. Instead, it returns the closest point ({longitude},{latitude}) of a feature.
-
-      const result = await getGeocoderResults(query);
-      console.log(result);
-
-      const source = map.getSource("tilequery");
-      (source as GeoJSONSource).setData(data);
-
-      const popup = new mapboxgl.Popup(); // Initialize a new popup
-
-      map.on("mouseenter", "tilequery-points", function (e) {
-        if (!e.features || !e.features[0].properties) {
-          return;
-        }
-
-        map.getCanvas().style.cursor = "pointer"; // When the cursor enters a feature, set it to a pointer
-
-        const title = "<h3>" + e.features[0].properties.STORE_NAME + "</h3>"; // Set the store name
-        const storeType = "<h4>" + e.features[0].properties.STORE_TYPE + "</h4>"; // Set the store type
-        const storeAddress = "<p>" + e.features[0].properties.ADDRESS_LINE1 + "</p>"; // Set the store address
-        const obj = JSON.parse(e.features[0].properties.tilequery); // Get the feature's tilequery object (https://docs.mapbox.com/api/maps/#response-retrieve-features-from-vector-tiles)
-        const distance =
-          "<p>" + (obj.distance / 1609.344).toFixed(2) + " mi. from location" + "</p>"; // Take the distance property, convert it to miles, and truncate it at 2 decimal places
-
-        const lon = e.features[0].properties.longitude;
-        const lat = e.features[0].properties.latitude;
-        const coordinates = new mapboxgl.LngLat(lon, lat); // Create a new LngLat object (https://docs.mapbox.com/mapbox-gl-js/api/#lnglatlike)
-        const content = title + storeType + storeAddress + distance; // All the HTML elements
-
-        popup
-          .setLngLat(coordinates) // Set the popup at the given coordinates
-          .setHTML(content) // Set the popup contents equal to the HTML elements you created
-          .addTo(map); // Add the popup to the map
-      });
-
-      map.on("mouseleave", "tilequery-points", function () {
-        map.getCanvas().style.cursor = ""; // Reset the cursor when it leaves the point
-        popup.remove(); // Remove the popup when the cursor leaves the point
-      });
-    });
-
-    // Fired when the geocoder returns a response
-    geocoder.on("results", (data: any) => {
-      //console.log("all results from geocoder: ", data);
-    });
-
-    // Emitted when the geocoder is looking up a query
-    geocoder.on("loading", (data: any) => {
-      //console.log("loading results");
-    });
-  }
-
-  measureFrameRate(): void {
-    //TODO: first measurer
-    const fpsControl = new MapboxFPS.FPSControl();
-    map.addControl(fpsControl, "bottom-right");
-    setInterval(function () {
-      const report = fpsControl.measurer.getMeasurementsReport();
-      console.log("Report:", report);
-    }, 5000); // alle 5 Sekunden
-
-    //TODO: second measurer
-    const fps: any = new FrameRateControl({});
-    map.addControl(fps);
-  }
-
   /**
    * Get the current bounding box, in order:
    * southern-most latitude, western-most longitude, northern-most latitude, eastern-most longitude.
    * @return string representation of the bounds in the above order
    */
-  getViewportBounds(): string {
+  getViewportBoundsString(): string {
     const currBounds = map.getBounds();
     const southLat = currBounds.getSouth();
     const westLng = currBounds.getWest();
@@ -338,6 +167,7 @@ export default class MapController {
   }
 
   /**
+   * * Um vektor sources hinzuzufügen müssen die sourcelayer angegeben werden!
    * * Um das sourceLayer herauszufinden, könnte das tileinfo-package nützlich sein (https://www.npmjs.com/package/tileinfo)
    * * oder alternativ auch https://github.com/mapbox/vector-tile-js
    */
@@ -375,8 +205,28 @@ export default class MapController {
     });
   }
 
+  addMapboxStreetsVectorData() {
+    // Add a circle layer with a vector source
+    map.addLayer({
+      id: "points-of-interest",
+      source: {
+        type: "vector",
+        url: "mapbox://mapbox.mapbox-streets-v8", // use the mapbox street tileset as the source
+      },
+      "source-layer": "poi_label",
+      type: "circle",
+      paint: {
+        // Mapbox Style Specification paint properties
+      },
+      layout: {
+        // Mapbox Style Specification layout properties
+      },
+    });
+  }
+
   removeData(sourceName: string): void {
     if (!map.getSource(sourceName)) {
+      console.warn(`Couldn't remove source ${sourceName}`);
       return;
     }
     mapboxUtils.removeAllLayersForSource(map, sourceName);
@@ -389,9 +239,7 @@ export default class MapController {
     console.log("now adding to map...");
     console.log(sourceName);
 
-    //TODO maybe ask user and don't remove if its the same?
-    //TODO macht das Sinn alle Layer zu löschen????
-    // oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
+    //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapboxUtils.removeAllLayersForSource(map, sourceName);
 
     if (map.getSource(sourceName)) {
@@ -530,361 +378,9 @@ export default class MapController {
       },
     });
     */
-
-    map.on("mouseenter", "points-l1", () => {
-      // Change the cursor style as a UI indicator.
-      map.getCanvas().style.cursor = "pointer";
-    });
-
-    map.on("mouseleave", "points-l1", () => {
-      map.getCanvas().style.cursor = "default";
-    });
-
-    /*
-    // Add a circle layer with a vector source
-    map.addLayer({
-    id: "points-of-interest",
-    source: {
-        type: "vector",
-        url: "mapbox://mapbox.mapbox-streets-v8",
-    },
-    "source-layer": "poi_label",
-    type: "circle",
-    paint: {
-        // Mapbox Style Specification paint properties
-    },
-    layout: {
-        // Mapbox Style Specification layout properties
-    },
-    });
-    */
-
-    const layerName = sourceName + "-l1";
-
-    map.on("sourcedata", () => {
-      const everyPoint = map.queryRenderedFeatures({ layers: [layerName] });
-      const everyPoint2 = map.querySourceFeatures(sourceName, { sourceLayer: layerName });
-      console.log(everyPoint);
-      console.log(everyPoint2);
-
-      //TODO: dont do it like this -> endlossschleife
-      /*
-      for (let index = 0; index < everyPoint.length; index++) {
-        const point = everyPoint[index].geometry.coordinates;
-        console.log(point);
-        this.addTurfCircle(point, 0.2);
-      }
-      */
-    });
-
-    const allPoints = this.getAllPoints(sourceName, sourceName + "-l1");
-    console.log(allPoints);
   }
 
-  //TODO: has to be called after layer is loaded!
-  getAllPoints(src: string, layerName: string) {
-    map.once("sourcedata", (e) => {
-      if (map.getSource(layerName) && map.isSourceLoaded(layerName)) {
-        console.log("source loaded!");
-        const features = map.querySourceFeatures(layerName);
-        console.log(features);
-        const everyPoint = map.queryRenderedFeatures({ layers: [layerName] });
-        const everyPoint2 = map.querySourceFeatures(src, { sourceLayer: layerName });
-        console.log(everyPoint);
-        console.log(everyPoint2);
-      }
-    });
-    /*
-    console.log(layerName);
-    const everyPoint = map.queryRenderedFeatures({ layers: [layerName] });
-    const everyPoint2 = map.querySourceFeatures(src, { sourceLayer: layerName });
-    console.log(everyPoint);
-    console.log(everyPoint2);
-    */
-  }
-
-  // example with createJS (aber vermutlich nicht sonderlich nützlich)
-  handleImageLoad(canvas: HTMLCanvasElement, img: HTMLImageElement) {
-    // create a new stage and point it at our canvas:
-    const exportCanvas = document.getElementById("test_canvas") as HTMLCanvasElement;
-    exportCanvas.width = canvas.width;
-    exportCanvas.height = canvas.height;
-    const stage = new createjs.Stage(exportCanvas);
-
-    if (stage == null) return;
-
-    var bmp = new createjs.Bitmap(img); //.set({ scaleX: 0.5, scaleY: 0.5 });
-    stage.addChild(bmp);
-
-    /*
-    var colorMatrix = new createjs.ColorMatrix();
-    colorMatrix.adjustSaturation(-100);
-    colorMatrix.adjustContrast(50);
-    */
-
-    var blurFilter = new createjs.BlurFilter(4, 4, 1);
-    bmp = bmp.clone();
-    bmp.filters = [blurFilter];
-    bmp.cache(0, 0, img.width, img.height);
-    //bmp.y = 200;
-    stage.addChild(bmp);
-
-    // draw to the canvas:
-    stage.update();
-
-    canvas.classList.add(Config.CSS_HIDDEN);
-  }
-
-  getBlurFilter(name: string = "gaussianBlur") {
-    // prettier-ignore
-    const kernels = {
-      // Define several convolution kernels
-      gaussianBlur: [
-        0.045, 0.122, 0.045,
-        0.122, 0.332, 0.122,
-        0.045, 0.122, 0.045
-      ],
-      gaussianBlur2: [
-        1, 2, 1,
-        2, 4, 2,
-        1, 2, 1
-      ],
-      gaussianBlur3: [
-        0, 1, 0,
-        1, 1, 1,
-        0, 1, 0
-      ],
-      boxBlur: [
-          0.111, 0.111, 0.111,
-          0.111, 0.111, 0.111,
-          0.111, 0.111, 0.111
-      ],
-      triangleBlur: [
-          0.0625, 0.125, 0.0625,
-          0.125,  0.25,  0.125,
-          0.0625, 0.125, 0.0625
-      ]
-    };
-
-    switch (name) {
-      case "gaussianBlur2":
-        return kernels.gaussianBlur2;
-      case "gaussianBlur3":
-        return kernels.gaussianBlur3;
-      case "boxBlur":
-        return kernels.boxBlur;
-      case "triangleBlur":
-        return kernels.triangleBlur;
-      case "gaussianBlur":
-      default:
-        return kernels.gaussianBlur;
-    }
-  }
-
-  computeKernelWeight(kernel: number[]): number {
-    const weight = kernel.reduce(function (prev: number, curr: number) {
-      return prev + curr;
-    });
-    return weight <= 0 ? 1 : weight;
-  }
-
-  render(image: HTMLImageElement): HTMLCanvasElement | null {
-    const newCanvas = document.querySelector("#test_canvas") as HTMLCanvasElement;
-    // const newCanvas = document.createElement("canvas"); // in-memory canvas
-    const glContext = newCanvas.getContext("webgl");
-
-    if (!glContext) {
-      console.log("No gl context available!");
-      return null;
-    }
-
-    // adjust canvas size to the image size
-    newCanvas.width = image.width;
-    newCanvas.height = image.height;
-
-    const vertexShader = createShader(glContext, glContext.VERTEX_SHADER, vertexShaderCanvas());
-    const fragmentShader = createShader(
-      glContext,
-      glContext.FRAGMENT_SHADER,
-      fragmentShaderCanvas()
-    );
-
-    const program = createProgram(glContext, vertexShader, fragmentShader);
-
-    const positionLocation = glContext.getAttribLocation(program, "a_position");
-    const texcoordLocation = glContext.getAttribLocation(program, "a_texCoord");
-
-    // create and initialize a WebGLBuffer to store vertex and color data
-    const positionBuffer = glContext.createBuffer();
-    // bind buffer (think of it as ARRAY_BUFFER = positionBuffer)
-    glContext.bindBuffer(glContext.ARRAY_BUFFER, positionBuffer);
-    // Set a rectangle the same size as the image at (0, 0). Necessary to show the image on the canvas.
-    this.setRectangle(glContext, 0, 0, image.width, image.height);
-
-    // provide texture coordinates for the rectangle.
-    const texcoordBuffer = glContext.createBuffer();
-    glContext.bindBuffer(glContext.ARRAY_BUFFER, texcoordBuffer);
-    glContext.bufferData(
-      glContext.ARRAY_BUFFER,
-      new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]),
-      glContext.STATIC_DRAW
-    );
-
-    function createTexture() {
-      if (!glContext) return;
-
-      // Create a texture.
-      const texture = glContext.createTexture();
-      glContext.bindTexture(glContext.TEXTURE_2D, texture);
-
-      // Set the parameters so we can render any size image.
-      glContext.texParameteri(
-        glContext.TEXTURE_2D,
-        glContext.TEXTURE_WRAP_S,
-        glContext.CLAMP_TO_EDGE
-      );
-      glContext.texParameteri(
-        glContext.TEXTURE_2D,
-        glContext.TEXTURE_WRAP_T,
-        glContext.CLAMP_TO_EDGE
-      );
-      glContext.texParameteri(
-        glContext.TEXTURE_2D,
-        glContext.TEXTURE_MIN_FILTER,
-        glContext.NEAREST
-      );
-      glContext.texParameteri(
-        glContext.TEXTURE_2D,
-        glContext.TEXTURE_MAG_FILTER,
-        glContext.NEAREST
-      );
-    }
-
-    //TODO var originalImageTexture = createAndSetupTexture(gl);
-
-    // Upload the image into the texture.
-    glContext.texImage2D(
-      glContext.TEXTURE_2D,
-      0,
-      glContext.RGBA,
-      glContext.RGBA,
-      glContext.UNSIGNED_BYTE,
-      image
-    );
-
-    // lookup uniforms
-    const resolutionLocation = glContext.getUniformLocation(program, "u_resolution");
-    const textureSizeLocation = glContext.getUniformLocation(program, "u_textureSize");
-    const kernelLocation = glContext.getUniformLocation(program, "u_kernel[0]");
-    const kernelWeightLocation = glContext.getUniformLocation(program, "u_kernelWeight");
-
-    //const blurKernel = this.getBlurFilter("triangleBlur");
-    const blurKernel = this.getBlurFilter();
-    const kernelWeight = this.computeKernelWeight(blurKernel);
-
-    drawWithKernel();
-
-    function drawWithKernel() {
-      if (!glContext) return;
-
-      resizeCanvas(newCanvas);
-
-      // Tell WebGL how to convert from clip space to pixels
-      glContext.viewport(0, 0, glContext.canvas.width, glContext.canvas.height);
-
-      // Clear the canvas
-      glContext.clearColor(0, 0, 0, 0);
-      glContext.clear(glContext.COLOR_BUFFER_BIT);
-
-      // Tell it to use our program (pair of shaders)
-      glContext.useProgram(program);
-
-      // Turn on the position attribute
-      glContext.enableVertexAttribArray(positionLocation);
-
-      // Bind the position buffer.
-      glContext.bindBuffer(glContext.ARRAY_BUFFER, positionBuffer);
-
-      // Tell the position attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-      var size = 2; // 2 components per iteration
-      var type = glContext.FLOAT; // the data is 32bit floats
-      var normalize = false; // don't normalize the data
-      var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
-      var offset = 0; // start at the beginning of the buffer
-      glContext.vertexAttribPointer(positionLocation, size, type, normalize, stride, offset);
-
-      // Turn on the texcoord attribute
-      glContext.enableVertexAttribArray(texcoordLocation);
-
-      // bind the texcoord buffer.
-      glContext.bindBuffer(glContext.ARRAY_BUFFER, texcoordBuffer);
-
-      // Tell the texcoord attribute how to get data out of texcoordBuffer (ARRAY_BUFFER)
-      var size = 2; // 2 components per iteration
-      var type = glContext.FLOAT; // the data is 32bit floats
-      var normalize = false; // don't normalize the data
-      var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
-      var offset = 0; // start at the beginning of the buffer
-      glContext.vertexAttribPointer(texcoordLocation, size, type, normalize, stride, offset);
-
-      // set the resolution
-      glContext.uniform2f(resolutionLocation, glContext.canvas.width, glContext.canvas.height);
-
-      // set the size of the image
-      glContext.uniform2f(textureSizeLocation, image.width, image.height);
-
-      // set the kernel and it's weight
-      glContext.uniform1fv(kernelLocation, blurKernel);
-      glContext.uniform1f(kernelWeightLocation, kernelWeight);
-
-      // Draw the rectangle.
-      var primitiveType = glContext.TRIANGLES;
-      var offset = 0;
-      var count = 6; // 6 means two triangles
-      glContext.drawArrays(primitiveType, offset, count);
-    }
-
-    return newCanvas;
-  }
-
-  setRectangle(gl: WebGLRenderingContext, x: number, y: number, width: number, height: number) {
-    var x1 = x;
-    var x2 = x + width;
-    var y1 = y;
-    var y2 = y + height;
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
-      gl.STATIC_DRAW
-    );
-  }
-
-  //TODO 1. alternativ kann auch der Canvas weggelassen werden und nur der Weichzeichner auf das Bild angewendet werden, wenn WebGl nicht nötig
-  //TODO 2. oder man nutzt einfach das CustomLayer unten (das ist vermutlich fast am sinnvollsten?)
-  //TODO 3. testen ob zoomen dann überhaupt möglich ist, wenn als canvas / image layer drübergelegt ?? wenn nein bleibt eh nur option 2
-  //  -> zu 3. das overlay muss ja sowieso bei jeder bewegung entfernt und neu geladen werden, also sollte das nicht das problem sein
-  /**
-   * Einen Canvas darüber zu legen ist laut https://github.com/mapbox/mapbox-gl-js/issues/6456 nicht allzu 
-   * gut für die Performance, stattdessen Custom Layer verwenden! Probleme:
-        - Severe performance hit; browsers have a hard time compositing two GL contexts.
-        - You can only draw on top of a Mapbox map — there’s no way to draw something in between
-   */
-
-  //TODO andere Idee: ich will ja die Kreise blurren (die ich mit Turf.js zeichne oder halt direkt mit Canvas?)
-  //TODO  -> d.h. ich kann einfach die Kreise blurren und die dann als Image/canvassource darüberlegen
-
-  /**
-   * Idee (ich glaub die drüber is besser):
-   * 1. vor neuem Layer ein Bild machen und das kurz anzeigen (also diesen canvas visible und die echte karte nicht)
-   * 2. karten kontext clearen und dann neues Layer adden
-   * 3. bild von neuem Layer (mit weißem Hintergrund) und das blurren
-   * 4. dieses dann als image layer auf karte
-   * -> bringt aber nichts weil bild ja nicht interaktiv
-   *
-   * -> karte wieder anzeigen mit geblurrtem CustomLayer stattdessen?
-   * -> irgendwie müsste halt nur der unterschied zw. baselayer und neuem Layer geblurrt werden oder?
-   */
-  blurMap() {
+  blurMap(): void {
     if (!map.loaded) {
       console.error("The map is not ready yet!");
       return;
@@ -905,12 +401,12 @@ export default class MapController {
       img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
       img.height = mapCanvas.clientHeight;
 
-      const canvas = this.render(img);
+      const canvas = render(img);
       /*
-      //TODO:
-      if (canvas) {
-        addCanvasOverlay(canvas);
-      }*/
+        //TODO:
+        if (canvas) {
+          addCanvasOverlay(canvas);
+        }*/
     };
   }
 
