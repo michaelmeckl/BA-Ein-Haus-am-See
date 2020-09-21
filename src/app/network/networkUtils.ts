@@ -1,7 +1,7 @@
-import Benchmark from "../../shared/benchmarking";
-import osmtogeojson from "osmtogeojson";
 import axios from "axios";
 import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
+import osmtogeojson from "osmtogeojson";
+import Benchmark from "../../shared/benchmarking";
 
 export async function testGuide(): Promise<any> {
   try {
@@ -114,6 +114,7 @@ export async function fetchOsmData(mapBounds: string, query: string): Promise<an
       bounds: mapBounds,
       osmQuery: query,
     });
+    //const url = "/osmRequestPbfVersion?" + params; //TODO osmtogeojson has to be commented out to work with this
     const url = "/osmRequestCacheVersion?" + params;
 
     Benchmark.startMeasure("Request client side");

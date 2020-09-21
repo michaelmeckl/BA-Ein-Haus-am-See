@@ -1,4 +1,3 @@
-//TODO: connect to and request data from postgres:
 /*
   getAmenities(amenities, res) {
     const conString = "pg://localhost/portland_from_osm";
