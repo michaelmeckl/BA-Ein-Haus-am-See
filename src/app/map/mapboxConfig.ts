@@ -21,14 +21,8 @@ const initialZoomLevel = 12;
 //const mapStyle = "mapbox://styles/mapbox/streets-v11?optimize=true";
 
 const mapStyle = "mapbox://styles/mapbox/streets-v11";
-
-// gescheiterte Versuche für osmscout
-//const mapStyle = "http://192.168.178.43:8553/v1/mbgl/style?style=osmbright";
-//const mapStyle = "http://10.0.2.15:8553/v1/mbgl/style?style=osmbright";
-//const mapStyle = "http://127.0.0.1:8553/v1/mbgl/style?style=osmbright";
-
 //TODO der osmscout style ist nicht allzu hübsch, theoretisch kann aber einfach der mapbox style heruntergeladen und die tile requests ausgetauscht werden zu eigenem osmscout server! ("http://localhost:8553/v1/mbgl/tile?z={z}&x={x}&y={y}")
-//const mapStyle = "http://127.0.0.1:8553/v1/mbgl/style?style=osmbright";
+//const mapStyle = ""../assets/osmscoutStyle.json"";  // path to local osmscout style which serves own hosted tiles
 
 // setup map
 const map = new mapboxgl.Map({

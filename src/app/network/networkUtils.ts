@@ -106,6 +106,19 @@ export async function fetchOsmDataFromClientVersion(
   }
 }
 
+export async function getStyle(url: string) {
+  const response = await axios.get(url);
+  console.log(response);
+  return response.data;
+}
+
+export async function getPoiTypes() {
+  const url = "http://192.168.178.43:8553/v1/poi_types";
+  const response = await axios.get(url);
+  console.log(response);
+  return response.data;
+}
+
 //TODO
 export async function fetchOsmData(mapBounds: string, query: string): Promise<any> {
   try {
