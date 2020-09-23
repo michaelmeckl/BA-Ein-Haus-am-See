@@ -1,8 +1,6 @@
 /* eslint-env browser */
-
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
-
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { parameterSelection } from "../main";
@@ -10,6 +8,7 @@ import { fetchOsmData } from "../network/networkUtils";
 import { render as renderAndBlur } from "../webgl/blurFilter";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { addWebglCircle } from "../webgl/webglCircle";
+import { getDeckGlLayer, mapboxLayer } from "./deckLayer";
 import { getDataFromMap, getPointsInRadius } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -73,8 +72,10 @@ export default class MapController {
       */
     });
 
-    map.on("movestart", () => {
+    map.on("movestart", async () => {
       //console.log("Move start event fired!");
+      //const pois = await getPoiTypes();
+      //console.log(pois);
     });
 
     map.on("moveend", async () => {
@@ -239,6 +240,38 @@ export default class MapController {
         // Mapbox Style Specification layout properties
       },
     });
+  }
+
+  addDeckLayer(): void {
+    console.log("in addDeckLayer");
+
+    //TODO richtige geodaten zum testen übergeben!
+    const deck = getDeckGlLayer("HeatmapLayer", "");
+    console.log("Props:", deck.props);
+    console.log("ViewState:", deck.viewState);
+
+    const layer = (deck as unknown) as CustomLayerInterface;
+    map.addLayer(layer);
+
+    /*
+    const layer = (deckglLayer as unknown) as CustomLayerInterface;
+    console.log(layer);
+    map.addLayer(layer);
+    
+
+    const layer2 = (geojsonlayer as unknown) as CustomLayerInterface;
+    map.addLayer(layer2);
+*/
+
+    /*
+    const layer3 = (mapboxLayer as unknown) as CustomLayerInterface;
+    map.addLayer(layer3);
+    */
+
+    /*
+    const layer4 = (deckLayer as unknown) as CustomLayerInterface;
+    map.addLayer(layer4);
+    */
   }
 
   removeData(sourceName: string): void {

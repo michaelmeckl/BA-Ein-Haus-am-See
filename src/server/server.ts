@@ -8,7 +8,7 @@ import { INTERNAL_SERVER_ERROR, NOT_FOUND } from "http-status-codes";
 import path from "path";
 import OsmRouter from "./routes";
 
-//TODO handle crashes better?
+//TODO handle crashes better than killing the process?
 process.on("uncaughtException", (e) => {
   console.log(e);
   process.exit(1);
@@ -103,7 +103,7 @@ export default class Server {
    * Start the express server on the given port.
    */
   start(port: number): void {
-    this.app.listen(port, () => {
+    const server = this.app.listen(port, () => {
       console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
     });
   }

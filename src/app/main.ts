@@ -1,8 +1,8 @@
 /* eslint-env browser */
-import MapController from "./map/mapController";
 import Benchmark from "../shared/benchmarking";
-import { fetchOsmData, testGuide } from "./network/networkUtils";
 import { Config } from "../shared/config";
+import MapController from "./map/mapController";
+import { fetchOsmData } from "./network/networkUtils";
 import OsmTags from "./osmModel/osmTagCollection";
 
 export const parameterSelection: Set<string> = new Set();
@@ -157,6 +157,12 @@ function setupUI(mapController: MapController): void {
   const blurButtton = document.querySelector("#blurButton");
   if (blurButtton) {
     blurButtton.addEventListener("click", mapController.blurMap.bind(mapController));
+  }
+
+  //TODO
+  const deckButtton = document.querySelector("#deckglButton");
+  if (deckButtton) {
+    deckButtton.addEventListener("click", mapController.addDeckLayer.bind(mapController));
   }
 
   //testVectorTileAPI(mapController);

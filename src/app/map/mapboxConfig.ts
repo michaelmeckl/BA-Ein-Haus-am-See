@@ -1,4 +1,4 @@
-import mapboxgl, { LngLatLike } from "mapbox-gl";
+import mapboxgl from "mapbox-gl";
 
 // make sure that MapboxGl (and WebGL) are supported in the browser
 if (!mapboxgl.supported()) {
@@ -13,7 +13,7 @@ mapboxgl.accessToken = process.env.MapboxToken;
 
 const lat = 49.008;
 const lng = 12.1;
-const initialPosition: LngLatLike = [lng, lat]; // Regensburg
+const initialPosition: [number, number] = [lng, lat]; // Regensburg
 const initialZoomLevel = 12;
 
 // remove unused layers and features with ?optimize=true
