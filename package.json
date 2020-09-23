@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "rimraf ./public/dist && webpack",
     "build-watch": "webpack && webpack --watch",
-    "serve": "ts-node-dev --files src/index.ts",
+    "serve": "ts-node-dev src/index.ts",
     "start": "concurrently --kill-others \"npm run build-watch\" \"npm run serve\"",
     "deploy": "npm run build && npm run serve"
   },
@@ -27,8 +27,10 @@
   },
   "homepage": "https://github.com/michaelmeckl/BA-Ein-Haus-am-See#readme",
   "dependencies": {
+    "@deck.gl/aggregation-layers": "^8.2.8",
     "@deck.gl/core": "^8.2.8",
     "@deck.gl/layers": "^8.2.8",
+    "@deck.gl/mapbox": "^8.2.8",
     "@mapbox/geojson-coords": "0.0.0",
     "@mapbox/mapbox-gl-geocoder": "^4.7.0",
     "@turf/buffer": "^5.1.5",

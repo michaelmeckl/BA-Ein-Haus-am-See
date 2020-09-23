@@ -11,6 +11,7 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 module.exports = {
     mode: "development",
     devtool: "none",
+    //watch: true,
     entry: [
         "./src/app/main.ts",
     ],
