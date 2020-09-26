@@ -1,4 +1,4 @@
-/*Include the padding and border in an element's total width and height */
+/* Include the padding and border in an element's total width and height */
 * {
     -webkit-box-sizing: border-box;
     -moz-box-sizing: border-box;
@@ -19,6 +19,21 @@ body {
     min-height: 100vh;
     overflow: hidden;
 }
+
+
+/** General Stylings */
+
+.hidden {
+    display: none;
+    opacity: 0;
+
+    /* TODO better performance than display: none as transform can use hardware acceleration 
+    but unfortunately leaves the space
+    transform: scale(0);*/
+}
+
+
+/** Headline Styling */
 
 .heading {
     background-color: lavender;
@@ -53,6 +68,9 @@ body {
     background-color: #11a74f;
 }
 
+
+/** Map Styling */
+
 #mapContainer {
     transition: margin-left .5s;
 }
@@ -78,6 +96,9 @@ body {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     border-radius: 3px;
 }
+
+
+/** Dropdown Menu Styling */
 
 .dropbtn {
     background-color: #c7bd34;
@@ -142,6 +163,8 @@ body {
     background-color: #b61919;
 }
 
+/** Selection Menu Styling */
+
 .selection-box {
     position: absolute;
     z-index: 0;
@@ -194,14 +217,79 @@ body {
     color: white;
 }
 
-.hidden {
-    display: none;
-    opacity: 0;
+/** Snackbar Styling */
 
-    /* TODO better performance than display: none as transform can use hardware acceleration 
-    but unfortunately leaves the space
-    transform: scale(0);*/
+#snackbar {
+    visibility: hidden;
+    min-width: 250px;
+    background-color: darkviolet;
+    color: #fff;
+    text-align: center;
+    border-radius: 2px;
+    padding: 16px;
+    position: fixed;
+    z-index: 1;
+    left: 15px;
+    bottom: 30px;
+    font-size: 17px;
 }
+
+#snackbar.show {
+    visibility: visible;
+    -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
+    animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+@-webkit-keyframes fadein {
+    from {
+        bottom: 0;
+        opacity: 0;
+    }
+
+    to {
+        bottom: 30px;
+        opacity: 1;
+    }
+}
+
+@keyframes fadein {
+    from {
+        bottom: 0;
+        opacity: 0;
+    }
+
+    to {
+        bottom: 30px;
+        opacity: 1;
+    }
+}
+
+@-webkit-keyframes fadeout {
+    from {
+        bottom: 30px;
+        opacity: 1;
+    }
+
+    to {
+        bottom: 0;
+        opacity: 0;
+    }
+}
+
+@keyframes fadeout {
+    from {
+        bottom: 30px;
+        opacity: 1;
+    }
+
+    to {
+        bottom: 0;
+        opacity: 0;
+    }
+}
+
+
+/** Sidebar Styling */
 
 #sidebar {
     position: fixed;

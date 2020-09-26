@@ -8,7 +8,7 @@ import { fetchOsmData } from "../network/networkUtils";
 import { render as renderAndBlur } from "../webgl/blurFilter";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { addWebglCircle } from "../webgl/webglCircle";
-import { getDeckGlLayer, mapboxLayer } from "./deckLayer";
+import { getDeckGlLayer } from "./deckLayer";
 import { getDataFromMap, getPointsInRadius } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";

@@ -4,10 +4,11 @@ import { Config } from "../shared/config";
 import MapController from "./map/mapController";
 import { fetchOsmData } from "./network/networkUtils";
 import OsmTags from "./osmModel/osmTagCollection";
+import { showSnackbar, SnackbarType } from "./utils";
 
 export const parameterSelection: Set<string> = new Set();
 
-// const enum instead of enum as this inlines the elements at runtime
+// * const enum instead of enum as this inlines the elements at runtime
 // -> not the enum as a whole is needed at runtime
 const enum HtmlElements {
   LIST_TEMPLATE_ID = "#li-template",
@@ -111,6 +112,9 @@ function selectData(e: Event, mapController: MapController): void {
       mapController.removeData(textContent.toLowerCase());
     }
 
+    // eslint-disable-next-line no-magic-numbers
+    showSnackbar(`Successfully removed filter: "${query}"`, SnackbarType.SUCCESS, 2000);
+
     // check if there are other list elements, if not hide selection box
     if (list.children.length === 0) {
       selectionBox.classList.add(Config.CSS_HIDDEN);
@@ -126,6 +130,9 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   //ganz Regensburg: 12.028,48.966,12.192,49.076
   //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
   const bounds = mapController.getViewportBoundsString();
+
+  // give feedback to the user
+  showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
 
   Benchmark.startMeasure("Fetching data from osm");
   // request data from osm
