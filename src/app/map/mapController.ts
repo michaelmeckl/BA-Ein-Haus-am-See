@@ -15,6 +15,7 @@ import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
+import { testGettingNearbyFeatures } from "./testNearbyFeaturesTutorial";
 import { testTurfFunctions } from "./turfUtils";
 
 /**
@@ -27,6 +28,8 @@ export default class MapController {
   //TODO oder so:
   private mapData = new Map<string, number[] | number[][]>(); // sourcename as key, array of all points as value or array of
   // array for polygon and linestring?? (basically do i want to flatten it??)
+
+  //private currentData?: string;
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -102,7 +105,7 @@ export default class MapController {
       //sortDistances(e.lngLat);
 
       testTurfFunctions();
-      addWebglCircle(map);
+      //addWebglCircle(map);
     });
   }
 
@@ -258,7 +261,6 @@ export default class MapController {
     console.log(layer);
     map.addLayer(layer);
     
-
     const layer2 = (geojsonlayer as unknown) as CustomLayerInterface;
     map.addLayer(layer2);
 */
@@ -283,6 +285,8 @@ export default class MapController {
   showData(data: string, sourceName: string): void {
     console.log("now adding to map...");
     console.log(sourceName);
+
+    //this.currentData = data;
 
     //TODO hier schon das geojson parsen und lokal speichern, damit später gequeriet werden kann?
     //TODO reex oder programm zum parsen finden!
@@ -350,6 +354,7 @@ export default class MapController {
         ],
         //"circle-stroke-width": 4,
         "circle-blur": 1,
+        "circle-opacity": 0.5,
         /*
         "circle-opacity": {
           stops: [
@@ -427,6 +432,8 @@ export default class MapController {
       },
     });
     */
+
+    //testGettingNearbyFeatures(sourceName);
   }
 
   blurMap(): void {

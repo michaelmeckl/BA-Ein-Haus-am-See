@@ -20,6 +20,8 @@ const initialZoomLevel = 12;
 //TODO test performance with optimize!
 //const mapStyle = "mapbox://styles/mapbox/streets-v11?optimize=true";
 
+//! TODO: style als eigene datei und dann tiles sowohl von mapbox als auch von eigenem osmscout server holen
+// * -> beide urls unter source angeben, damit bessere performance beim tile fetching (weil dann parallel gearbeitet werden kann)
 const mapStyle = "mapbox://styles/mapbox/streets-v11";
 //TODO der osmscout style ist nicht allzu hübsch, theoretisch kann aber einfach der mapbox style heruntergeladen und die tile requests ausgetauscht werden zu eigenem osmscout server! ("http://localhost:8553/v1/mbgl/tile?z={z}&x={x}&y={y}")
 //const mapStyle = ""../assets/osmscoutStyle.json"";  // path to local osmscout style which serves own hosted tiles
