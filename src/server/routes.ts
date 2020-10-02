@@ -30,6 +30,13 @@ export default class OsmRouter {
    * Init the express router and setup routes.
    */
   initRoutes(): void {
+    this.osmRouter.get("/testCmd", async (req: Request, res: Response, next: NextFunction) => {
+      const result = await ServerUtils.executeOSMFilter(this.publicDirPath);
+      console.log("Result of operation is:\n", result);
+
+      res.status(OK).send(result);
+    });
+
     this.osmRouter.get("/osmRequest", async (req: Request, res: Response, next: NextFunction) => {
       const bounds = req.query.bounds?.toString();
       const query = req.query.osmQuery?.toString();
@@ -157,6 +164,8 @@ export default class OsmRouter {
                 console.log(geoData.length);
                 //TODO das ergebnis ist nur json und kein valides geojson! (kann auch nicht mehr in eines umgewandelt werden!)
 
+                //* wieso übertrag ich nicht gleich das pbf? -> mapbox kann das doch auch ?
+                //* und zum filtern nach tags könnten dann andere Tools sinnvoller sein
                 return res.status(OK).send(JSON.stringify(geoData));
               });
           } catch (error) {

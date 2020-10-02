@@ -122,6 +122,10 @@ export async function getPoiTypes() {
 //TODO
 export async function fetchOsmData(mapBounds: string, query: string): Promise<any> {
   try {
+    //TODO delete me later
+    //const antwort = await axios.get("/testCmd");
+    //console.log("Serverantwort: ", antwort);
+
     console.log("sending request!");
     const params = new URLSearchParams({
       bounds: mapBounds,
