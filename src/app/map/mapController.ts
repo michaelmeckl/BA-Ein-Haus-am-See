@@ -1,14 +1,16 @@
+import type { Point } from "geojson";
+/* eslint-disable no-magic-numbers */
 /* eslint-env browser */
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
-import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
+import mapboxgl, { CustomLayerInterface, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
 import { render as renderAndBlur } from "../webgl/blurFilter";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { addWebglCircle } from "../webgl/webglCircle";
-import { getDeckGlLayer } from "./deckLayer";
+import { createMapboxLayer, getDeckGlLayer } from "./deckLayer";
 import { getDataFromMap, getPointsInRadius } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -51,6 +53,12 @@ export default class MapController {
   setupMapState(): void {
     this.addMapControls();
 
+    // disable map rotation using right click + drag
+    map.dragRotate.disable();
+
+    // disable map rotation using touch rotation gesture
+    map.touchZoomRotate.disableRotation();
+
     // start measuring the frame rate
     const performanceMeasurer = new PerformanceMeasurer();
     performanceMeasurer.startMeasuring();
@@ -88,7 +96,7 @@ export default class MapController {
     });
 
     // fired when any map data begins loading or changing asynchronously.
-    map.on("dataloading", () => {
+    map.once("dataloading", () => {
       //console.log("A dataloading event occurred.");
     });
 
@@ -96,6 +104,7 @@ export default class MapController {
     // und dann z.b. mit turf distanz oder der LatLng.distanceto()-Methode zu allen queryRendered features
     // bekommen und dann diese gebiete markieren
 
+    /*
     map.on("click", (e) => {
       console.log("Click:", e);
 
@@ -107,6 +116,27 @@ export default class MapController {
       testTurfFunctions();
       //addWebglCircle(map);
     });
+    */
+
+    /** 
+     * * Example for updating an overlay while hovering over features:
+    map.on("mousemove", function (e) {
+      var states = map.queryRenderedFeatures(e.point, {
+        layers: ["statedata"],
+      });
+
+      if (states.length > 0) {
+        document.getElementById("pd").innerHTML =
+          "<h3><strong>" +
+          states[0].properties.name +
+          "</strong></h3><p><strong><em>" +
+          states[0].properties.density +
+          "</strong> people per square mile</em></p>";
+      } else {
+        document.getElementById("pd").innerHTML = "<p>Hover over a state!</p>";
+      }
+    });
+    */
   }
 
   addMapControls(): void {
@@ -145,13 +175,45 @@ export default class MapController {
     /*
     // after the GeoJSON data is loaded, update markers on the screen and do so on every map move/moveend
     map.on('data', function(e) {
-    if (e.sourceId !== 'earthquakes' || !e.isSourceLoaded) return;
+    if (e.sourceId !== 'bars' || !e.isSourceLoaded) return;
 
     map.on('move', updateMarkers);
     map.on('moveend', updateMarkers);
     updateMarkers();
     });
     */
+  }
+
+  addPopupOnHover(): void {
+    // Create a popup, but don't add it to the map yet.
+    const popup = new mapboxgl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+    });
+
+    map.on("mouseenter", "places", function (e) {
+      // Change the cursor style as a UI indicator.
+      map.getCanvas().style.cursor = "pointer";
+
+      const coordinates = e.features[0].geometry.coordinates.slice();
+      const description = e.features[0].properties.description;
+
+      // Ensure that if the map is zoomed out such that multiple
+      // copies of the feature are visible, the popup appears
+      // over the copy being pointed to.
+      while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+        coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+      }
+
+      // Populate the popup and set its coordinates
+      // based on the feature found.
+      popup.setLngLat(coordinates).setHTML(description).addTo(map);
+    });
+
+    map.on("mouseleave", "places", function () {
+      map.getCanvas().style.cursor = "";
+      popup.remove();
+    });
   }
 
   /**
@@ -245,16 +307,237 @@ export default class MapController {
     });
   }
 
+  //TODO
+  addHeatmapLayer(data?: string): void {
+    // Heatmap layers work with a vector tile source as well as geojson.
+    map.addSource("bars", {
+      type: "geojson",
+      data: "../assets/data.geojson",
+    });
+
+    map.addLayer(
+      {
+        id: "bars-heat",
+        type: "heatmap",
+        source: "bars",
+        maxzoom: 15,
+        paint: {
+          // Increase the heatmap weight based on frequency and property magnitude
+          // heatmap-weight is a measure of how much an individual point contributes to the heatmap
+          //! both do not work with text values
+          /*
+          "heatmap-weight": [
+            "interpolate",
+            ["linear"],
+            ["get", "type"],
+            "point",
+            0,
+            "way",
+            0.5,
+            "polygon",
+            1,
+          ],
+          */
+          /*
+          "heatmap-weight": {
+            property: "type",
+            type: "exponential",
+            stops: [
+              [0, 0.2],
+              [62, 1],
+            ],
+          },*/
+          // Increase the heatmap color weight weight by zoom level
+          // heatmap-intensity is a multiplier on top of heatmap-weight
+          //"heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 9, 3],
+          "heatmap-intensity": {
+            stops: [
+              [11, 1],
+              [15, 3],
+            ],
+          },
+          // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
+          // Begin color ramp at 0-stop with a 0-transparancy color
+          // to create a blur-like effect.
+          // prettier-ignore
+          "heatmap-color": [
+            "interpolate", ["linear"], ["heatmap-density"],
+            0, "rgba(33,102,172,0)",
+            0.2, "rgb(103,169,207)",
+            0.4, "rgb(209,229,240)",
+            0.6, "rgb(253,219,199)",
+            0.8, "rgb(239,138,98)",
+            1, "rgb(178,24,43)",
+          ],
+          /*
+          // Adjust the heatmap radius by zoom level
+          // prettier-ignore
+          "heatmap-radius": [
+            "interpolate", ["linear"], ["zoom"],
+            0, 2,
+            9, 20,
+            15, 50, 
+            18, 70,
+          ],
+          */
+          // increase radius as zoom increases
+          "heatmap-radius": {
+            //default radius is 30 (pixel)
+            stops: [
+              [11, 15],
+              [15, 20],
+            ],
+          },
+          // Transition from heatmap to circle layer by zoom level
+          //"heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 7, 1, 9, 0],
+          // decrease opacity to transition into the circle layer
+          "heatmap-opacity": {
+            default: 1,
+            stops: [
+              [14, 1],
+              [15, 0],
+            ],
+          },
+        },
+      },
+      "waterway-label"
+    );
+
+    map.addLayer(
+      {
+        id: "bars-point",
+        type: "circle",
+        source: "bars",
+        minzoom: 14,
+        paint: {
+          // Size circle radius by earthquake magnitude and zoom level
+          /*
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            7, ["interpolate", ["linear"], ["get", "mag"], 1, 1, 6, 4],
+            16, ["interpolate", ["linear"], ["get", "mag"], 1, 5, 6, 50],
+          ],
+          */
+          "circle-radius": {
+            property: "type",
+            type: "exponential",
+            stops: [
+              [{ zoom: 15, value: 1 }, 5],
+              [{ zoom: 15, value: 62 }, 10],
+              [{ zoom: 22, value: 1 }, 20],
+              [{ zoom: 22, value: 62 }, 50],
+            ],
+          },
+          "circle-color": {
+            property: "type",
+            type: "exponential",
+            stops: [
+              [0, "rgba(236,222,239,0)"],
+              [10, "rgb(236,222,239)"],
+              [20, "rgb(208,209,230)"],
+              [30, "rgb(166,189,219)"],
+              [40, "rgb(103,169,207)"],
+              [50, "rgb(28,144,153)"],
+              [60, "rgb(1,108,89)"],
+            ],
+          },
+          "circle-stroke-color": "white",
+          "circle-stroke-width": 1,
+          // Transition from heatmap to circle layer by zoom level
+          //"circle-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 16, 1],
+          "circle-opacity": {
+            stops: [
+              [14, 0],
+              [15, 1],
+            ],
+          },
+        },
+      },
+      "waterway-label"
+    );
+
+    map.on("mouseover", "bars-point", (e) => {
+      // change the cursor style to show the user this is clickable
+      map.getCanvas().style.cursor = "pointer";
+    });
+
+    map.on("click", "bars-point", function (e) {
+      if (!e.features) {
+        return;
+      }
+      const clickedPoint = e.features[0];
+
+      //* nested geojson properties need to be parsed because Mapbox doesn't support nested objects or arrays
+      // see https://stackoverflow.com/questions/52859961/display-properties-of-nested-geojson-in-mapbox
+      const props = clickedPoint.properties;
+      if (props === null) {
+        return;
+      }
+      Object.keys(props).forEach(function (key) {
+        //only parse the tags key as the other properties are no obejcts and would only result in an error!
+        if (key === "tags") {
+          props[key] = JSON.parse(props[key]);
+        }
+      });
+
+      new mapboxgl.Popup()
+        // cast to point so coordinates is safe to access
+        .setLngLat((clickedPoint.geometry as Point).coordinates as LngLatLike)
+        .setHTML(
+          "<h3>Name: </h3> " +
+            clickedPoint.properties?.tags.name +
+            "<p>Amenity: " +
+            clickedPoint.properties?.tags.amenity +
+            "</p>"
+        )
+        .addTo(map);
+    });
+
+    this.addLegend();
+  }
+
+  addLegend(): void {
+    //TODO sinnvolle Werte
+    const layers = ["0-10", "10-20", "20-50", "50-100", "100-200", "200-500", "500-1000", "1000+"];
+    //prettier-ignore
+    const colors = ["rgba(33,102,172,0)", "rgb(103,169,207)", "rgb(209,229,240)", "rgb(253,219,199)", "rgb(239,138,98)", "rgb(178,24,43)"];
+
+    const legend = document.querySelector("#legend");
+
+    if (!legend) {
+      return;
+    }
+
+    for (let i = 0; i < layers.length; i++) {
+      const layer = layers[i];
+      const color = colors[i];
+      const item = document.createElement("div");
+      const key = document.createElement("span");
+      key.className = "legend-key";
+      key.style.backgroundColor = color;
+
+      const value = document.createElement("span");
+      value.innerHTML = layer;
+      item.appendChild(key);
+      item.appendChild(value);
+      legend.appendChild(item);
+    }
+  }
+
   addDeckLayer(): void {
     console.log("in addDeckLayer");
 
-    //TODO richtige geodaten zum testen übergeben!
-    const deck = getDeckGlLayer("HeatmapLayer", "");
+    //* für normale Deck Layer:
+    const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson");
     console.log("Props:", deck.props);
-    console.log("ViewState:", deck.viewState);
-
     const layer = (deck as unknown) as CustomLayerInterface;
-    map.addLayer(layer);
+
+    //* für Mapbox Layer:
+    //const layer = createMapboxLayer("../assets/data.geojson");
+    //* add the layer before the waterway-label to make sure it is placed below map labels!
+    map.addLayer(layer, "waterway-label");
 
     /*
     const layer = (deckglLayer as unknown) as CustomLayerInterface;
