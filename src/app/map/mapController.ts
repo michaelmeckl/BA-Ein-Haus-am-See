@@ -1,10 +1,11 @@
+import { HeatmapLayer } from "@deck.gl/aggregation-layers";
 /* eslint-env browser */
 /* eslint-disable no-magic-numbers */
 
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
 import type { RGBAColor } from "@deck.gl/core";
-import { ScatterplotLayer } from "@deck.gl/layers";
+import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { MapboxLayer } from "@deck.gl/mapbox";
 import type { Point } from "geojson";
 import mapboxgl, { CustomLayerInterface, LngLatLike } from "mapbox-gl";
@@ -13,7 +14,7 @@ import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
 import { render as renderAndBlur } from "../webgl/blurFilter";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { getDeckGlLayer } from "./deckLayer";
+import { createMapboxLayer, getDeckGlLayer } from "./deckLayer";
 import { getDataFromMap } from "./featureUtils";
 import { initialPosition, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -528,11 +529,8 @@ export default class MapController {
   }
 
   addDeckLayer(): void {
-    console.log("in addDeckLayer");
-
-    //const firstLabelLayerId = map.getStyle().layers?.find((layer) => layer.type === "symbol")?.id;
-    const firstLabelLayerId = map.getStyle().layers?.filter((layer) => layer.type === "symbol");
-    console.log("firstLabelLayer: ", firstLabelLayerId);
+    /*
+    const firstLabelLayerId = map.getStyle().layers?.find((layer) => layer.type === "symbol")?.id;
 
     map.addLayer(
       new MapboxLayer({
@@ -547,38 +545,23 @@ export default class MapController {
         getRadius: (d: { radius: number }) => d.radius,
         opacity: 0.3,
       }),
-      "waterway-label"
+      firstLabelLayerId
     );
+    */
 
     //* für normale Deck Layer:
+    /*
     const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson");
     console.log("Deck:", deck);
     console.log("Props:", deck.props);
     const layer = (deck as unknown) as CustomLayerInterface;
-
+    */
     //* für Mapbox Layer:
-    //const layer = createMapboxLayer("../assets/data.geojson");
+    //const layer = createMapboxLayer("../assets/data.geojson", HeatmapLayer);  //TODO um die heatmap auszuprobieren brauch ich andere Daten als Geojson
+    const layer = createMapboxLayer("../assets/data.geojson", GeoJsonLayer);
+
     //* add the layer before the waterway-label to make sure it is placed below map labels!
     map.addLayer(layer, "waterway-label");
-
-    /*
-    const layer = (deckglLayer as unknown) as CustomLayerInterface;
-    console.log(layer);
-    map.addLayer(layer);
-    
-    const layer2 = (geojsonlayer as unknown) as CustomLayerInterface;
-    map.addLayer(layer2);
-*/
-
-    /*
-    const layer3 = (mapboxLayer as unknown) as CustomLayerInterface;
-    map.addLayer(layer3);
-    */
-
-    /*
-    const layer4 = (deckLayer as unknown) as CustomLayerInterface;
-    map.addLayer(layer4);
-    */
   }
 
   removeData(sourceName: string): void {

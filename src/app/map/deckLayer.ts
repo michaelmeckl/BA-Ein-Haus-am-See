@@ -1,25 +1,14 @@
 /* eslint-disable no-magic-numbers */
 import { HeatmapLayer, HexagonLayer } from "@deck.gl/aggregation-layers";
-import { Deck, Layer, RGBAColor } from "@deck.gl/core";
+import { Deck, Layer, PostProcessEffect, RGBAColor } from "@deck.gl/core";
 import type { DeckProps, InitialViewStateProps } from "@deck.gl/core/lib/deck";
 import type { LayerProps } from "@deck.gl/core/lib/layer";
 import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { MapboxLayer } from "@deck.gl/mapbox";
 import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
+import { triangleBlur, tiltShift } from "@luma.gl/shadertools";
 
 type supportedLayers = "GeojsonLayer" | "ScatterplotLayer" | "HeatmapLayer";
-
-/*
-type layerArray = (
-  | GeoJsonLayer<unknown>
-  | (ScatterplotLayer<unknown, any> | HeatmapLayer<unknown>)[]
-  | null
-)[];
-*/
-
-// source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
-const AIR_PORTS =
-  "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson";
 
 const initialViewState: InitialViewStateProps = {
   latitude: initialPosition[1],
@@ -29,15 +18,25 @@ const initialViewState: InitialViewStateProps = {
   pitch: 0,
 };
 
-//TODO client width and heigth instead??
+/*
+const postProcessEffect = new PostProcessEffect(tiltShift, {
+  blurRadius: 15,
+});
+*/
+const postProcessEffect = new PostProcessEffect(triangleBlur, {
+  radius: 7,
+});
+
 const mapCanvas = map.getCanvas();
 
 const deckProperties: DeckProps = {
+  //canvas: document.querySelector("#test_canvas") as HTMLCanvasElement,
+  //canvas: document.createElement("canvas") as HTMLCanvasElement,
   width: mapCanvas.clientWidth,
   height: mapCanvas.clientHeight,
   initialViewState: initialViewState,
   controller: true,
-  effects: [],
+  effects: [postProcessEffect], // add postprocess effects to the layers
   layers: [] as Layer<any, LayerProps<any>>[], // init as an empty array of Deckgl Layer Type
   // change the map's viewstate whenever the view state of deck.gl changes
   onViewStateChange: (change: {
@@ -75,7 +74,8 @@ function createGeojsonLayer(data: string): GeoJsonLayer<any> {
     pointRadiusMinPixels: 2,
     pointRadiusScale: 200,
     //accessors
-    getRadius: (f: { properties: { scalerank: number } }) => 11 - f.properties.scalerank,
+    //getRadius: (f: { properties: { scalerank: number } }) => 11 - f.properties.scalerank,
+    getRadius: 0.7,
     getFillColor: [200, 0, 80, 180],
     getLineWidth: 1,
     // Interactive props
@@ -87,24 +87,70 @@ function createGeojsonLayer(data: string): GeoJsonLayer<any> {
 function createScatterplotLayer(data: string): ScatterplotLayer<any> {
   return new ScatterplotLayer({
     id: "scatterplotLayer",
-    //TODO data: data,
-    data: [{ position: [-122.45, 37.8], color: [255, 0, 0], radius: 100 }],
-    getColor: (color: RGBAColor): RGBAColor => color,
-    getRadius: (radius: number): number => radius,
+    //data: data,
+    data: [
+      {
+        position: [12.09582, 49.01343],
+        color: [255, 0, 0],
+        radius: 100,
+      },
+      {
+        position: [12.29579, 49.01323],
+        color: [0, 0, 255],
+        radius: 100,
+      },
+      {
+        position: [12.09572, 49.03443],
+        color: [255, 0, 255],
+        radius: 40,
+      },
+      {
+        position: [12.12533, 49.01343],
+        color: [255, 255, 0],
+        radius: 100,
+      },
+    ],
+    // accessors loop over the provided data
+    getFillColor: (d: any): RGBAColor => d.color, // access the color attribute in the data above with d.color
+    getRadius: (d: any): number => d.radius,
   });
 }
 
 function createHeatmapLayer(data: string): HeatmapLayer<any> {
-  console.log("in createHeatmapLayer");
-
   return new HeatmapLayer({
     id: "heatmapLayer",
-    data: data,
+    //data: data, //TODO die geodaten in assets funktionieren nicht, da im falschen format
+    data: [
+      {
+        position: [12.09582, 49.01343],
+        color: [255, 0, 0],
+        radius: 100,
+      },
+      {
+        position: [12.09829, 49.05323],
+        color: [0, 0, 255],
+        radius: 100,
+      },
+      {
+        position: [12.09572, 49.03443],
+        color: [255, 0, 255],
+        radius: 40,
+      },
+      {
+        position: [12.09543, 49.01556],
+        color: [255, 255, 0],
+        radius: 100,
+      },
+    ],
     pickable: false,
-    getPosition: (d) => [Number(d[0]), Number(d[1])],
-    getWeight: (d) => Number(d[2]),
+    getPosition: (d: any) => {
+      //console.log(d);
+      return d.position;
+      //return [Number(d.geometry.coordinates[0]), Number(d.geometry.coordinates[1])];
+    },
+    getWeight: (d: any) => 10,
     intensity: 1,
-    threshold: 0.6, // TODO reduces the opacity of the pixels with relatively low weight to create a fading effect at the edge.
+    threshold: 0.1, //* reduces the opacity of the pixels with relatively low weight to create a fading effect at the edge.
     radiusPixels: 40,
   });
 }
@@ -127,7 +173,6 @@ export function getDeckGlLayer(layerType: supportedLayers, data: string): Deck {
   }
 
   //console.log("layer: ", layer);
-
   deckProperties.layers?.push(layer);
 
   deckglLayer = new Deck(deckProperties);
@@ -145,12 +190,15 @@ export function removeDeckLayer(layerId: string): void {
   }
 }
 
-export function createMapboxLayer(geoData: string): MapboxLayer<any> {
-  return new MapboxLayer({
+type BaseLayerType = typeof GeoJsonLayer | typeof HeatmapLayer | typeof ScatterplotLayer;
+
+export function createMapboxLayer(geoData: string, baseType: BaseLayerType): MapboxLayer<any> {
+  const l = new MapboxLayer({
     id: "mapboxLayer",
-    // @ts-expect-error :
-    type: GeoJsonLayer,
+    // @ts-expect-error
+    type: baseType,
     data: geoData,
+    renderingMode: "2d",
     filled: true,
     //getPosition: (d: { position: any }) => d.position,
     getRadius: 20,
@@ -159,10 +207,31 @@ export function createMapboxLayer(geoData: string): MapboxLayer<any> {
     getLineWidth: 1,
     lineWidthScale: 5,
     //lineWidthMinPixels: 2,
-    onClick: console.log,
   });
 
-  // * update the layer later in the code
+  deckgl.setProps({
+    effects: [new deck.PostProcessEffect(luma[selectedEffect], settings)],
+  });
+
+  const deckglLayer = new Deck(deckProperties);
+  l.deck = deckglLayer;
+  l.map = map;
+  //TODO does not work (l.deck or setting the deck manually dont work either)
+  l.deck.setProps({ effects: [postProcessEffect] });
+  // not working as context exists already
+  /*
+  const ctx = l.deck.canvas.getContext("2d");if (ctx) {
+    ctx.filter = `blur(${30}px)`;
+    //TODO oder: ctx.shadowBlur = blurAmount;
+  }*/
+
+  console.log(l);
+  console.log(l.deck); //null if not provided above
+  console.log(l.map); //null  "   "
+
+  return l;
+
+  // * update the layer later in the code when needed with this:
   /*
   const key = radius;
   const value = 60;

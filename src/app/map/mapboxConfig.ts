@@ -32,7 +32,7 @@ const map = new mapboxgl.Map({
   style: mapStyle, // stylesheet location
   center: initialPosition, // starting position: [lng, lat]
   zoom: initialZoomLevel, // starting zoom
-  interactive: false, //* set interactive false when deck gl should handle all interactions
+  interactive: true, //* set interactive to false when deck gl should handle all interactions
   minZoom: 4, // as this website focuses on bavaria there is no need to show the lowest zoom levels (performance optimization)
   maxZoom: 20,
   hash: true, //sync map position with the hash fragment of the page's URL
