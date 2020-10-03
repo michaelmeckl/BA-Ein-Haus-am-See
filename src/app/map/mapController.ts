@@ -1,24 +1,25 @@
-import type { Point } from "geojson";
-/* eslint-disable no-magic-numbers */
 /* eslint-env browser */
+/* eslint-disable no-magic-numbers */
+
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
+import type { RGBAColor } from "@deck.gl/core";
+import { ScatterplotLayer } from "@deck.gl/layers";
+import { MapboxLayer } from "@deck.gl/mapbox";
+import type { Point } from "geojson";
 import mapboxgl, { CustomLayerInterface, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
 import { render as renderAndBlur } from "../webgl/blurFilter";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { addWebglCircle } from "../webgl/webglCircle";
-import { createMapboxLayer, getDeckGlLayer } from "./deckLayer";
-import { getDataFromMap, getPointsInRadius } from "./featureUtils";
-import { map } from "./mapboxConfig";
+import { getDeckGlLayer } from "./deckLayer";
+import { getDataFromMap } from "./featureUtils";
+import { initialPosition, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
-import { testGettingNearbyFeatures } from "./testNearbyFeaturesTutorial";
-import { testTurfFunctions } from "./turfUtils";
 
 /**
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
@@ -529,8 +530,29 @@ export default class MapController {
   addDeckLayer(): void {
     console.log("in addDeckLayer");
 
+    //const firstLabelLayerId = map.getStyle().layers?.find((layer) => layer.type === "symbol")?.id;
+    const firstLabelLayerId = map.getStyle().layers?.filter((layer) => layer.type === "symbol");
+    console.log("firstLabelLayer: ", firstLabelLayerId);
+
+    map.addLayer(
+      new MapboxLayer({
+        id: "deckgl-circle",
+        //@ts-expect-error
+        type: ScatterplotLayer,
+        data: [
+          { position: [initialPosition[0], initialPosition[1]], color: [255, 0, 0], radius: 1000 },
+        ],
+        getPosition: (d: { position: number[] }): number[] => d.position,
+        getFillColor: (d: { color: RGBAColor }) => d.color,
+        getRadius: (d: { radius: number }) => d.radius,
+        opacity: 0.3,
+      }),
+      "waterway-label"
+    );
+
     //* für normale Deck Layer:
     const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson");
+    console.log("Deck:", deck);
     console.log("Props:", deck.props);
     const layer = (deck as unknown) as CustomLayerInterface;
 

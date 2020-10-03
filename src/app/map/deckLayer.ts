@@ -1,43 +1,64 @@
+/* eslint-disable no-magic-numbers */
 import { HeatmapLayer, HexagonLayer } from "@deck.gl/aggregation-layers";
-import { Deck, Layer } from "@deck.gl/core";
-import { ArcLayer, GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { Deck, Layer, RGBAColor } from "@deck.gl/core";
+import type { DeckProps, InitialViewStateProps } from "@deck.gl/core/lib/deck";
+import type { LayerProps } from "@deck.gl/core/lib/layer";
+import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { MapboxLayer } from "@deck.gl/mapbox";
 import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
 
-type supportedLayers =
-  | "GeoJsonLayer"
-  | "ScatterplotLayer"
-  | "HeatmapLayer"
-  | "MapboxLayer"
-  | "ArcLayer";
+type supportedLayers = "GeojsonLayer" | "ScatterplotLayer" | "HeatmapLayer";
 
+/*
 type layerArray = (
   | GeoJsonLayer<unknown>
   | (ScatterplotLayer<unknown, any> | HeatmapLayer<unknown>)[]
-  | ArcLayer<unknown, any>
   | null
 )[];
+*/
 
 // source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
 const AIR_PORTS =
   "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson";
 
-const INITIAL_VIEW_STATE = {
+const initialViewState: InitialViewStateProps = {
   latitude: initialPosition[1],
   longitude: initialPosition[0],
   zoom: initialZoomLevel,
   bearing: 0,
+  pitch: 0,
 };
 
 //TODO client width and heigth instead??
 const mapCanvas = map.getCanvas();
-const deckProperties = {
-  width: mapCanvas.width,
-  height: mapCanvas.height,
-  initialViewState: INITIAL_VIEW_STATE,
+
+const deckProperties: DeckProps = {
+  width: mapCanvas.clientWidth,
+  height: mapCanvas.clientHeight,
+  initialViewState: initialViewState,
   controller: true,
-  layers: [],
   effects: [],
+  layers: [] as Layer<any, LayerProps<any>>[], // init as an empty array of Deckgl Layer Type
+  // change the map's viewstate whenever the view state of deck.gl changes
+  onViewStateChange: (change: {
+    interactionState: {
+      inTransition?: boolean;
+      isDragging?: boolean;
+      isPanning?: boolean;
+      isRotating?: boolean;
+      isZooming?: boolean;
+    };
+    viewState: any;
+    oldViewState: any;
+  }): any => {
+    //console.log(change);
+    map.jumpTo({
+      center: [change.viewState.longitude, change.viewState.latitude],
+      zoom: change.viewState.zoom,
+      bearing: change.viewState.bearing,
+      pitch: change.viewState.pitch,
+    });
+  },
 };
 
 let deckglLayer: Deck;
@@ -45,24 +66,21 @@ let deckglLayer: Deck;
 function createGeojsonLayer(data: string): GeoJsonLayer<any> {
   return new GeoJsonLayer({
     id: "geojsonLayer",
-    data: AIR_PORTS,
+    data: data,
     // Styles
     stroked: true,
     filled: true,
     lineWidthScale: 20,
     lineWidthMinPixels: 2,
     pointRadiusMinPixels: 2,
-    pointRadiusScale: 2000,
+    pointRadiusScale: 200,
+    //accessors
     getRadius: (f: { properties: { scalerank: number } }) => 11 - f.properties.scalerank,
     getFillColor: [200, 0, 80, 180],
-    getLineColor: (d) => colorToRGBArray(d.properties.color),
     getLineWidth: 1,
     // Interactive props
     pickable: true,
     autoHighlight: true,
-    onClick: (info: { object: { properties: { name: any; abbrev: any } } }) =>
-      // eslint-disable-next-line
-      info.object && alert(`${info.object.properties.name} (${info.object.properties.abbrev})`),
   });
 }
 
@@ -71,132 +89,52 @@ function createScatterplotLayer(data: string): ScatterplotLayer<any> {
     id: "scatterplotLayer",
     //TODO data: data,
     data: [{ position: [-122.45, 37.8], color: [255, 0, 0], radius: 100 }],
-    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-    getColor: (color: any) => color,
-    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-    getRadius: (radius: any) => radius,
-    //getRadius: (d: {radius: number}) => d.radius,
-  });
-}
-
-function createMapboxLayer(data: string): MapboxLayer<any> {
-  return new MapboxLayer({
-    id: "mapboxLayer",
-    type: ScatterplotLayer,
-    data: [{ position: [-74.5, 40], size: 100 }],
-    getPosition: (d: { position: any }) => d.position,
-    getRadius: (d: { size: any }) => d.size,
-    getColor: [255, 0, 0],
-  });
-}
-
-//TODO
-function addMapboxLayerAlternative(): void {
-  const DATA_URL =
-    "https://raw.githubusercontent.com/uber-common/deck.gl-data/master/examples/3d-heatmap/heatmap-data.csv";
-
-  const COLOR_RANGE = [
-    [1, 152, 189],
-    [73, 227, 206],
-    [216, 254, 181],
-    [254, 237, 177],
-    [254, 173, 84],
-    [209, 55, 78],
-  ];
-  const LIGHT_SETTINGS = {
-    lightsPosition: [-0.144528, 49.739968, 8000, -3.807751, 54.104682, 8000],
-    ambientRatio: 0.4,
-    diffuseRatio: 0.6,
-    specularRatio: 0.2,
-    lightsStrength: [0.8, 0.0, 0.8, 0.0],
-    numberOfLights: 2,
-  };
-
-  let hexagonLayer;
-  map.on("load", () => {
-    hexagonLayer = new MapboxLayer({
-      type: HexagonLayer,
-      id: "heatmap",
-      //data: d3.csv(DATA_URL),
-      data: AIR_PORTS,
-      radius: 2000,
-      coverage: 1,
-      upperPercentile: 100,
-      colorRange: COLOR_RANGE,
-      elevationRange: [0, 1000],
-      elevationScale: 250,
-      extruded: true,
-      getPosition: (d) => [Number(d.lng), Number(d.lat)],
-      lightSettings: LIGHT_SETTINGS,
-      opacity: 1,
-      pickable: true,
-      autoHighlight: true,
-      onClick: console.log,
-    });
-
-    map.addLayer(hexagonLayer, "waterway-label");
+    getColor: (color: RGBAColor): RGBAColor => color,
+    getRadius: (radius: number): number => radius,
   });
 }
 
 function createHeatmapLayer(data: string): HeatmapLayer<any> {
+  console.log("in createHeatmapLayer");
+
   return new HeatmapLayer({
     id: "heatmapLayer",
-    data: AIR_PORTS,
+    data: data,
     pickable: false,
-    getPosition: (d) => [d[0], d[1]],
-    getWeight: (d) => d[2],
+    getPosition: (d) => [Number(d[0]), Number(d[1])],
+    getWeight: (d) => Number(d[2]),
     intensity: 1,
-    threshold: 0.03,
-    radiusPixels: 30,
-  });
-}
-
-function createArcLayer(data: string): ArcLayer<any> {
-  return new ArcLayer({
-    id: "arcLayer",
-    data: AIR_PORTS,
-    dataTransform: (d: { features: any[] }) =>
-      d.features.filter((f: { properties: { scalerank: number } }) => f.properties.scalerank < 4),
-    // Styles
-    getSourcePosition: (f: any) => [-0.4531566, 51.4709959], // London
-    getTargetPosition: (f: { geometry: { coordinates: any } }) => f.geometry.coordinates,
-    getSourceColor: [0, 128, 200],
-    getTargetColor: [200, 0, 80],
-    getWidth: 1,
+    threshold: 0.6, // TODO reduces the opacity of the pixels with relatively low weight to create a fading effect at the edge.
+    radiusPixels: 40,
   });
 }
 
 export function getDeckGlLayer(layerType: supportedLayers, data: string): Deck {
-  let layer: Layer<any> | MapboxLayer<any>;
+  let layer: Layer<any>;
 
   switch (layerType) {
     case "HeatmapLayer":
       layer = createHeatmapLayer(data);
       break;
-    case "MapboxLayer":
-      layer = createMapboxLayer(data);
-      break;
     case "ScatterplotLayer":
       layer = createScatterplotLayer(data);
       break;
-    case "ArcLayer":
-      layer = createArcLayer(data);
-      break;
-    case "GeoJsonLayer":
+    case "GeojsonLayer":
       layer = createGeojsonLayer(data);
       break;
     default:
       throw new Error("Unknown Layer Type provided to Deck.gl!");
   }
 
-  deckProperties.layers.push(layer);
+  //console.log("layer: ", layer);
 
-  //eslint-disable-next-line
+  deckProperties.layers?.push(layer);
+
   deckglLayer = new Deck(deckProperties);
   return deckglLayer;
 }
 
-export function removeDeckLayer(layerId: string) {
+export function removeDeckLayer(layerId: string): void {
   const layers = deckglLayer.props.layers;
   for (let i = layers.length - 1; i > 0; i--) {
     const layer = layers[i];
@@ -207,30 +145,30 @@ export function removeDeckLayer(layerId: string) {
   }
 }
 
-/**
- * TODO map sollte auf interactive false gesetzt werden
-const map = new mapboxgl.Map({
-  ...
-  // Note: deck.gl will be in charge of interaction and event handling
-  interactive: false,
-  ...
-});
+export function createMapboxLayer(geoData: string): MapboxLayer<any> {
+  return new MapboxLayer({
+    id: "mapboxLayer",
+    // @ts-expect-error :
+    type: GeoJsonLayer,
+    data: geoData,
+    filled: true,
+    //getPosition: (d: { position: any }) => d.position,
+    getRadius: 20,
+    getFillColor: [255, 0, 0],
+    getLineColor: (d: any) => [245, 245, 245],
+    getLineWidth: 1,
+    lineWidthScale: 5,
+    //lineWidthMinPixels: 2,
+    onClick: console.log,
+  });
 
-// TODO besseres Beispiel für Layer auf Mapbox:
-export const deck = new Deck({
-  canvas: 'deck-canvas',
-  width: '100%',
-  height: '100%',
-  initialViewState: INITIAL_VIEW_STATE,
-  controller: true,
-  onViewStateChange: ({viewState}) => {
-    map.jumpTo({
-      center: [viewState.longitude, viewState.latitude],
-      zoom: viewState.zoom,
-      bearing: viewState.bearing,
-      pitch: viewState.pitch
-    });
-  },
-});
-
- */
+  // * update the layer later in the code
+  /*
+  const key = radius;
+  const value = 60;
+  myLayer.setProps({
+    getColor: [0, 0, 255],
+    [key]: value
+  });
+  */
+}

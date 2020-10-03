@@ -190,7 +190,7 @@ function makeRadius(
   const point = [turfHelpers.point(lngLatArray)];
   const collection = turfHelpers.featureCollection(point);
 
-  // @ts-expect-error "units: string" - option is apparently not recognized by typescript even though it is completely correct
+  // @ts-expect-error  : "units: string" - option is apparently not recognized by typescript even though it is completely correct
   const buffered = buffer(collection, radiusInMeters, { units: "meters" });
   return buffered;
 }
