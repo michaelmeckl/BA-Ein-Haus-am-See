@@ -29,6 +29,15 @@ function getResolutions() {
   return resolutions;
 }
 
+// see https://stackoverflow.com/questions/37599561/drawing-a-circle-with-the-radius-in-miles-meters-with-mapbox-gl-js
+export function getCircleRadiusForZoomLevel(zoom: number) {
+  // see https://docs.mapbox.com/help/glossary/zoom-level/
+  const metersPerPixel = 78271.484 / 2 ** zoom;
+  const metersToPixelsAtMaxZoom = (meters: number, latitude: number) =>
+    meters / metersPerPixel / Math.cos((latitude * Math.PI) / 180);
+  return metersToPixelsAtMaxZoom;
+}
+
 function addIconLayer(map: mapboxgl.Map, sourceName: string): void {
   map.addLayer({
     id: sourceName + "-symbol",
