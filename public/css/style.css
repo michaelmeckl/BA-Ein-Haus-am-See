@@ -97,6 +97,10 @@ body {
     border-radius: 3px;
 }
 
+#deckgl-overlay {
+    /*mix-blend-mode: overlay;*/
+}
+
 /** Legend Styling */
 
 .map-overlay {

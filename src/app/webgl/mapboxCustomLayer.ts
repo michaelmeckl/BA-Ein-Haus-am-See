@@ -6,12 +6,14 @@ export class MapboxCustomLayer {
   type: string;
   renderingMode: string;
 
+  data: number[];
+
   // definite assignment assertion (!) is fine here as the custom layer interface implementation
   // makes sure the methods are called in correct order.
-  program!: WebGLProgram;
-  aPos!: number;
+  //program!: WebGLProgram;
+  program: WebGLProgram | null;
+  aPos: number | null;
   buffer: WebGLBuffer | null;
-  data: number[];
 
   constructor(customData: number[]) {
     this.id = "webglCustomLayer";
@@ -20,6 +22,8 @@ export class MapboxCustomLayer {
     this.data = customData;
 
     this.buffer = null;
+    this.aPos = null;
+    this.program = null;
   }
 
   /**
@@ -59,6 +63,10 @@ export class MapboxCustomLayer {
   render(gl: WebGLRenderingContext, matrix: number[]): void {
     //console.log("in render: ", gl.canvas);
 
+    if (!this.aPos || !this.program) {
+      return;
+    }
+
     //TODO cleart die ganze map
     //webglUtils.clearCanvas(gl); // clear canvas color and depth
     //gl.viewport(0, 0, gl.canvas.width, gl.canvas.height); //resize canvas
@@ -77,14 +85,18 @@ export class MapboxCustomLayer {
     gl.vertexAttribPointer(this.aPos, size, gl.FLOAT, normalized, stride, 0);
     //enable alpha blending
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    //TODO andere blend Functions benutzen? z.B. gl.depthFunc(gl.LESS);
+    //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    //TODO andere blend Functions benutzen?
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     const primitiveType = gl.TRIANGLE_STRIP;
     const offset = 0; // 0 for offset means start at the beginning of the buffer.
     // eslint-disable-next-line no-magic-numbers
     const count = this.data.length / 2;
     gl.drawArrays(primitiveType, offset, count);
+
+    // * this rerenders all the layers
+    //map.triggerRepaint();
   }
 
   /**
@@ -92,7 +104,10 @@ export class MapboxCustomLayer {
    * This gives the layer a chance to clean up gl resources and event listeners.
    */
   onRemove(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
-    //TODO cleanup resources ?
+    // Cleanup resources
+    this.buffer = null;
+    this.aPos = null;
+    this.program = null;
   }
 
   /**

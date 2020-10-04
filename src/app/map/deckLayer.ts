@@ -2,13 +2,14 @@
 import { HeatmapLayer, HexagonLayer } from "@deck.gl/aggregation-layers";
 import { Deck, Layer, PostProcessEffect, RGBAColor } from "@deck.gl/core";
 import type { DeckProps, InitialViewStateProps } from "@deck.gl/core/lib/deck";
-import type { LayerProps } from "@deck.gl/core/lib/layer";
-import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import type { DataSet, LayerProps } from "@deck.gl/core/lib/layer";
+import { GeoJsonLayer, PathLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { MapboxLayer } from "@deck.gl/mapbox";
 import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
 import { triangleBlur, tiltShift } from "@luma.gl/shadertools";
+import GL from "@luma.gl/constants";
 
-type supportedLayers = "GeojsonLayer" | "ScatterplotLayer" | "HeatmapLayer";
+type supportedLayers = "GeojsonLayer" | "ScatterplotLayer" | "HeatmapLayer" | "PathLayer";
 
 const initialViewState: InitialViewStateProps = {
   latitude: initialPosition[1],
@@ -36,7 +37,7 @@ const deckProperties: DeckProps = {
   height: mapCanvas.clientHeight,
   initialViewState: initialViewState,
   controller: true,
-  effects: [postProcessEffect], // add postprocess effects to the layers
+  effects: [], // add postprocess effects to the layers
   layers: [] as Layer<any, LayerProps<any>>[], // init as an empty array of Deckgl Layer Type
   // change the map's viewstate whenever the view state of deck.gl changes
   onViewStateChange: (change: {
@@ -62,31 +63,115 @@ const deckProperties: DeckProps = {
 
 let deckglLayer: Deck;
 
-function createGeojsonLayer(data: string): GeoJsonLayer<any> {
+//TODO 2 geojson layer? eins für die kreise und eins für die stroke?
+function createGeojsonLayer(data: string, name: string): GeoJsonLayer<any> {
   return new GeoJsonLayer({
-    id: "geojsonLayer",
+    id: name,
     data: data,
     // Styles
-    stroked: true,
+    //stroked: true,
     filled: true,
-    lineWidthScale: 20,
-    lineWidthMinPixels: 2,
+    opacity: 0.8,
     pointRadiusMinPixels: 2,
     pointRadiusScale: 200,
     //accessors
     //getRadius: (f: { properties: { scalerank: number } }) => 11 - f.properties.scalerank,
-    getRadius: 0.7,
-    getFillColor: [200, 0, 80, 180],
-    getLineWidth: 1,
+    getRadius: 1.7,
+    getFillColor: [53, 53, 53, 53],
+    getLineColor: [0, 0, 0, 0],
+    getLineWidth: 50,
     // Interactive props
     pickable: true,
-    autoHighlight: true,
+    //parameters: () => GL.BLEND_DST_RGB,
   });
 }
 
-function createScatterplotLayer(data: string): ScatterplotLayer<any> {
+function createGeojsonLayer2(data: string, name: string): GeoJsonLayer<any> {
+  return new GeoJsonLayer({
+    id: name,
+    data: data,
+    // Styles
+    stroked: true,
+    filled: false,
+    opacity: 0.8,
+    pointRadiusMinPixels: 2,
+    pointRadiusScale: 200,
+    //accessors
+    getRadius: 1.7,
+    getLineColor: [0, 0, 0, 20],
+    getLineWidth: 60,
+    // Interactive props
+    pickable: true,
+  });
+}
+
+export function createOverlay(data: string): Deck {
+  const layer = createGeojsonLayer2(data, "2");
+
+  //* separates deck mit anderen props muss angeleget werden, sonst gehts nicht
+  const deckLayer = new Deck({
+    width: mapCanvas.clientWidth,
+    height: mapCanvas.clientHeight,
+    initialViewState: initialViewState,
+    controller: true,
+    effects: [], // add postprocess effects to the layers
+    layers: [] as Layer<any, LayerProps<any>>[], // init as an empty array of Deckgl Layer Type
+    // change the map's viewstate whenever the view state of deck.gl changes
+    onViewStateChange: (change: {
+      interactionState: {
+        inTransition?: boolean;
+        isDragging?: boolean;
+        isPanning?: boolean;
+        isRotating?: boolean;
+        isZooming?: boolean;
+      };
+      viewState: any;
+      oldViewState: any;
+    }): any => {
+      //console.log(change);
+      map.jumpTo({
+        center: [change.viewState.longitude, change.viewState.latitude],
+        zoom: change.viewState.zoom,
+        bearing: change.viewState.bearing,
+        pitch: change.viewState.pitch,
+      });
+    },
+  });
+
+  deckLayer.setProps({
+    layers: [layer],
+    effects: [postProcessEffect],
+  });
+  return deckLayer;
+}
+
+//TODO
+function createPathLayer(data: DataSet<any>, name: string): PathLayer<any> {
+  const testData = [
+    {
+      path: [
+        [12.089283, 48.9920256],
+        [12.1025303, 48.9941069],
+        [12.0909411, 49.0012031],
+      ],
+    },
+  ];
+
+  return new PathLayer({
+    id: name,
+    data: testData,
+    pickable: true,
+    widthScale: 20,
+    widthMinPixels: 2,
+    //getPath: d => d.path,
+    getColor: (d) => [255, 0, 0, 127],
+    getWidth: (d) => 2,
+  });
+}
+
+function createScatterplotLayer(data: string, name: string): ScatterplotLayer<any> {
   return new ScatterplotLayer({
-    id: "scatterplotLayer",
+    id: name,
     //data: data,
     data: [
       {
@@ -116,9 +201,9 @@ function createScatterplotLayer(data: string): ScatterplotLayer<any> {
   });
 }
 
-function createHeatmapLayer(data: string): HeatmapLayer<any> {
+function createHeatmapLayer(data: string, name: string): HeatmapLayer<any> {
   return new HeatmapLayer({
-    id: "heatmapLayer",
+    id: name,
     //data: data, //TODO die geodaten in assets funktionieren nicht, da im falschen format
     data: [
       {
@@ -155,18 +240,23 @@ function createHeatmapLayer(data: string): HeatmapLayer<any> {
   });
 }
 
-export function getDeckGlLayer(layerType: supportedLayers, data: string): Deck {
+export function getDeckGlLayer(layerType: supportedLayers, data: string, name: string): Deck {
   let layer: Layer<any>;
 
   switch (layerType) {
     case "HeatmapLayer":
-      layer = createHeatmapLayer(data);
+      layer = createHeatmapLayer(data, name);
       break;
     case "ScatterplotLayer":
-      layer = createScatterplotLayer(data);
+      layer = createScatterplotLayer(data, name);
       break;
     case "GeojsonLayer":
-      layer = createGeojsonLayer(data);
+      layer = createGeojsonLayer(data, name);
+      //deckProperties.layers?.push(layer);
+      //layer = createGeojsonLayer2(data, `${name}-2`);
+      break;
+    case "PathLayer":
+      layer = createPathLayer(data, name);
       break;
     default:
       throw new Error("Unknown Layer Type provided to Deck.gl!");
@@ -176,6 +266,10 @@ export function getDeckGlLayer(layerType: supportedLayers, data: string): Deck {
   deckProperties.layers?.push(layer);
 
   deckglLayer = new Deck(deckProperties);
+  deckglLayer.setProps({
+    effects: [postProcessEffect],
+  });
+
   return deckglLayer;
 }
 
@@ -257,4 +351,36 @@ export function createNewMapboxLayer(geoData: string, baseType: BaseLayerType, r
   //deckglLayer.redraw(true);
 
   return l;
+}
+
+//* Alternative to the createMapboxLayer - Method that takes full adavantage of the Deck API
+//! Does not work!!!
+export function createMapboxDeck(geoData: string): void {
+  //@ts-expect-error
+  const deck = new Deck({
+    //gl: map.getCanvas().getContext("webgl") as WebGLRenderingContext,
+    gl: map.painter.context.gl,
+    initialViewState: initialViewState,
+    layers: [
+      new GeoJsonLayer({
+        id: "geojson-baselayer",
+        data: geoData,
+        filled: true,
+        getRadius: 40,
+        getFillColor: [53, 53, 53],
+        getLineColor: (d: any) => [0, 0, 0, 255],
+        getLineWidth: 1,
+        lineWidthScale: 5,
+      }),
+    ],
+  });
+
+  map.addLayer(new MapboxLayer({ id: "mapboxDeckLayer", deck }), "waterway-label");
+
+  //TODO nicht so, das zerschießt den map Canvas komplett
+  /*
+  deck.setProps({
+    effects: [postProcessEffect],
+  });
+  */
 }

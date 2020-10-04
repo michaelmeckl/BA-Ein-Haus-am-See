@@ -29,6 +29,32 @@ export function createFragmentShaderSource(): string {
   return fragmentSource;
 }
 
+export function defaultLumaShaders(): any {
+  const vertexSource = `
+        attribute vec2 positions;
+        attribute vec3 colors;
+
+        uniform mat4 uPMatrix;
+
+        varying vec3 vColor;
+
+        void main() {
+            vColor = colors;
+            gl_Position = uPMatrix * vec4(positions, 0, 1.0);
+        }
+    `;
+
+  const fragmentSource = `
+        varying vec3 vColor;
+
+        void main() {
+            gl_FragColor = vec4(vColor, 0.35);      /* 0.35 is the alpha value */
+        }
+    `;
+
+  return { vertexSource, fragmentSource };
+}
+
 // see https://www.shadertoy.com/view/MdyBzG
 export function applyKawaseBlurFilter() {
   //TODO hier wird webgl 2 verwendet -> umschreiben
@@ -120,6 +146,7 @@ export function vertexShaderCanvas(): string {
   `;
 }
 
+//blur für canvas
 export function fragmentShaderCanvas(): string {
   return `
     precision mediump float;

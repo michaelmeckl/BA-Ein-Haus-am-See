@@ -26,7 +26,7 @@ export function setRectangle(
   );
 }
 
-export function render(image: HTMLImageElement): HTMLCanvasElement | null {
+export function renderAndBlur(image: HTMLImageElement): HTMLCanvasElement | null {
   const newCanvas = document.querySelector("#test_canvas") as HTMLCanvasElement;
   // const newCanvas = document.createElement("canvas"); // in-memory canvas
   const glContext = newCanvas.getContext("webgl");
@@ -89,7 +89,7 @@ export function render(image: HTMLImageElement): HTMLCanvasElement | null {
     glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MAG_FILTER, glContext.NEAREST);
   }
 
-  //TODO var originalImageTexture = createAndSetupTexture(gl);
+  createTexture();
 
   // Upload the image into the texture.
   glContext.texImage2D(
@@ -107,7 +107,7 @@ export function render(image: HTMLImageElement): HTMLCanvasElement | null {
   const kernelLocation = glContext.getUniformLocation(program, "u_kernel[0]");
   const kernelWeightLocation = glContext.getUniformLocation(program, "u_kernelWeight");
 
-  //const blurKernel = this.getBlurFilterKernel("triangleBlur");
+  //const blurKernel = getBlurFilterKernel("triangleBlur");
   const blurKernel = getBlurFilterKernel();
   const kernelWeight = computeKernelWeight(blurKernel);
 

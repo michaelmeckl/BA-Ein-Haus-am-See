@@ -3,6 +3,8 @@ import { Buffer } from "@luma.gl/webgl";
 import { Model } from "@luma.gl/engine";
 import type { CustomLayerInterface, MercatorCoordinate } from "mapbox-gl";
 import { map } from "../map/mapboxConfig";
+import { createBlurFragmentSource, defaultLumaShaders, fragmentShaderCanvas } from "./webglUtils";
+import { dotScreen, triangleBlur, vignette } from "@luma.gl/shadertools";
 
 // Create a Mapbox custom layer
 // https://docs.mapbox.com/mapbox-gl-js/example/custom-style-layer/
@@ -31,27 +33,9 @@ class CustomLayer {
 
     instrumentGLContext(gl);
 
-    const vertexSource = `
-        attribute vec2 positions;
-        attribute vec3 colors;
-
-        uniform mat4 uPMatrix;
-
-        varying vec3 vColor;
-
-        void main() {
-            vColor = colors;
-            gl_Position = uPMatrix * vec4(positions, 0, 1.0);
-        }
-    `;
-
-    const fragmentSource = `
-        varying vec3 vColor;
-
-        void main() {
-            gl_FragColor = vec4(vColor, 0.35);      /* 0.35 is the alpha value */
-        }
-    `;
+    const { vertexSource, fragmentSource } = defaultLumaShaders();
+    //const fragmentSource = createBlurFragmentSource();
+    //const fragmentSource = fragmentShaderCanvas();
 
     //flatten the coordinates
     const positions = new Float32Array(this.coordinates.length * 2);
@@ -69,15 +53,28 @@ class CustomLayer {
         0.0, 0.0, 1.0,
     ]));
 
+    // * auch mehrere models sind möglich!
     // Model to draw a triangle on the map
     this.model = new Model(gl, {
       id: "lumaModel",
       vs: vertexSource,
       fs: fragmentSource,
+      //drawMode: gl.TRIANGLE_STRIP,
       attributes: {
         positions: this.positionBuffer,
         colors: this.colorBuffer,
+
+        /*
+        uniform sampler2D u_image;
+    uniform vec2 u_textureSize;
+    uniform float u_kernel[9];
+    uniform float u_kernelWeight;
+    
+    // the texCoords passed in from the vertex shader.
+    varying vec2 v_texCoord;
+    */
       },
+      //modules: [triangleBlur],
       vertexCount: this.coordinates.length,
     });
   }

@@ -38,6 +38,25 @@ export function getCircleRadiusForZoomLevel(zoom: number) {
   return metersToPixelsAtMaxZoom;
 }
 
+export function getFirstSymbolLayer(): string | undefined {
+  const layers = map.getStyle().layers;
+
+  if (!layers) {
+    return undefined;
+  }
+
+  // Find the index of the first symbol layer in the map style
+  let firstSymbolId;
+  for (let i = 0; i < layers.length; i++) {
+    if (layers[i].type === "symbol") {
+      firstSymbolId = layers[i].id;
+      break;
+    }
+  }
+
+  return firstSymbolId;
+}
+
 function addIconLayer(map: mapboxgl.Map, sourceName: string): void {
   map.addLayer({
     id: sourceName + "-symbol",

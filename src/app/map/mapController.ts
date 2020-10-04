@@ -1,4 +1,3 @@
-import { HeatmapLayer } from "@deck.gl/aggregation-layers";
 /* eslint-env browser */
 /* eslint-disable no-magic-numbers */
 
@@ -12,10 +11,16 @@ import mapboxgl, { CustomLayerInterface, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
-import { render as renderAndBlur } from "../webgl/blurFilter";
+import { renderAndBlur } from "../webgl/blurFilter";
 import LumaLayer from "../webgl/lumaLayer";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { createMapboxLayer, createNewMapboxLayer, getDeckGlLayer } from "./deckLayer";
+import {
+  createMapboxDeck,
+  createMapboxLayer,
+  createNewMapboxLayer,
+  createOverlay,
+  getDeckGlLayer,
+} from "./deckLayer";
 import { getDataFromMap } from "./featureUtils";
 import { initialPosition, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -530,41 +535,25 @@ export default class MapController {
   }
 
   addDeckLayer(): void {
-    /*
-    const firstLabelLayerId = map.getStyle().layers?.find((layer) => layer.type === "symbol")?.id;
-
-    map.addLayer(
-      new MapboxLayer({
-        id: "deckgl-circle",
-        //@ts-expect-error
-        type: ScatterplotLayer,
-        data: [
-          { position: [initialPosition[0], initialPosition[1]], color: [255, 0, 0], radius: 1000 },
-        ],
-        getPosition: (d: { position: number[] }): number[] => d.position,
-        getFillColor: (d: { color: RGBAColor }) => d.color,
-        getRadius: (d: { radius: number }) => d.radius,
-        opacity: 0.3,
-      }),
-      firstLabelLayerId
-    );
-    */
-
     //* für normale Deck Layer:
-    /*
-    const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson");
-    console.log("Deck:", deck);
-    console.log("Props:", deck.props);
+    const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson", "geojsonLayer-1");
     const layer = (deck as unknown) as CustomLayerInterface;
-    */
+
+    //const deck2 = createOverlay("../assets/data.geojson");
+    //const layer2 = (deck2 as unknown) as CustomLayerInterface;
+
     //* für Mapbox Layer:
     //const layer = createMapboxLayer("../assets/data.geojson", HeatmapLayer);  //TODO um die heatmap auszuprobieren brauch ich andere Daten als Geojson
-    const layer = createMapboxLayer("../assets/data.geojson", GeoJsonLayer);
+    //const layer = createMapboxLayer("../assets/data.geojson", GeoJsonLayer);
     //const layerAround = createNewMapboxLayer("../assets/data.geojson", GeoJsonLayer, 500);
 
     //* add the layer before the waterway-label to make sure it is placed below map labels!
     map.addLayer(layer, "waterway-label");
     //map.addLayer(layerAround, "mapboxLayer");
+    //map.addLayer(layer2, "waterway-label");
+
+    //* Alternative für Mapbox Layer:
+    //createMapboxDeck("../assets/data.geojson");
   }
 
   removeData(sourceName: string): void {
