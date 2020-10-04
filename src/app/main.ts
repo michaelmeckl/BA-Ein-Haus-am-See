@@ -146,9 +146,9 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
 
   if (data) {
     const t0 = performance.now();
-    //mapController.showData(data, inputQuery);   //set the query as the sourcename
-    //TODO
-    mapController.addHeatmapLayer(data);
+    mapController.showData(data, inputQuery); //set the query as the sourcename
+    //TODO nur zum Testen:
+    //mapController.addHeatmapLayer(data);
     const t1 = performance.now();
     console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 
@@ -172,6 +172,12 @@ function setupUI(mapController: MapController): void {
   const deckButtton = document.querySelector("#deckglButton");
   if (deckButtton) {
     deckButtton.addEventListener("click", mapController.addDeckLayer.bind(mapController));
+  }
+
+  //TODO
+  const lumaButton = document.querySelector("#lumaButton");
+  if (lumaButton) {
+    lumaButton.addEventListener("click", mapController.addLumaGlLayer.bind(mapController));
   }
 
   //testVectorTileAPI(mapController);

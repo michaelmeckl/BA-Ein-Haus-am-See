@@ -13,8 +13,9 @@ import Benchmark from "../../shared/benchmarking";
 import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
 import { render as renderAndBlur } from "../webgl/blurFilter";
+import LumaLayer from "../webgl/lumaLayer";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { createMapboxLayer, getDeckGlLayer } from "./deckLayer";
+import { createMapboxLayer, createNewMapboxLayer, getDeckGlLayer } from "./deckLayer";
 import { getDataFromMap } from "./featureUtils";
 import { initialPosition, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -559,9 +560,11 @@ export default class MapController {
     //* für Mapbox Layer:
     //const layer = createMapboxLayer("../assets/data.geojson", HeatmapLayer);  //TODO um die heatmap auszuprobieren brauch ich andere Daten als Geojson
     const layer = createMapboxLayer("../assets/data.geojson", GeoJsonLayer);
+    //const layerAround = createNewMapboxLayer("../assets/data.geojson", GeoJsonLayer, 500);
 
     //* add the layer before the waterway-label to make sure it is placed below map labels!
     map.addLayer(layer, "waterway-label");
+    //map.addLayer(layerAround, "mapboxLayer");
   }
 
   removeData(sourceName: string): void {
@@ -777,6 +780,18 @@ export default class MapController {
    * * bei polygon entweder auch das oder vllt das zentrum der umschließenden bounding box nehmen?
    */
 
+  //TODO mal mit requestAnimationFrame versuchen zum updaten statt ein neues Layer bei jeder Bewegung zu machen?
+  /*
+  requestAnimationFrame(function draw() {
+    requestAnimationFrame(draw);
+
+    clear(gl, {
+        color: [0, 0, 0, 1]
+    });
+    customLayer.draw();
+  });
+  */
+
   addWebGlLayer(): void {
     if (map.getLayer("webglCustomLayer")) {
       // the layer exists already; remove it
@@ -791,8 +806,29 @@ export default class MapController {
     //const firstSymbolId = mapboxUtils.findLayerByType(map, "symbol");
     // Insert the layer beneath the first symbol layer in the layer stack if one exists.
     //map.addLayer(customLayer, firstSymbolId);
-    map.addLayer(customLayer);
+    map.addLayer(customLayer, "waterway-label");
 
     console.log("Finished adding webgl data!");
+  }
+
+  addLumaGlLayer(): void {
+    console.log("adding luma layer ...");
+
+    const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat({
+      lng: 12.089283,
+      lat: 48.9920256,
+    });
+    const uniSouthEast = mapboxgl.MercatorCoordinate.fromLngLat({
+      lng: 12.1025303,
+      lat: 48.9941069,
+    });
+    const uniNorthWest = mapboxgl.MercatorCoordinate.fromLngLat({
+      lng: 12.0909411,
+      lat: 49.0012031,
+    });
+
+    const data = [uniSouthEast, uniNorthWest, uniSouthWest];
+
+    const animationLoop = new LumaLayer(data);
   }
 }

@@ -37,7 +37,7 @@ const map = new mapboxgl.Map({
   maxZoom: 20,
   hash: true, //sync map position with the hash fragment of the page's URL
   trackResize: true, //TODO bessere performance wenn false?
-  antialias: false, // set to true for antialiasing custom layers but this has a negative impact on performance
+  antialias: false, // * set to true for antialiasing custom layers but this has a negative impact on performance
   //TODO nicht so toll für performance -> gibt es eine bessere Lösung?
   preserveDrawingBuffer: true, // necessary to be able to export the map canvas as an image
 });

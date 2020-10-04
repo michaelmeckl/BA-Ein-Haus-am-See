@@ -209,15 +209,14 @@ export function createMapboxLayer(geoData: string, baseType: BaseLayerType): Map
     //lineWidthMinPixels: 2,
   });
 
-  deckgl.setProps({
-    effects: [new deck.PostProcessEffect(luma[selectedEffect], settings)],
+  deckglLayer = new Deck(deckProperties);
+  deckglLayer.setProps({
+    effects: [postProcessEffect],
   });
-
-  const deckglLayer = new Deck(deckProperties);
   l.deck = deckglLayer;
-  l.map = map;
-  //TODO does not work (l.deck or setting the deck manually dont work either)
-  l.deck.setProps({ effects: [postProcessEffect] });
+  //l.map = map;
+
+  //l.deck.setProps({ effects: [postProcessEffect] });
   // not working as context exists already
   /*
   const ctx = l.deck.canvas.getContext("2d");if (ctx) {
@@ -225,19 +224,37 @@ export function createMapboxLayer(geoData: string, baseType: BaseLayerType): Map
     //TODO oder: ctx.shadowBlur = blurAmount;
   }*/
 
+  //deckProperties.layers?.push(l);
+
   console.log(l);
   console.log(l.deck); //null if not provided above
   console.log(l.map); //null  "   "
 
   return l;
+}
 
-  // * update the layer later in the code when needed with this:
-  /*
-  const key = radius;
-  const value = 60;
-  myLayer.setProps({
-    getColor: [0, 0, 255],
-    [key]: value
+// test to create another circle around the points
+export function createNewMapboxLayer(geoData: string, baseType: BaseLayerType, radius = 100): any {
+  const l = new MapboxLayer({
+    id: "newMapboxLayer",
+    // @ts-expect-error
+    type: baseType,
+    data: geoData,
+    renderingMode: "2d",
+    filled: true,
+    //getPosition: (d: { position: any }) => d.position,
+    getRadius: radius,
+    getFillColor: (d: any) => [127, 127, 127],
+    getLineColor: (d: any) => [127, 127, 127],
+    getLineWidth: 1,
   });
-  */
+
+  deckglLayer.setProps({
+    effects: [postProcessEffect],
+  });
+  l.deck = deckglLayer;
+
+  //deckglLayer.redraw(true);
+
+  return l;
 }
