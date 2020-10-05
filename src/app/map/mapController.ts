@@ -7,13 +7,15 @@ import type { RGBAColor } from "@deck.gl/core";
 import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { MapboxLayer } from "@deck.gl/mapbox";
 import type { Point } from "geojson";
-import mapboxgl, { CustomLayerInterface, LngLatLike } from "mapbox-gl";
+import mapboxgl, { CustomLayerInterface, GeoJSONSource, LngLat, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
 import { renderAndBlur } from "../webgl/blurFilter";
 import LumaLayer from "../webgl/lumaLayer";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
+import { addCanvasOverlay } from "./canvasUtils";
+import ClusterManager from "./clusterManager";
 import {
   createMapboxDeck,
   createMapboxLayer,
@@ -534,6 +536,10 @@ export default class MapController {
     }
   }
 
+  //! mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
+  //! den Unterschied vom Circle und der Bounding Box nehmen und das dann einfärben mit fill-color!!!
+  // oder vllt damit auch den stroke dazwischen erzeugen und das blurren?
+
   addDeckLayer(): void {
     //* für normale Deck Layer:
     const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson", "geojsonLayer-1");
@@ -563,6 +569,13 @@ export default class MapController {
   // * um ein bestimmtes tile an einer position zu bekommen: https://github.com/mapbox/tilebelt
 
   showData(data: string, sourceName: string): void {
+    //! idee:
+    //! den geojson string mit turf zu einer featurecollection machen und diese dann gleich preprocessen / filtern / etc.
+    //! z.B. könnte man alle mity geometryType="way" separat speichern, mit foreach und turf.buffer jeder eine stroke geben
+    //!      und diese dann an das Line Layer übergeben, um es zu stylen, so könnte nur der Buffer gestyled werden vllt
+    //! turf can add properties mit turf.point([...], {additional Props hierher})
+
+    console.log(data);
     console.log("now adding to map...");
     console.log(sourceName);
 
@@ -584,134 +597,157 @@ export default class MapController {
       return;
     }
 
-    // add geojson source
-    // see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson
+    // declare some filters for clustering
+    const bar = ["==", ["get", "amenity"], "Bar"];
+    const restaurant = ["==", ["get", "amenity"], "Restaurant"];
+    const supermarket = ["==", ["get", "amenity"], "Supermarket"];
+    const cafe = ["==", ["get", "amenity"], "Cafe"];
+    const other = ["==", ["get", "amenity"], ""]; //TODO oder null statt leerstring?
+
+    // Add a geojson source, see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson
     map.addSource(sourceName, {
       type: "geojson",
-      //maxzoom: 13, // default: 18
-      cluster: false, // TODO: cluster near points (default: false)
-      clusterRadius: 10, //default is 50
       buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 0.45, // higher means simpler geometries and increased performance
       data: data, // url or inline geojson
-      //data: "../assets/data.geojson",
+
+      cluster: true, // Cluster near points (default: false). The point_count property will be added to the source data.
+      clusterRadius: 20, //default is 50
+      clusterMaxZoom: 14, // don't show clusters above zoom level 14
+      clusterMinPoints: 3, // at least 3 points necessary for clustering
+      //clusterProperties: { sum: ["+", ["get", "scalerank"]] },
+      clusterProperties: {
+        // keep separate counts for each category in a cluster
+        Bar: ["+", ["case", bar, 1, 0]],
+        Restaurant: ["+", ["case", restaurant, 1, 0]],
+        Supermarket: ["+", ["case", supermarket, 1, 0]],
+        Cafe: ["+", ["case", cafe, 1, 0]],
+        Other: ["+", ["case", other, 1, 0]],
+      },
     });
+    //console.log("Source: ", map.getSource(sourceName));
 
     this.addLayers(sourceName);
+
+    const clusterManager = new ClusterManager(sourceName);
+    clusterManager.addClusterLayer();
+    /*
+    clusterManager.addOtherClusterLayer();
+    clusterManager.updateMarkers();
+    */
   }
 
   addLayers(sourceName: string): void {
-    //visualize source
+    //TODO extract the layer props and filters to a separate class?
+
+    //point-layer
     map.addLayer({
       id: sourceName + "-l1",
       type: "circle",
       source: sourceName,
+      // 'all' checks 2 conditions:  on this layer show only points or multipoints and only if not clustered
+      filter: [
+        "all",
+        ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false],
+        ["!", ["has", "point_count"]],
+      ],
       //interactive: true,
       layout: {
-        //"visibility": "visible",  //TODO: damit vllt am anfang alles unsichtbar und wenn fertig alle auf visible?
+        //"visibility": "visible",
       },
+      //prettier-ignore
       paint: {
-        //increase circle radius when zooming in
-        "circle-radius": 25,
-        /*{
-          base: 1,
-          stops: [
-            [8, 4],
-            [16, 25],
-          ],
-        },*/
-        // style color based on wheelchair access
+        //increase circle radius (in pixels) when zooming in
+        // see https://docs.mapbox.com/help/tutorials/mapbox-gl-js-expressions/
+        "circle-radius": [
+          "interpolate", ["linear"], ["zoom"],
+          0, 0.0, 
+          8, 4.0, // 4px at zoom level 8
+          //12, ["/", ["get", "zoom"], 3], //TODO adjust expression values
+          16, 25.0,
+        ],
+        // style color based on amenity type
         "circle-color": [
           "match",
-          ["get", "wheelchair", ["get", "tags"]],
-          "yes",
-          "#fbb03b",
-          "limited",
-          "#223b53",
-          "no",
-          "#3bb2d0",
-          "#ff0000", // other
+          //["get", "amenity", ["get", "tags"]],    //* wird automatisch "geflattened"!
+          ["get", "amenity"], 
+          "bar", "#fbb03b",
+          "restaurant", "#223b53",
+          "supermarket", "#3bb2d0",
+          "#ff0000", // fallback color for others
         ],
-        //"circle-stroke-width": 4,
-        "circle-blur": 1,
-        "circle-opacity": 0.5,
-        /*
-        "circle-opacity": {
-          stops: [
-            [2, 0.2],
-            [16, 0.8],
-          ],
-        },
-        */
+        "circle-stroke-width": [
+          "interpolate", ["linear"], ["zoom"],
+          4, 0.0, 
+          10, 15,
+          15, 52,
+          20, 90,
+        ],
+        "circle-stroke-color": "rgba(100, 100, 100, 100)",
+        "circle-stroke-opacity": [
+          "interpolate", ["linear"], ["zoom"],
+          4, 0.0, 
+          6, 0.08,
+          15, 0.2,
+          20, 0.25,
+        ],
+        "circle-opacity": [
+          "interpolate", ["linear"], ["zoom"],
+          4, 0.0, 
+          12, 0.5,
+          20, 1.0,
+        ],
+        "circle-blur": 0.3,
       },
     });
 
+    //line - layer
     map.addLayer({
       id: sourceName + "-l2",
       type: "line",
       source: sourceName,
+      filter: ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
       paint: {
-        "line-color": "#ff0000",
+        "line-color": "rgba(255, 0, 0, 255)",
         "line-width": 8,
         "line-blur": 8,
         //"line-offset": 3,
+        //"line-opacity": 0.5,
+        //"line-gap-width": 20, // renders a second line 20 pixes away
       },
-      //filter: ["==", "$type", "Polygon"],
     });
 
+    //polygon-layer
     map.addLayer({
       id: sourceName + "-l3",
       type: "fill",
+      //TODO extract types as an enum
+      filter: ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], true, false],
       source: sourceName,
       paint: {
-        //"fill-color": "#00dd00",
-        //TODO this creates a small outline effect, maybe useful?
-        "fill-outline-color": "rgba(0,0,0,0.1)",
-        "fill-color": "rgba(0,0,0,0.1)",
+        //"fill-outline-color": "rgba(0,0,0,0.3)",
+        "fill-outline-color": "rgba(255,255,255,0.9)", //to render white outlines around the polygon
+        "fill-color": "rgba(0,210,237,0.1)",
+        "fill-opacity": 0.6,
       },
     });
-
-    // with ["has", "name"] it can be tested if something exists in the properties
-
-    //TODO: extract types as an enum
-
-    map.setFilter(sourceName + "-l1", [
-      "match",
-      ["geometry-type"],
-      ["Point", "MultiPoint"],
-      true,
-      false,
-    ]);
-    map.setFilter(sourceName + "-l2", [
-      "match",
-      ["geometry-type"],
-      ["LineString", "MultiLineString"],
-      true,
-      false,
-    ]);
-    map.setFilter(sourceName + "-l3", [
-      "match",
-      ["geometry-type"],
-      ["Polygon", "MultiPolygon"],
-      true,
-      false,
-    ]);
-
+    //add line strokes around polygons as there is no stroke paint property for polygons for performance reasons
     /*
     map.addLayer({
       id: sourceName + "-l4",
-      type: "symbol",
+      type: "line",
+      filter: ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], true, false],
       source: sourceName,
-      layout: {
-        // see https://docs.mapbox.com/help/tutorials/mapbox-gl-js-expressions/
-        "text-field": ["get", "name", ["get", "tags"]],
-        "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-        "text-offset": [0, 0.6],
-        "text-anchor": "top",
-        "text-allow-overlap": true,
+      paint: {
+        "line-color": "rgba(13, 13, 13, 60)",
+        "line-width": 50,
+        "line-blur": 4,
+        "line-opacity": 0.5,
+        //"line-gap-width": 20,
       },
-    });
-    */
+    });*/
+
+    //* with ["has", "name"] it can be tested if something exists in the properties
 
     //testGettingNearbyFeatures(sourceName);
   }
@@ -737,12 +773,56 @@ export default class MapController {
       img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
       img.height = mapCanvas.clientHeight;
 
+      // perf-results: 101,6 ; 101,2 ; 82,6 ; 62,7 ; 45,9 (ms) -> avg: 78,8 ms (vllt lieber median?)
+      Benchmark.startMeasure("blur Image with Webgl");
       const canvas = renderAndBlur(img);
-      /*
-        //TODO:
-        if (canvas) {
-          addCanvasOverlay(canvas);
-        }*/
+      Benchmark.stopMeasure("blur Image with Webgl");
+
+      if (canvas) {
+        // perf-results:  7,8; 12,5; 10,9; 7,3; 6,8  (ms) -> avg: 9,06 ms
+        Benchmark.startMeasure("addingCanvasOverlay");
+        addCanvasOverlay(canvas);
+        Benchmark.stopMeasure("addingCanvasOverlay");
+
+        // perf-results:  178; 187; 160; 93; 111 (ms) -> avg: 145,8 ms
+        //this.addBlurredImage(img, canvas);
+      }
+    };
+  }
+
+  addBlurredImage(img: HTMLImageElement, canvas: HTMLCanvasElement): void {
+    Benchmark.startMeasure("addingImageOverlay");
+    img.src = canvas.toDataURL();
+
+    const bounds = map.getBounds();
+    const viewportBounds = [
+      bounds.getNorthWest().toArray(),
+      bounds.getNorthEast().toArray(),
+      bounds.getSouthEast().toArray(),
+      bounds.getSouthWest().toArray(),
+    ];
+    //console.log("ViewportBounds: ", viewportBounds);
+
+    img.onload = () => {
+      map.addSource("canvasSource", {
+        type: "image",
+        coordinates: viewportBounds,
+        url: img.src,
+      });
+      //TODO save this source in the class and only use updateImage(options: ImageSourceOptions): this;
+      // to update the image instead of rerendering the whole source
+
+      map.addLayer({
+        id: "overlay",
+        source: "canvasSource",
+        type: "raster",
+        paint: {
+          "raster-opacity": 0.85,
+          //"raster-resampling": "linear",
+        },
+      });
+
+      Benchmark.stopMeasure("addingImageOverlay");
     };
   }
 
