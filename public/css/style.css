@@ -244,11 +244,15 @@ body {
     border: none;
     margin-left: 10px;
     padding: 2px 6px 2px 6px;
+    background: #eeeeee00;
 }
 
 .close:hover {
+    /*
     background-color: rgba(199, 15, 15, 0.911);
     color: white;
+    */
+    background-color: #ddd;
 }
 
 /** Snackbar Styling */
