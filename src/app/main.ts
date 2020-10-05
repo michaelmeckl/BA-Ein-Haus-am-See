@@ -6,8 +6,6 @@ import { fetchOsmData } from "./network/networkUtils";
 import OsmTags from "./osmModel/osmTagCollection";
 import { showSnackbar, SnackbarType } from "./utils";
 
-export const parameterSelection: Set<string> = new Set();
-
 // * const enum instead of enum as this inlines the elements at runtime
 // -> not the enum as a whole is needed at runtime
 const enum HtmlElements {
@@ -98,13 +96,13 @@ function selectData(e: Event, mapController: MapController): void {
   listEl.appendChild(document.createTextNode(query));
   list.appendChild(listEl);
 
-  parameterSelection.add(query.toLowerCase());
+  mapController.addActiveFilter(query.toLowerCase());
 
   // remove the list element when its close button is clicked
   closeButton.addEventListener("click", function (this: ChildNode) {
     const listElement = this.parentElement as Node;
     list.removeChild(listElement);
-    parameterSelection.delete(query.toLowerCase());
+    mapController.removeActiveFilter(query.toLowerCase());
 
     // remove data from the map as well
     const textContent = listElement.textContent?.trim();
@@ -126,7 +124,6 @@ function selectData(e: Event, mapController: MapController): void {
 }
 
 async function performOsmQuery(mapController: MapController, inputQuery: string): Promise<void> {
-  //TODO: let user choose bounding box?
   //ganz Regensburg: 12.028,48.966,12.192,49.076
   //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
   const bounds = mapController.getViewportBoundsString();

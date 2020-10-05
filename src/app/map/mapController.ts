@@ -9,7 +9,6 @@ import { MapboxLayer } from "@deck.gl/mapbox";
 import type { Point } from "geojson";
 import mapboxgl, { CustomLayerInterface, GeoJSONSource, LngLat, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
-import { parameterSelection } from "../main";
 import { fetchOsmData } from "../network/networkUtils";
 import { renderAndBlur } from "../webgl/blurFilter";
 import LumaLayer from "../webgl/lumaLayer";
@@ -30,6 +29,9 @@ import * as mapboxUtils from "./mapboxUtils";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
 
+//! add clear map data button or another option (or implement the removeMapData method correct) because atm
+//! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
+
 /**
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
  */
@@ -42,6 +44,8 @@ export default class MapController {
   // array for polygon and linestring?? (basically do i want to flatten it??)
 
   //private currentData?: string;
+
+  private activeFilters: Set<string> = new Set();
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -164,9 +168,18 @@ export default class MapController {
     map.addControl(Geocoder.geocoderControl, "bottom-left");
   }
 
+  addActiveFilter(filter: string): void {
+    this.activeFilters.add(filter);
+  }
+
+  //TODO remove map data in here? so everything is in one place
+  removeActiveFilter(filter: string): void {
+    this.activeFilters.delete(filter);
+  }
+
   reloadData(): void {
     //TODO load data new on every move, works but needs another source than overpass api mirror
-    parameterSelection.forEach(async (param) => {
+    this.activeFilters.forEach(async (param) => {
       Benchmark.startMeasure("Fetching data on moveend");
       const data = await fetchOsmData(this.getViewportBoundsString(), param);
       console.log(Benchmark.stopMeasure("Fetching data on moveend"));
@@ -205,7 +218,9 @@ export default class MapController {
       // Change the cursor style as a UI indicator.
       map.getCanvas().style.cursor = "pointer";
 
+      // @ts-expect-error
       const coordinates = e.features[0].geometry.coordinates.slice();
+      // @ts-expect-error
       const description = e.features[0].properties.description;
 
       // Ensure that if the map is zoomed out such that multiple
@@ -298,6 +313,9 @@ export default class MapController {
       });*/
   }
 
+  //! this could be used to get all pois in the tileset without the limitations of the tilequeryAPI
+  //! but unfortunately not all data is visible on all layers (neither is it with the tilequeryAPI btw) but
+  //! this problem remains here as well
   addMapboxStreetsVectorData(): void {
     // Add a circle layer with a vector source
     map.addLayer({
@@ -420,16 +438,6 @@ export default class MapController {
         source: "bars",
         minzoom: 14,
         paint: {
-          // Size circle radius by earthquake magnitude and zoom level
-          /*
-          "circle-radius": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            7, ["interpolate", ["linear"], ["get", "mag"], 1, 1, 6, 4],
-            16, ["interpolate", ["linear"], ["get", "mag"], 1, 5, 6, 50],
-          ],
-          */
           "circle-radius": {
             property: "type",
             type: "exponential",
