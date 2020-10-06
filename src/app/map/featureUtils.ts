@@ -3,7 +3,6 @@
  */
 import { chunk } from "lodash";
 import mapboxgl from "mapbox-gl";
-import { parameterSelection } from "../main";
 import { map } from "./mapboxConfig";
 
 //TODO has to be called after layer is loaded!
@@ -71,11 +70,11 @@ export function getAllRenderedFeaturesIn(
   }
 }
 
-export function getDataforFeaturesInSelection() {
-  console.log(parameterSelection.entries);
+export function getDataforFeaturesInSelection(filters: Set<string>) {
+  console.log(filters.entries.toString());
 
   const allGeoData: mapboxgl.MapboxGeoJSONFeature[] = [];
-  for (const el of parameterSelection) {
+  for (const el of filters) {
     //TODO
     // With features[0].geometry.coordinates you will receive all points along the LineString
     /**
@@ -161,8 +160,8 @@ export function getPointsInRadius(map: mapboxgl.Map) {
   });
 }
 
-export function getDataFromMap() {
-  const allGeoData = getDataforFeaturesInSelection();
+export function getDataFromMap(filters: Set<string>) {
+  const allGeoData = getDataforFeaturesInSelection(filters);
   console.log("QuerySourceFeatures: ");
   console.log(allGeoData);
 

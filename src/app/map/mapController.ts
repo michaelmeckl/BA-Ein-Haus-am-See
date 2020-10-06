@@ -9,6 +9,7 @@ import { MapboxLayer } from "@deck.gl/mapbox";
 import buffer from "@turf/buffer";
 import { featureCollection } from "@turf/helpers";
 import { multiPolygon } from "@turf/helpers";
+import * as webglUtils from "../webgl/webglUtils";
 import type {
   Feature,
   FeatureCollection,
@@ -560,9 +561,6 @@ export default class MapController {
     }
   }
 
-  //! mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
-  //! den Unterschied vom Circle und der Bounding Box nehmen und das dann einfärben mit fill-color!!!
-
   addDeckLayer(): void {
     //* für normale Deck Layer:
     const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson", "geojsonLayer-1");
@@ -600,6 +598,8 @@ export default class MapController {
     const allPoints = new Set();
     const allWays = new Set();
     const allPolygons = new Set();
+
+    // ! in combineFeatures wird auch nochmal ein Buffer hinzugefügt, das sollte nur an einer stelle passieren!
 
     for (let index = 0; index < data.features.length; index++) {
       const element = data.features[index];
@@ -679,7 +679,19 @@ export default class MapController {
     console.log("this.currentPolygons: ", this.currentPolygons);
     console.log("allPolygons: ", allPolygons);
 
-    const newData = featureCollection([...this.currentWays, ...this.currentPolygons]);
+    //mapboxUtils.getDifferenceBetweenViewportAndFeature([...this.currentPoints]);
+    mapboxUtils.getDifferenceBetweenViewportAndFeature([
+      ...this.currentPoints,
+      ...this.currentWays,
+      ...this.currentPolygons,
+    ]);
+
+    /*
+    const newData = featureCollection([
+      ...this.currentPoints,
+      ...this.currentWays,
+      ...this.currentPolygons,
+    ]);
 
     map.addSource("buffered", {
       type: "geojson",
@@ -712,6 +724,7 @@ export default class MapController {
       },
       filterExpression: ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], true, false],
     });
+    */
   }
 
   showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
@@ -719,7 +732,8 @@ export default class MapController {
     console.log("now adding to map...");
     console.log(sourceName);
 
-    this.preprocessGeoData(data);
+    //TODO
+    //this.preprocessGeoData(data);
 
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapboxUtils.removeAllLayersForSource(sourceName);
@@ -1009,7 +1023,8 @@ export default class MapController {
 
     console.log("adding webgl data...");
 
-    const mapData = getDataFromMap();
+    const mapData = getDataFromMap(this.activeFilters);
+
     const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
 
     //const firstSymbolId = mapboxUtils.findLayerByType(map, "symbol");

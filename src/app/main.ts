@@ -46,6 +46,7 @@ async function testVectorTileAPI(c: MapController): Promise<void> {
 
 /* Set the width of the side navigation to 250px */
 function openSidebar(): void {
+  //TODO alternativ auch mit map.easeTo({padding: {left: 400, top: 100}}) gut machbar!
   (document.getElementById(HtmlElements.SIDEBAR) as HTMLDivElement).style.width = "250px";
   (document.getElementById(HtmlElements.MAP_CONTAINER) as HTMLDivElement).style.marginLeft =
     "250px";
