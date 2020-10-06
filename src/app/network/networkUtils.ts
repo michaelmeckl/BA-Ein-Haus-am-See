@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
+import type { FeatureCollection, GeoJsonProperties, Geometry, GeometryObject } from "geojson";
 import osmtogeojson from "osmtogeojson";
 import Benchmark from "../../shared/benchmarking";
 
@@ -120,7 +120,10 @@ export async function getPoiTypes() {
 }
 
 //TODO
-export async function fetchOsmData(mapBounds: string, query: string): Promise<any> {
+export async function fetchOsmData(
+  mapBounds: string,
+  query: string
+): Promise<FeatureCollection<GeometryObject, any> | null> {
   try {
     //TODO delete me later
     //const antwort = await axios.get("/testCmd");
@@ -145,7 +148,7 @@ export async function fetchOsmData(mapBounds: string, query: string): Promise<an
     const geoJson = osmtogeojson(response.data);
     Benchmark.stopMeasure("o2geo client");
 
-    return geoJson;
+    return geoJson as FeatureCollection<GeometryObject, any>;
   } catch (error) {
     console.error(error);
     return null;

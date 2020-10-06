@@ -4,7 +4,7 @@ import * as turfHelpers from "@turf/helpers";
 import intersect from "@turf/intersect";
 import sector from "@turf/sector";
 import shortestPath from "@turf/shortest-path";
-import type { Point } from "geojson";
+import type { Feature, GeoJsonProperties, Geometry, Point, Polygon } from "geojson";
 import { map } from "./mapboxConfig";
 import * as mapboxUtils from "./mapboxUtils";
 
@@ -38,6 +38,21 @@ export function getNearestPoint(map: mapboxgl.Map): void {
         "hospitals"
       );
     }
+  });
+}
+
+type turfUnits = "meters" | "kilometers";
+
+export function addBufferToFeature(
+  element: Feature<Geometry, GeoJsonProperties>,
+  units: turfUnits,
+  bufferSize = 100
+): Feature<any> {
+  //const newElement = buffer(element as Feature<Polygon, GeoJsonProperties>, 50, {units: "meters"});
+
+  //@ts-expect-error
+  return buffer(element, bufferSize, {
+    units: units,
   });
 }
 

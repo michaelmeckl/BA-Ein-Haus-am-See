@@ -38,6 +38,7 @@
     "@mapbox/geojson-coords": "0.0.1",
     "@mapbox/mapbox-gl-geocoder": "^4.7.0",
     "@turf/bbox": "^6.0.1",
+    "@turf/boolean-contains": "^6.0.1",
     "@turf/boolean-point-in-polygon": "^6.0.1",
     "@turf/boolean-within": "^6.0.1",
     "@turf/buffer": "^5.1.5",

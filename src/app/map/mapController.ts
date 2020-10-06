@@ -6,7 +6,18 @@
 import type { RGBAColor } from "@deck.gl/core";
 import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { MapboxLayer } from "@deck.gl/mapbox";
-import type { Point } from "geojson";
+import buffer from "@turf/buffer";
+import { featureCollection } from "@turf/helpers";
+import { multiPolygon } from "@turf/helpers";
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonProperties,
+  GeometryObject,
+  LineString,
+  Point,
+  Polygon,
+} from "geojson";
 import mapboxgl, { CustomLayerInterface, GeoJSONSource, LngLat, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { fetchOsmData } from "../network/networkUtils";
@@ -28,6 +39,7 @@ import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
+import { addBufferToFeature } from "./turfUtils";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -44,6 +56,10 @@ export default class MapController {
   // array for polygon and linestring?? (basically do i want to flatten it??)
 
   //private currentData?: string;
+
+  private currentPoints = new Set<Feature<Point, GeoJsonProperties>>();
+  private currentWays = new Set<Feature<LineString, GeoJsonProperties>>();
+  private currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
 
   private activeFilters: Set<string> = new Set();
 
@@ -546,7 +562,6 @@ export default class MapController {
 
   //! mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
   //! den Unterschied vom Circle und der Bounding Box nehmen und das dann einfärben mit fill-color!!!
-  // oder vllt damit auch den stroke dazwischen erzeugen und das blurren?
 
   addDeckLayer(): void {
     //* für normale Deck Layer:
@@ -576,30 +591,143 @@ export default class MapController {
 
   // * um ein bestimmtes tile an einer position zu bekommen: https://github.com/mapbox/tilebelt
 
-  showData(data: string, sourceName: string): void {
-    //! idee:
-    //! den geojson string mit turf zu einer featurecollection machen und diese dann gleich preprocessen / filtern / etc.
-    //! z.B. könnte man alle mity geometryType="way" separat speichern, mit foreach und turf.buffer jeder eine stroke geben
-    //!      und diese dann an das Line Layer übergeben, um es zu stylen, so könnte nur der Buffer gestyled werden vllt
-    //! turf can add properties mit turf.point([...], {additional Props hierher})
+  preprocessGeoData(data: FeatureCollection<GeometryObject, any>): void {
+    //TODO reset the classSets so there are always only the current features in them
 
-    console.log(data);
+    //! another option would be to let them be and use them as a client side cache later???
+
+    // feature sets without the additional stroke
+    const allPoints = new Set();
+    const allWays = new Set();
+    const allPolygons = new Set();
+
+    for (let index = 0; index < data.features.length; index++) {
+      const element = data.features[index];
+
+      switch (element.geometry.type) {
+        case "Point":
+          //! turf can add properties mit turf.point([...], {additional Props hierher})
+          allPoints.add(element);
+          this.currentPoints.add(element as Feature<Point, GeoJsonProperties>);
+          break;
+
+        case "MultiPoint":
+          for (const coordinate of element.geometry.coordinates) {
+            const point = {
+              geometry: { type: "Point", coordinates: coordinate },
+              properties: { ...element.properties },
+              type: "Feature",
+            } as Feature<Point, GeoJsonProperties>;
+
+            allPoints.add(point);
+            this.currentPoints.add(point);
+          }
+          break;
+
+        case "LineString": {
+          allWays.add(element);
+          const newElement = addBufferToFeature(element, "meters", 30);
+          this.currentWays.add(newElement);
+          break;
+        }
+        case "MultiLineString":
+          for (const coordinate of element.geometry.coordinates) {
+            const way = {
+              geometry: { type: "LineString", coordinates: coordinate },
+              properties: { ...element.properties },
+              type: "Feature",
+            } as Feature<LineString, GeoJsonProperties>;
+
+            allWays.add(way);
+            const newElement = addBufferToFeature(way, "meters", 30);
+            this.currentWays.add(newElement);
+          }
+          break;
+
+        case "Polygon": {
+          allPolygons.add(element);
+
+          //TODO render the data "this.current polygons" later in the addLayer instead of the original data.
+          const newElement = addBufferToFeature(element, "meters", 50);
+          this.currentPolygons.add(newElement);
+          break;
+        }
+        case "MultiPolygon":
+          for (const coordinate of element.geometry.coordinates) {
+            // construct a new polygon for every coordinate array in the multipolygon
+            const polygon = {
+              geometry: { type: "Polygon", coordinates: coordinate },
+              properties: { ...element.properties },
+              type: "Feature",
+            } as Feature<Polygon, GeoJsonProperties>;
+
+            allPolygons.add(polygon);
+            const newElement = addBufferToFeature(polygon, "meters", 30);
+            this.currentPolygons.add(newElement);
+          }
+          break;
+
+        default:
+          throw new Error("Unknown geojson geometry type in data!");
+      }
+    }
+
+    console.log("this.currentPoints: ", this.currentPoints);
+    console.log("allPoints: ", allPoints);
+    console.log("this.currentWays: ", this.currentWays);
+    console.log("allWays: ", allWays);
+    console.log("this.currentPolygons: ", this.currentPolygons);
+    console.log("allPolygons: ", allPolygons);
+
+    const newData = featureCollection([...this.currentWays, ...this.currentPolygons]);
+
+    map.addSource("buffered", {
+      type: "geojson",
+      data: newData,
+    });
+
+    mapboxUtils.addLayer({
+      id: "buffered-layer-line",
+      sourceName: "buffered",
+      type: "line",
+      paintProps: {
+        "line-color": "rgba(200, 0, 0, 0.9)",
+      },
+      filterExpression: [
+        "match",
+        ["geometry-type"],
+        ["LineString", "MultiLineString"],
+        true,
+        false,
+      ],
+    });
+
+    mapboxUtils.addLayer({
+      id: "buffered-layer-poly",
+      sourceName: "buffered",
+      type: "fill",
+      paintProps: {
+        "fill-outline-color": "rgba(0,0,0,0.9)",
+        "fill-color": "rgba(0,0,200,0.9)",
+      },
+      filterExpression: ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], true, false],
+    });
+  }
+
+  showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
+    console.log("original Data:", data);
     console.log("now adding to map...");
     console.log(sourceName);
 
-    //this.currentData = data;
-
-    //TODO hier schon das geojson parsen und lokal speichern, damit später gequeriet werden kann?
-    //TODO reex oder programm zum parsen finden!
-    //this.mapData.set("point", [1, 2]);
+    this.preprocessGeoData(data);
 
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
-    mapboxUtils.removeAllLayersForSource(map, sourceName);
+    mapboxUtils.removeAllLayersForSource(sourceName);
 
     if (map.getSource(sourceName)) {
       console.log(map.getSource(sourceName));
       console.log(`Source ${sourceName} is already used! Updating it!`);
-      mapboxUtils.updateLayerSource(map, sourceName, data);
+      mapboxUtils.updateLayerSource(sourceName, data);
       console.log(map.getSource(sourceName));
       this.addLayers(sourceName);
       return;
@@ -619,7 +747,8 @@ export default class MapController {
       tolerance: 0.45, // higher means simpler geometries and increased performance
       data: data, // url or inline geojson
 
-      cluster: true, // Cluster near points (default: false). The point_count property will be added to the source data.
+      // Cluster near points (default: false). The point_count property will be added to the source data.
+      cluster: false, //! this prevents other types like lines or polygons to be rendered! -> separate source Layer needed!
       clusterRadius: 20, //default is 50
       clusterMaxZoom: 14, // don't show clusters above zoom level 14
       clusterMinPoints: 3, // at least 3 points necessary for clustering
@@ -649,22 +778,23 @@ export default class MapController {
     //TODO extract the layer props and filters to a separate class?
 
     //point-layer
-    map.addLayer({
-      id: sourceName + "-l1",
-      type: "circle",
-      source: sourceName,
-      // 'all' checks 2 conditions:  on this layer show only points or multipoints and only if not clustered
-      filter: [
-        "all",
-        ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false],
-        ["!", ["has", "point_count"]],
-      ],
-      //interactive: true,
-      layout: {
-        //"visibility": "visible",
-      },
-      //prettier-ignore
-      paint: {
+    map.addLayer(
+      {
+        id: sourceName + "-l1",
+        type: "circle",
+        source: sourceName,
+        // 'all' checks 2 conditions:  on this layer show only points or multipoints and only if not clustered
+        filter: [
+          "all",
+          ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false],
+          ["!", ["has", "point_count"]],
+        ],
+        //interactive: true,
+        layout: {
+          //"visibility": "visible",
+        },
+        //prettier-ignore
+        paint: {
         //increase circle radius (in pixels) when zooming in
         // see https://docs.mapbox.com/help/tutorials/mapbox-gl-js-expressions/
         "circle-radius": [
@@ -707,7 +837,9 @@ export default class MapController {
         ],
         "circle-blur": 0.3,
       },
-    });
+      },
+      "waterway-label"
+    );
 
     //line - layer
     map.addLayer({
