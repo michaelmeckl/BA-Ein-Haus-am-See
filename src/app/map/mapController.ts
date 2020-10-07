@@ -520,6 +520,7 @@ export default class MapController {
       new mapboxgl.Popup()
         // cast to point so coordinates is safe to access
         .setLngLat((clickedPoint.geometry as Point).coordinates as LngLatLike)
+        //TODO oder einfacher: setLngLat(map.unproject(e.point))
         .setHTML(
           "<h3>Name: </h3> " +
             clickedPoint.properties?.tags.name +
