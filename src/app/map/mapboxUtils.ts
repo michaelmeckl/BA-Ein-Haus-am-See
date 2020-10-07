@@ -1,28 +1,20 @@
 /**
  * Utility-Methods for working with Mapbox Gl.
  */
-import type { GeoJSONSource } from "mapbox-gl";
-import { map } from "./mapboxConfig";
-import type {
-  Feature,
-  FeatureCollection,
-  GeoJsonProperties,
-  GeometryObject,
-  LineString,
-  MultiPolygon,
-  Point,
-  Polygon,
-} from "geojson";
-import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
-import circle from "@turf/circle";
-import * as turfHelpers from "@turf/helpers";
 import bboxPolygon from "@turf/bbox-polygon";
+import circle from "@turf/circle";
 import difference from "@turf/difference";
-import union from "@turf/union";
-import mask from "@turf/mask";
-import { addBufferToFeature } from "./turfUtils";
 import intersect from "@turf/intersect";
+import mask from "@turf/mask";
+import union from "@turf/union";
+import type { Feature, GeoJsonProperties, LineString, MultiPolygon, Point, Polygon } from "geojson";
 import mapboxgl from "mapbox-gl";
+import Benchmark from "../../shared/benchmarking";
+import { map } from "./mapboxConfig";
+import * as turfHelpers from "@turf/helpers";
+import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
+import { addBufferToFeature } from "./turfUtils";
+import { logMemoryUsage } from "../utils";
 // TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
 
 export async function testTilequeryAPI(): Promise<void> {
@@ -50,12 +42,10 @@ function getResolutions() {
 }
 
 // see https://stackoverflow.com/questions/37599561/drawing-a-circle-with-the-radius-in-miles-meters-with-mapbox-gl-js
-export function getCircleRadiusForZoomLevel(zoom: number): any {
+export function getMetersForZoomLevel(meters: number, zoom: number): number {
   // see https://docs.mapbox.com/help/glossary/zoom-level/
   const metersPerPixel = 78271.484 / 2 ** zoom;
-  const metersToPixelsAtMaxZoom = (meters: number, latitude: number) =>
-    meters / metersPerPixel / Math.cos((latitude * Math.PI) / 180);
-  return metersToPixelsAtMaxZoom;
+  return meters / metersPerPixel /*/ Math.cos((latitude * Math.PI) / 180)*/;
 }
 
 /**
@@ -134,49 +124,40 @@ export function findAllFeaturesInCircle(allFeatures: any) {
 /**
  * Util - Function that returns the current viewport extent as a polygon.
  */
+//TODO vllt etwas mehr als den viewport gleich nehmen?
 export function getViewportAsPolygon(): Feature<Polygon, GeoJsonProperties> {
   const bounds = map.getBounds();
   const viewportBounds = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
   return bboxPolygon(viewportBounds);
 }
 
-//TODO größtenteils doppelt in mapController (da mit switch, vllt effizienter?)
 function convertAllFeaturesToPolygons(
-  features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
-): Feature<any, GeoJsonProperties>[] {
-  const polygonFeatures = [];
+  features: Feature<Point | LineString | Polygon, GeoJsonProperties>[],
+  bufferSize = 100
+): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
+  const polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
 
   for (let index = 0; index < features.length; index++) {
     const feature = features[index];
 
     if (feature.geometry.type === "Point") {
+      //! turf can add properties mit turf.point([...], {additional Props hierher})
       const circleOptions = { steps: 80, units: "meters" /*, properties: {foo: 'bar'}*/ };
       // replace all point features with circle polygon features
       polygonFeatures.push(
-        circle(feature as Feature<Point, GeoJsonProperties>, 200, circleOptions)
+        circle(feature as Feature<Point, GeoJsonProperties>, bufferSize, circleOptions)
       );
-    } else if (feature.geometry.type === "LineString") {
-      // replace all line features with buffered line polygon features
-      polygonFeatures.push(addBufferToFeature(feature, "meters", 30)); //TODO buffer automatically makes it a polygon if i am correct
-    } else if (feature.geometry.type === "Polygon") {
-      const poly = addBufferToFeature(feature, "meters", 50);
-      console.log(poly);
-      polygonFeatures.push(poly);
+    } else if (feature.geometry.type === "LineString" || feature.geometry.type === "Polygon") {
+      // add a buffer to all lines and polygons
+      // This also replaces all line features with buffered polygon features as turf.buffer() returns
+      // Polygons (or Multipolygons).
+      polygonFeatures.push(addBufferToFeature(feature, "meters", bufferSize));
     } else {
       break;
     }
   }
 
   return polygonFeatures;
-}
-
-function polyMask(
-  mask: Feature<Polygon, GeoJsonProperties>,
-  bounds: Feature<Polygon, GeoJsonProperties>
-): Feature<Polygon, GeoJsonProperties> {
-  const diff = difference(bounds, mask);
-  console.log("Difference: ", diff);
-  return diff;
 }
 
 function performUnion(features: any): Feature<any, GeoJsonProperties> {
@@ -188,8 +169,10 @@ function performUnion(features: any): Feature<any, GeoJsonProperties> {
   return unionResult;
 }
 
-function findIntersections(features: any): Feature<any, GeoJsonProperties>[] {
-  const allIntersections: any[] = [];
+function findIntersections(
+  features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+): Feature<any, GeoJsonProperties>[] {
+  const allIntersections: Feature<any, GeoJsonProperties>[] = [];
 
   /*
   //* create a lookup object to improve performance from O(m*n) to O(m+n)
@@ -222,24 +205,34 @@ function findIntersections(features: any): Feature<any, GeoJsonProperties>[] {
   return allIntersections;
 }
 
-export function combineFeatures(
+export function calculateMaskAndIntersections(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
 ): any {
-  const polygonFeatures = convertAllFeaturesToPolygons(features);
+  Benchmark.startMeasure("convertAllFeaturesToPolygons");
+  const polygonFeatures = convertAllFeaturesToPolygons(features, 150);
+  Benchmark.stopMeasure("convertAllFeaturesToPolygons");
 
   if (polygonFeatures.length === 0) {
     console.warn("No polygons created!");
     return {} as Feature<Polygon | MultiPolygon, GeoJsonProperties>;
   }
 
+  Benchmark.startMeasure("performUnion");
+
   //combine / union all circles to one polygon
   //const unionPolygons = union(...polygonFeatures);
   const unionPolygons = performUnion(polygonFeatures);
   console.log("Unioned Polygons: ", unionPolygons);
 
+  Benchmark.stopMeasure("performUnion");
+
+  Benchmark.startMeasure("findIntersections");
+
   //get all intersections and remove all null values
   const intersections = findIntersections(polygonFeatures).filter((it) => it !== null);
   console.log("Intersections: ", intersections);
+
+  Benchmark.stopMeasure("findIntersections");
 
   /*
   //! out of memory error im browser!
@@ -254,23 +247,88 @@ export function combineFeatures(
   return { unionPolygons: unionPolygons, intersections: intersections };
 }
 
-//* Idee: mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
+function showMask(mask: any): void {
+  if (map.getSource("mask")) {
+    map.removeSource("maske");
+  }
+
+  map.addSource("maske", {
+    type: "geojson",
+    data: mask,
+  });
+
+  map.addLayer({
+    id: "mask-layer",
+    source: "maske",
+    type: "fill",
+    paint: {
+      //"fill-outline-color": "rgba(0,0,0,0.0)",
+      "fill-color": "rgba(105,105,105,0.7)",
+    },
+  });
+
+  //add a small blur effect on the outline
+  map.addLayer({
+    id: "mask-layer-outline",
+    source: "maske",
+    type: "line",
+    paint: {
+      "line-color": "rgba(233,233,233,0.3)",
+      //FIXME if the line width is too big (>20 ca.) artifacts start to appear on some edges?? because of polygon?
+      //prettier-ignore
+      "line-width": [
+        // this makes the line-width in meters stay relative to the current zoom level:
+        "interpolate",
+        ["exponential", 2], ["zoom"],
+        10, /*["*", 10, ["^", 2, -16]],*/ getMetersForZoomLevel(20, 10),
+        24, /*["*", 150, ["^", 2, 8]]*/ getMetersForZoomLevel(100, 24),
+      ],
+      //prettier-ignore
+      "line-blur": ["interpolate", ["linear"], ["zoom"],
+          10, 0,
+          16, 15,
+          24, 30,
+      ],
+    },
+  });
+}
+
+//Idee: mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
 //den Unterschied vom Polygon und der Bounding Box nehmen und das dann einfärben mit fill-color!
-export function getDifferenceBetweenViewportAndFeature(
+export function showDifferenceBetweenViewportAndFeature(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
 ): void {
-  const featureObject = combineFeatures([...features]);
-  console.log(featureObject);
+  Benchmark.startMeasure("calculateMaskAndIntersections");
+  const featureObject = calculateMaskAndIntersections([...features]);
+  Benchmark.stopMeasure("calculateMaskAndIntersections");
 
   const maske = featureObject.unionPolygons;
   const intersects: any[] = featureObject.intersections;
 
-  const result = polyMask(maske, getViewportAsPolygon());
+  logMemoryUsage();
+
+  Benchmark.startMeasure("turf-difference");
+  const result = difference(getViewportAsPolygon(), maske);
+  Benchmark.stopMeasure("turf-difference");
+
+  Benchmark.startMeasure("turf-mask");
+  const result2 = mask(maske, getViewportAsPolygon());
+  Benchmark.stopMeasure("turf-mask");
+
+  Benchmark.startMeasure("turf-mask-auto");
+  const result3 = mask(maske);
+  Benchmark.stopMeasure("turf-mask-auto");
+
+  //showMask(result);
+  //showMask(result2);
+  showMask(result3);
 
   /*
+  //show intersections
   map.addSource("intersect", {
     type: "geojson",
-    data: mask(turfHelpers.featureCollection(intersects)),
+    data: turfHelpers.featureCollection(intersects),
+    //data: difference(maske, turfHelpers.featureCollection(intersects)),
   });
 
   map.addLayer({
@@ -282,38 +340,4 @@ export function getDifferenceBetweenViewportAndFeature(
     },
   });
   */
-
-  map.addSource("mask", {
-    type: "geojson",
-    data: result,
-  });
-
-  map.addLayer({
-    id: "mask-layer",
-    source: "mask",
-    type: "fill",
-    paint: {
-      //"fill-outline-color": "rgba(0,0,0,0.9)",
-      "fill-color": "rgba(103,103,103,0.9)",
-    },
-  });
-
-  //TODO alternative mit turf mask: welche ist besser? ->  messen!
-  /*
-  const turfMask = mask(maske, getViewportAsPolygon());
-
-  map.addSource("maske", {
-    type: "geojson",
-    data: turfMask,
-  });
-
-  map.addLayer({
-    id: "mask-layer2",
-    source: "maske",
-    type: "fill",
-    paint: {
-      "fill-outline-color": "rgba(0,0,0,0.9)",
-      "fill-color": "rgba(183,183,183,0.9)",
-    },
-  });*/
 }

@@ -1,3 +1,4 @@
+import { featureCollection } from "@turf/helpers";
 /* eslint-env browser */
 
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
@@ -11,7 +12,7 @@ import type {
   Point,
   Polygon,
 } from "geojson";
-import mapboxgl, { CustomLayerInterface, LngLatLike } from "mapbox-gl";
+import mapboxgl, { CustomLayerInterface, Layer, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { fetchOsmData } from "../network/networkUtils";
 import { renderAndBlur } from "../webgl/blurFilter";
@@ -272,24 +273,17 @@ export default class MapController {
   }
 
   preprocessGeoData(data: FeatureCollection<GeometryObject, any>): void {
-    //TODO reset the classSets so there are always only the current features in them
-
-    //! another option would be to let them be and use them as a client side cache later???
-
-    // feature sets without the additional stroke
-    const allPoints = new Set();
-    const allWays = new Set();
-    const allPolygons = new Set();
-
-    // ! in combineFeatures wird auch nochmal ein Buffer hinzugefügt, das sollte nur an einer stelle passieren!
+    //TODO reset the classSets so there are always only the current features in them ??
+    // another option would be to let them be and use them as a client side cache later???
+    this.currentPoints = new Set();
+    this.currentWays = new Set();
+    this.currentPolygons = new Set();
 
     for (let index = 0; index < data.features.length; index++) {
       const element = data.features[index];
 
       switch (element.geometry.type) {
         case "Point":
-          //! turf can add properties mit turf.point([...], {additional Props hierher})
-          allPoints.add(element);
           this.currentPoints.add(element as Feature<Point, GeoJsonProperties>);
           break;
 
@@ -301,15 +295,12 @@ export default class MapController {
               type: "Feature",
             } as Feature<Point, GeoJsonProperties>;
 
-            allPoints.add(point);
             this.currentPoints.add(point);
           }
           break;
 
         case "LineString": {
-          allWays.add(element);
-          const newElement = addBufferToFeature(element, "meters", 30);
-          this.currentWays.add(newElement);
+          this.currentWays.add(element as Feature<LineString, GeoJsonProperties>);
           break;
         }
         case "MultiLineString":
@@ -320,18 +311,12 @@ export default class MapController {
               type: "Feature",
             } as Feature<LineString, GeoJsonProperties>;
 
-            allWays.add(way);
-            const newElement = addBufferToFeature(way, "meters", 30);
-            this.currentWays.add(newElement);
+            this.currentWays.add(way);
           }
           break;
 
         case "Polygon": {
-          allPolygons.add(element);
-
-          //TODO render the data "this.current polygons" later in the addLayer instead of the original data.
-          const newElement = addBufferToFeature(element, "meters", 50);
-          this.currentPolygons.add(newElement);
+          this.currentPolygons.add(element as Feature<Polygon, GeoJsonProperties>);
           break;
         }
         case "MultiPolygon":
@@ -343,9 +328,7 @@ export default class MapController {
               type: "Feature",
             } as Feature<Polygon, GeoJsonProperties>;
 
-            allPolygons.add(polygon);
-            const newElement = addBufferToFeature(polygon, "meters", 30);
-            this.currentPolygons.add(newElement);
+            this.currentPolygons.add(polygon);
           }
           break;
 
@@ -355,58 +338,26 @@ export default class MapController {
     }
 
     console.log("this.currentPoints: ", this.currentPoints);
-    console.log("allPoints: ", allPoints);
     console.log("this.currentWays: ", this.currentWays);
-    console.log("allWays: ", allWays);
     console.log("this.currentPolygons: ", this.currentPolygons);
-    console.log("allPolygons: ", allPolygons);
+
+    const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
 
     //mapboxUtils.getDifferenceBetweenViewportAndFeature([...this.currentPoints]);
-    mapboxUtils.getDifferenceBetweenViewportAndFeature([
-      ...this.currentPoints,
-      ...this.currentWays,
-      ...this.currentPolygons,
-    ]);
+    mapboxUtils.showDifferenceBetweenViewportAndFeature(allFeatures);
 
-    /*
-    const newData = featureCollection([
-      ...this.currentPoints,
-      ...this.currentWays,
-      ...this.currentPolygons,
-    ]);
+    mapLayerManager.addNewGeojsonSource("currFeatures", featureCollection(allFeatures), false);
 
-    map.addSource("buffered", {
-      type: "geojson",
-      data: newData,
-    });
-
-    mapboxUtils.addLayer({
-      id: "buffered-layer-line",
-      sourceName: "buffered",
-      type: "line",
-      paintProps: {
-        "line-color": "rgba(200, 0, 0, 0.9)",
+    const layer: Layer = {
+      id: "123",
+      source: "currFeatures",
+      type: "circle",
+      paint: {
+        "circle-color": "rgba(255, 0, 0, 1)",
       },
-      filterExpression: [
-        "match",
-        ["geometry-type"],
-        ["LineString", "MultiLineString"],
-        true,
-        false,
-      ],
-    });
-
-    mapboxUtils.addLayer({
-      id: "buffered-layer-poly",
-      sourceName: "buffered",
-      type: "fill",
-      paintProps: {
-        "fill-outline-color": "rgba(0,0,0,0.9)",
-        "fill-color": "rgba(0,0,200,0.9)",
-      },
-      filterExpression: ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], true, false],
-    });
-    */
+    };
+    mapLayerManager.addNewLayer(layer, true);
+    //mapLayerManager.addLayers("currFeatures");
   }
 
   showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
@@ -414,11 +365,12 @@ export default class MapController {
     console.log("now adding to map...");
     console.log(sourceName);
 
-    //TODO
-    //this.preprocessGeoData(data);
-
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(sourceName);
+
+    //TODO
+    this.preprocessGeoData(data);
+    return;
 
     if (map.getSource(sourceName)) {
       // the source already exists, only update the data

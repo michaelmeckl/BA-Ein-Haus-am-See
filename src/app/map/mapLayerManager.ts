@@ -1,5 +1,11 @@
 /* eslint-disable no-magic-numbers */
-import type { FeatureCollection, Geometry, GeometryObject } from "geojson";
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonProperties,
+  Geometry,
+  GeometryObject,
+} from "geojson";
 import type { CustomLayerInterface, GeoJSONSource, Layer } from "mapbox-gl";
 import ClusterManager from "./clusterManager";
 import { map } from "./mapboxConfig";
@@ -41,7 +47,7 @@ class MapLayerManager {
   // Add a geojson source, see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson
   addNewGeojsonSource(
     sourceName: string,
-    geojsonData: string | FeatureCollection<Geometry, any>,
+    geojsonData?: string | Feature<Geometry, GeoJsonProperties> | FeatureCollection<Geometry, any>,
     clusteringEnabled = false
   ): void {
     let sourceOptions: mapboxgl.GeoJSONSourceOptions = {
@@ -99,7 +105,7 @@ class MapLayerManager {
   /**
    * Update the data source of a given source layer. Only works for GeoJson layer.
    */
-  updateSource(id: string, data: FeatureCollection<GeometryObject, any>): boolean {
+  updateSource(id: string, data: FeatureCollection<GeometryObject, GeoJsonProperties>): boolean {
     if (map.getSource(id)?.type !== "geojson") {
       return false;
     }

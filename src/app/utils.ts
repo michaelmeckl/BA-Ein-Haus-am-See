@@ -28,3 +28,10 @@ export function showSnackbar(
     snackbar.className = snackbar.className.replace("show", "");
   }, duration);
 }
+
+export function logMemoryUsage(): void {
+  //@ts-expect-error
+  console.log(performance.memory.jsHeapSizeLimit / (8 * 1024 * 1024) + " mb"); // will give you the JS heap size
+  //@ts-expect-error
+  console.log(performance.memory.usedJSHeapSize / (8 * 1024 * 1024) + " mb"); // how much you're currently using
+}
