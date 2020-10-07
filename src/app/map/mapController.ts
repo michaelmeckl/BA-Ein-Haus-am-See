@@ -1,4 +1,3 @@
-import { featureCollection } from "@turf/helpers";
 /* eslint-env browser */
 
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
@@ -28,7 +27,7 @@ import * as mapboxUtils from "./mapboxUtils";
 import mapLayerManager from "./mapLayerManager";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
-import { addBufferToFeature, testTurfFunctions } from "./turfUtils";
+import { featureCollection } from "@turf/helpers";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -133,7 +132,8 @@ export default class MapController {
     //TODO bekommen und dann diese gebiete markieren
     //mapboxUtils.testTilequeryAPI();
     //refetch all data for the current viewport
-    //this.reloadData();
+    //TODO !!
+    this.reloadData();
   }
 
   onSourceLoaded(): void {
@@ -165,7 +165,6 @@ export default class MapController {
     //!not working rigth now
     //sortDistances(e.lngLat);
 
-    testTurfFunctions();
     //addWebglCircle(map);
     */
   }
@@ -259,12 +258,6 @@ export default class MapController {
       },
       "source-layer": "poi_label",
       type: "circle",
-      paint: {
-        // Mapbox Style Specification paint properties
-      },
-      layout: {
-        // Mapbox Style Specification layout properties
-      },
     });
   }
 
@@ -346,16 +339,27 @@ export default class MapController {
     //mapboxUtils.getDifferenceBetweenViewportAndFeature([...this.currentPoints]);
     mapboxUtils.showDifferenceBetweenViewportAndFeature(allFeatures);
 
-    mapLayerManager.addNewGeojsonSource("currFeatures", featureCollection(allFeatures), false);
+    mapLayerManager.removeAllLayersForSource("currFeatures");
 
+    // show the points
     const layer: Layer = {
-      id: "123",
+      id: "points",
       source: "currFeatures",
       type: "circle",
       paint: {
         "circle-color": "rgba(255, 0, 0, 1)",
       },
     };
+
+    if (map.getSource("currFeatures")) {
+      // the source already exists, only update the data
+      console.log(`Source ${"currFeatures"} is already used! Updating it!`);
+      mapLayerManager.updateSource("currFeatures", featureCollection(allFeatures));
+    } else {
+      // source doesn't exist yet, create a new one
+      mapLayerManager.addNewGeojsonSource("currFeatures", featureCollection(allFeatures), false);
+    }
+
     mapLayerManager.addNewLayer(layer, true);
     //mapLayerManager.addLayers("currFeatures");
   }

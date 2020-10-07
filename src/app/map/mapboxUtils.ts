@@ -15,6 +15,9 @@ import * as turfHelpers from "@turf/helpers";
 import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
 import { addBufferToFeature } from "./turfUtils";
 import { logMemoryUsage } from "../utils";
+import mapLayerManager from "./mapLayerManager";
+import convex from "@turf/convex";
+import { featureCollection } from "@turf/helpers";
 // TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
 
 export async function testTilequeryAPI(): Promise<void> {
@@ -42,7 +45,7 @@ function getResolutions() {
 }
 
 // see https://stackoverflow.com/questions/37599561/drawing-a-circle-with-the-radius-in-miles-meters-with-mapbox-gl-js
-export function getMetersForZoomLevel(meters: number, zoom: number): number {
+export function getMeterRatioForZoomLevel(meters: number, zoom: number): number {
   // see https://docs.mapbox.com/help/glossary/zoom-level/
   const metersPerPixel = 78271.484 / 2 ** zoom;
   return meters / metersPerPixel /*/ Math.cos((latitude * Math.PI) / 180)*/;
@@ -223,7 +226,6 @@ export function calculateMaskAndIntersections(
   //const unionPolygons = union(...polygonFeatures);
   const unionPolygons = performUnion(polygonFeatures);
   console.log("Unioned Polygons: ", unionPolygons);
-
   Benchmark.stopMeasure("performUnion");
 
   Benchmark.startMeasure("findIntersections");
@@ -231,7 +233,6 @@ export function calculateMaskAndIntersections(
   //get all intersections and remove all null values
   const intersections = findIntersections(polygonFeatures).filter((it) => it !== null);
   console.log("Intersections: ", intersections);
-
   Benchmark.stopMeasure("findIntersections");
 
   /*
@@ -248,14 +249,16 @@ export function calculateMaskAndIntersections(
 }
 
 function showMask(mask: any): void {
-  if (map.getSource("mask")) {
-    map.removeSource("maske");
-  }
+  mapLayerManager.removeAllLayersForSource("maske");
 
-  map.addSource("maske", {
-    type: "geojson",
-    data: mask,
-  });
+  if (map.getSource("maske")) {
+    // the source already exists, only update the data
+    console.log(`Source ${"maske"} is already used! Updating it!`);
+    mapLayerManager.updateSource("maske", mask);
+  } else {
+    // source doesn't exist yet, create a new one
+    mapLayerManager.addNewGeojsonSource("maske", mask, false);
+  }
 
   map.addLayer({
     id: "mask-layer",
@@ -280,8 +283,8 @@ function showMask(mask: any): void {
         // this makes the line-width in meters stay relative to the current zoom level:
         "interpolate",
         ["exponential", 2], ["zoom"],
-        10, /*["*", 10, ["^", 2, -16]],*/ getMetersForZoomLevel(20, 10),
-        24, /*["*", 150, ["^", 2, 8]]*/ getMetersForZoomLevel(100, 24),
+        10, /*["*", 10, ["^", 2, -16]],*/ getMeterRatioForZoomLevel(20, 10),
+        24, /*["*", 150, ["^", 2, 8]]*/ getMeterRatioForZoomLevel(100, 24),
       ],
       //prettier-ignore
       "line-blur": ["interpolate", ["linear"], ["zoom"],
@@ -307,21 +310,24 @@ export function showDifferenceBetweenViewportAndFeature(
 
   logMemoryUsage();
 
+  /*
+  //* slower than the mask version (around 7 - 10 ms), also some incorrect artifacts at the edges
   Benchmark.startMeasure("turf-difference");
   const result = difference(getViewportAsPolygon(), maske);
   Benchmark.stopMeasure("turf-difference");
 
+  //* also a little bit slower than the auto version below (ca. 4-6 ms), also some incorrect artifacts at the edges
   Benchmark.startMeasure("turf-mask");
-  const result2 = mask(maske, getViewportAsPolygon());
+  const result = mask(maske, getViewportAsPolygon());
   Benchmark.stopMeasure("turf-mask");
+  */
 
+  //! this is the fastest version (ca. 1 - 3 ms) and the only one that doesn't produce any incorrect rendering artifacts
   Benchmark.startMeasure("turf-mask-auto");
-  const result3 = mask(maske);
+  const result = mask(maske);
   Benchmark.stopMeasure("turf-mask-auto");
 
-  //showMask(result);
-  //showMask(result2);
-  showMask(result3);
+  showMask(result);
 
   /*
   //show intersections

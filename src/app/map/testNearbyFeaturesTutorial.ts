@@ -4,7 +4,6 @@ import * as turfHelpers from "@turf/helpers";
 import type { GeoJSONSource } from "mapbox-gl";
 import { map } from "./mapboxConfig";
 import buffer from "@turf/buffer";
-import type { Feature } from "@turf/helpers";
 
 /* eslint-disable no-magic-numbers */
 const aliens = {
@@ -187,8 +186,8 @@ function makeRadius(
   lngLatArray: number[],
   radiusInMeters: number
 ): FeatureCollection<any, GeoJsonProperties> {
-  const point = [turfHelpers.point(lngLatArray)];
-  const collection = turfHelpers.featureCollection(point);
+  const point = turfHelpers.point(lngLatArray);
+  const collection = turfHelpers.featureCollection([point]);
 
   // @ts-expect-error  : "units: string" - option is apparently not recognized by typescript even though it is completely correct
   const buffered = buffer(collection, radiusInMeters, { units: "meters" });
