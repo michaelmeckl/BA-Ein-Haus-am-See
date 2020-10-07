@@ -96,6 +96,7 @@ body {
     border-radius: 3px;
 }
 
+/*TODO: */
 #deckgl-overlay {
     /*mix-blend-mode: overlay;*/
 }
@@ -232,9 +233,10 @@ body {
     background: #ddd;
 }
 
-/* Remove the margin bottom from the last child element */
-#selection-list li:last-child {
-    margin: 3px 0 0 0;
+/* Remove the margin from the first and last child element */
+#selection-list li:last-child,
+#selection-list li:first-child {
+    margin: 0;
 }
 
 /* close button for selection items*/
