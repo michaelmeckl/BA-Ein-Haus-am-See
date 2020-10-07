@@ -146,7 +146,7 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
     const t0 = performance.now();
     mapController.showData(data, inputQuery); //set the query as the sourcename
     //TODO nur zum Testen:
-    //mapController.addHeatmapLayer(data);
+    //mapController.addHeatmap(data);
     const t1 = performance.now();
     console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 

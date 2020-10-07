@@ -95,3 +95,39 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement): void {
     },
   });
 }
+
+export function addBlurredImage(img: HTMLImageElement, canvas: HTMLCanvasElement): void {
+  Benchmark.startMeasure("addingImageOverlay");
+  img.src = canvas.toDataURL();
+
+  const bounds = map.getBounds();
+  const viewportBounds = [
+    bounds.getNorthWest().toArray(),
+    bounds.getNorthEast().toArray(),
+    bounds.getSouthEast().toArray(),
+    bounds.getSouthWest().toArray(),
+  ];
+  //console.log("ViewportBounds: ", viewportBounds);
+
+  img.onload = () => {
+    map.addSource("canvasSource", {
+      type: "image",
+      coordinates: viewportBounds,
+      url: img.src,
+    });
+    //TODO save this source in the class and only use updateImage(options: ImageSourceOptions): this;
+    // to update the image instead of rerendering the whole source
+
+    map.addLayer({
+      id: "overlay",
+      source: "canvasSource",
+      type: "raster",
+      paint: {
+        "raster-opacity": 0.85,
+        //"raster-resampling": "linear",
+      },
+    });
+
+    Benchmark.stopMeasure("addingImageOverlay");
+  };
+}

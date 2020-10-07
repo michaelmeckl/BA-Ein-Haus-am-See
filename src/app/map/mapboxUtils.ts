@@ -22,19 +22,8 @@ import union from "@turf/union";
 import mask from "@turf/mask";
 import { addBufferToFeature } from "./turfUtils";
 import intersect from "@turf/intersect";
+import mapboxgl from "mapbox-gl";
 // TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
-
-type mapboxLayerType =
-  | "symbol"
-  | "fill"
-  | "line"
-  | "circle"
-  | "fill-extrusion"
-  | "raster"
-  | "background"
-  | "heatmap"
-  | "hillshade"
-  | undefined;
 
 export async function testTilequeryAPI(): Promise<void> {
   const queryResult = await queryAllTiles([12.1, 49.008], 3000, 50);
@@ -61,7 +50,7 @@ function getResolutions() {
 }
 
 // see https://stackoverflow.com/questions/37599561/drawing-a-circle-with-the-radius-in-miles-meters-with-mapbox-gl-js
-export function getCircleRadiusForZoomLevel(zoom: number) {
+export function getCircleRadiusForZoomLevel(zoom: number): any {
   // see https://docs.mapbox.com/help/glossary/zoom-level/
   const metersPerPixel = 78271.484 / 2 ** zoom;
   const metersToPixelsAtMaxZoom = (meters: number, latitude: number) =>
@@ -69,27 +58,69 @@ export function getCircleRadiusForZoomLevel(zoom: number) {
   return metersToPixelsAtMaxZoom;
 }
 
-function addIconLayer(sourceName: string): void {
-  map.addLayer({
-    id: sourceName + "-symbol",
-    type: "symbol",
-    source: sourceName,
-    layout: {
-      "icon-image": [
-        "match",
-        ["get", "amenity"],
-        "bar",
-        "bar-11",
-        "marker-11", // other
-      ],
-      "icon-allow-overlap": true,
-    },
-  });
+/**
+ * Mainly used for the heatmap, but may be useful for the other approaches too.
+ */
+export function addLegend(): void {
+  //TODO sinnvolle Werte einsetzen
+  const layers = ["0-10", "10-20", "20-50", "50-100", "100-200", "200-500", "500-1000", "1000+"];
+  //prettier-ignore
+  const colors = ["rgba(33,102,172,0)", "rgb(103,169,207)", "rgb(209,229,240)", "rgb(253,219,199)", "rgb(239,138,98)", "rgb(178,24,43)"];
+
+  const legend = document.querySelector("#legend");
+
+  if (!legend) {
+    return;
+  }
+
+  for (let i = 0; i < layers.length; i++) {
+    const layer = layers[i];
+    const color = colors[i];
+    const item = document.createElement("div");
+    const key = document.createElement("span");
+    key.className = "legend-key";
+    key.style.backgroundColor = color;
+
+    const value = document.createElement("span");
+    value.innerHTML = layer;
+    item.appendChild(key);
+    item.appendChild(value);
+    legend.appendChild(item);
+  }
 }
 
-export function addWithinStyleLayer() {
-  //TODO
-  //"paint": {"fill-color": ["case", ["within", poylgonjson], "black", "red"]}
+export function addPopupOnHover(): void {
+  // Create a popup, but don't add it to the map yet.
+  const popup = new mapboxgl.Popup({
+    closeButton: false,
+    closeOnClick: false,
+  });
+
+  map.on("mouseenter", "places", function (e) {
+    // Change the cursor style as a UI indicator.
+    map.getCanvas().style.cursor = "pointer";
+
+    // @ts-expect-error
+    const coordinates = e.features[0].geometry.coordinates.slice();
+    // @ts-expect-error
+    const description = e.features[0].properties.description;
+
+    // Ensure that if the map is zoomed out such that multiple
+    // copies of the feature are visible, the popup appears
+    // over the copy being pointed to.
+    while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+    }
+
+    // Populate the popup and set its coordinates
+    // based on the feature found.
+    popup.setLngLat(coordinates).setHTML(description).addTo(map);
+  });
+
+  map.on("mouseleave", "places", function () {
+    map.getCanvas().style.cursor = "";
+    popup.remove();
+  });
 }
 
 export function findAllFeaturesInCircle(allFeatures: any) {
@@ -98,44 +129,6 @@ export function findAllFeaturesInCircle(allFeatures: any) {
   //TODO
   //const withinGeoData = boolean_within(circleArea, allFeatures);
   //TODO add layer for the withinGeoData
-}
-
-/**
- * Find the first layer with the given type and return its id (or undefined if no layer with that type exists).
- */
-export function findLayerByType(layerType: mapboxLayerType): string | undefined {
-  const layers = map.getStyle().layers;
-
-  if (layers) {
-    for (let i = 0; i < layers.length; i++) {
-      if (layers[i].type === layerType) {
-        return layers[i].id;
-      }
-    }
-  }
-  return undefined;
-}
-
-/**
- * Util-Function to add a new layer below the "waterway-label" symbol layer on the map.
- */
-export function addLayer(layerProperties: {
-  id: string;
-  sourceName: string;
-  type: mapboxLayerType;
-  paintProps?: any;
-  filterExpression?: any[];
-}): void {
-  map.addLayer(
-    {
-      id: layerProperties.id,
-      type: layerProperties.type,
-      filter: layerProperties.filterExpression,
-      source: layerProperties.sourceName,
-      paint: layerProperties.paintProps,
-    },
-    "waterway-label"
-  );
 }
 
 /**
@@ -323,55 +316,4 @@ export function getDifferenceBetweenViewportAndFeature(
       "fill-color": "rgba(183,183,183,0.9)",
     },
   });*/
-}
-
-/**
- * Delete all layers for the source with the given ID.
- */
-export function removeAllLayersForSource(sourceID: string): boolean {
-  // eslint-disable-next-line no-unused-expressions
-  map.getStyle().layers?.forEach((layer) => {
-    if (layer.source === sourceID) {
-      console.log("deleting layer:" + JSON.stringify(layer));
-      map.removeLayer(layer.id);
-    }
-  });
-
-  /*
-    const mapLayer = map.getLayer(id);
-
-    console.log("maplayer:" + mapLayer);
-
-    //TODO: improve this! there can be more than one layer (and they don't have the same id name as the source but only start with it)
-    if (typeof mapLayer !== "undefined") {
-      // Remove map layer & source.
-      map.removeLayer(id).removeSource(id);
-      return true;
-    }
-    */
-
-  return false;
-}
-
-export function removeSource(sourceName: string): void {
-  if (!map.getSource(sourceName)) {
-    console.warn(`Couldn't remove source ${sourceName}`);
-    return;
-  }
-  removeAllLayersForSource(sourceName);
-  map.removeSource(sourceName);
-}
-
-/**
- * Update the data source of a given source layer. MUST be a GeoJson layer.
- */
-export function updateLayerSource(
-  id: string,
-  data: FeatureCollection<GeometryObject, any>
-): boolean {
-  if (map.getSource(id)?.type !== "geojson") {
-    return false;
-  }
-  const result = (map.getSource(id) as GeoJSONSource).setData(data);
-  return result ? true : false;
 }
