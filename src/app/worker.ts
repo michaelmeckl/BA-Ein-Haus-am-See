@@ -1,22 +1,12 @@
-/*
+import buffer from "@turf/buffer";
 import circle from "@turf/circle";
+import mask from "@turf/mask";
 import union from "@turf/union";
-*/
-/*
-import Benchmark from "../../shared/benchmarking";
-import { addBufferToFeature } from "./turfUtils";
-*/
+import Benchmark from "../shared/benchmarking";
+
 const ctx: Worker = self as any;
 
-// Post data to parent thread
-ctx.postMessage({ foo: "foo" });
-
-// Respond to message from parent thread
-ctx.addEventListener("message", (event) => console.log(event));
-
-/*
-function convertAllFeaturesToPolygons(features, bufferSize = 100) {
-  console.log("in worker convert features");
+function convertAllFeaturesToPolygons(features: string | any[], bufferSize = 100): any[] {
   const polygonFeatures = [];
 
   for (let index = 0; index < features.length; index++) {
@@ -26,18 +16,17 @@ function convertAllFeaturesToPolygons(features, bufferSize = 100) {
       //! turf can add properties mit turf.point([...], {additional Props hierher})
       const circleOptions = {
         steps: 80,
-        units: "meters"
+        units: "meters",
       };
       // replace all point features with circle polygon features
-      polygonFeatures.push(
-        circle(feature, bufferSize, circleOptions)
-      );
+      //@ts-expect-error
+      polygonFeatures.push(circle(feature, bufferSize, circleOptions));
       console.log("after turf circle in worker");
     } else if (feature.geometry.type === "LineString" || feature.geometry.type === "Polygon") {
       // add a buffer to all lines and polygons
       // This also replaces all line features with buffered polygon features as turf.buffer() returns
       // Polygons (or Multipolygons).
-      polygonFeatures.push(addBufferToFeature(feature, "meters", bufferSize));
+      polygonFeatures.push(buffer(feature, bufferSize, { units: "meters" }));
     } else {
       break;
     }
@@ -46,7 +35,7 @@ function convertAllFeaturesToPolygons(features, bufferSize = 100) {
   return polygonFeatures;
 }
 
-function performUnion(features) {
+function performUnion(features: string | any[]) {
   let unionResult = features[0];
   for (let index = 1; index < features.length; index++) {
     const element = features[index];
@@ -55,9 +44,7 @@ function performUnion(features) {
   return unionResult;
 }
 
-export async function calculateMaskAndIntersections(features) {
-  console.log("in worker calculate Mask");
-
+export async function calculateMaskAndIntersections(features: any) {
   Benchmark.startMeasure("convertAllFeaturesToPolygons");
   const polygonFeatures = convertAllFeaturesToPolygons(features, 150);
   Benchmark.stopMeasure("convertAllFeaturesToPolygons");
@@ -82,22 +69,27 @@ export async function calculateMaskAndIntersections(features) {
   // 3. in hellerem grau einzeichnen
 
   return {
-    unionPolygons: unionPolygons
+    unionPolygons: unionPolygons,
   };
 }
-*/
 
-/*
-ctx.onmessage = function (e) {
-  console.log("Worker: Message received from main script");
-  //const workerResult = calculateMaskAndIntersections(e.data);
-  const workerResult = "hello from worker";
-  postMessage(workerResult);
-};
+// Respond to message from parent thread
+ctx.addEventListener("message", async (event) => {
+  //console.log("in worker onmessage: ", event);
+  Benchmark.startMeasure("calculateMaskAndIntersections");
+  const featureObject = await calculateMaskAndIntersections(event.data);
+  Benchmark.stopMeasure("calculateMaskAndIntersections");
 
-//export default self;
-export default null as any;
-*/
+  const maske = featureObject.unionPolygons;
+  //const intersects: any[] = featureObject.intersections;
+
+  Benchmark.startMeasure("turf-mask-auto");
+  const workerResult = mask(maske);
+  Benchmark.stopMeasure("turf-mask-auto");
+
+  // return result to main thread
+  ctx.postMessage(workerResult);
+});
 
 /*
 export default class WebpackWorker extends Worker {
@@ -105,17 +97,6 @@ export default class WebpackWorker extends Worker {
     super("");
   }
 }
-
-ctx.addEventListener("message", (event) => {
-  console.log(event);
-  setTimeout(
-    () =>
-      ctx.postMessage({
-        foo: "boo",
-      }),
-    5000
-  );
-});
 */
 
 //export default null as any;

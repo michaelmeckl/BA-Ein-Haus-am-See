@@ -18,6 +18,8 @@ import { logMemoryUsage } from "../utils";
 import mapLayerManager from "./mapLayerManager";
 import { featureCollection } from "@turf/helpers";
 import { fetchMaskData } from "../network/networkUtils";
+import geobuf from "geobuf";
+import Pbf from "pbf";
 import WebWorker from "worker-loader!../worker";
 // TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
 
@@ -302,23 +304,13 @@ let webWorker: Worker | undefined;
 
 function stopWorker(): void {
   webWorker?.terminate();
+  // set to undefined so it can be used again afterwards
   webWorker = undefined;
 }
 
-//Idee: mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
-//den Unterschied vom Polygon und der Bounding Box nehmen und das dann einfärben mit fill-color!
-export async function showDifferenceBetweenViewportAndFeature(
+function setupWebWorker(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
-): Promise<any> {
-  /*
-  const featureObject = await calculateMaskAndIntersections([...features]);
-  const maske = featureObject.unionPolygons;
-  //const intersects = featureObject.intersections;
-  const result = mask(maske);
-  return result;
-  */
-
-  //TODO
+): void {
   if (typeof Worker !== "undefined") {
     if (typeof webWorker === "undefined") {
       //worker = new Worker("../worker.js", { type: "module" });
@@ -330,21 +322,25 @@ export async function showDifferenceBetweenViewportAndFeature(
 
     webWorker.onmessage = (event) => {
       console.log("worker result: ", event.data);
+      showMask(event.data);
       stopWorker();
     };
     webWorker.onerror = (ev) => {
       console.error("Worker error: ", ev);
       stopWorker();
     };
-    webWorker.onmessageerror = (ev) => {
-      console.error("Worker Message error: ", ev);
-      stopWorker();
-    };
   } else {
     console.warn("No Web Worker support!");
   }
+}
 
-  //TODO alte version:
+//Idee: mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
+//den Unterschied vom Polygon und der Bounding Box nehmen und das dann einfärben mit fill-color!
+export async function showDifferenceBetweenViewportAndFeature(
+  features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
+): Promise<any> {
+  setupWebWorker(features);
+
   /*
   Benchmark.startMeasure("calculateMaskAndIntersections");
   const featureObject = await calculateMaskAndIntersections([...features]);
@@ -372,10 +368,8 @@ export async function showDifferenceBetweenViewportAndFeature(
 
   showMask(result);
   */
-
   //! auf den mapCanvas die canvas operationen und blend modes anwenden, um die intersections besser
   // darzustellen? geht das so wie bei Julien??
-
   /*
   //show intersections
   map.addSource("intersect", {

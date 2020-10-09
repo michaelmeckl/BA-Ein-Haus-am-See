@@ -3,6 +3,8 @@
  */
 import { map } from "./mapboxConfig";
 import Benchmark from "../../shared/benchmarking";
+import mapLayerManager from "./mapLayerManager";
+import type { CanvasSource } from "mapbox-gl";
 
 export function addImageOverlay(image: HTMLImageElement) {
   // wait till map is loaded, then add a imageSource (or a canvas source alternatively)
@@ -78,6 +80,12 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement): void {
     bounds.getSouthEast().toArray(),
     bounds.getSouthWest().toArray(),
   ];
+
+  mapLayerManager.removeAllLayersForSource("canvasSource");
+
+  if (map.getSource("canvasSource")) {
+    map.removeSource("canvasSource");
+  }
 
   map.addSource("canvasSource", {
     type: "canvas",

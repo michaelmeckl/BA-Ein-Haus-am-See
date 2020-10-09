@@ -6,8 +6,10 @@ import { OK } from "http-status-codes";
 import pbf2json from "pbf2json";
 import querystring from "querystring";
 import through from "through2";
+import union from "@turf/union";
 import Benchmark from "../shared/benchmarking";
 import RedisCache from "./redisCache";
+import fs from "fs";
 import * as ServerUtils from "./serverUtils";
 //import pg from "pg";  //postgres
 
@@ -182,11 +184,37 @@ export default class OsmRouter {
       }
     );
 
-    //TODO fetch from postgis db
-    //url: 'http://localhost:{port_of_db}/amenities',
-    this.osmRouter.get("/amenities", function (req, res) {
-      //this.getAmenities(req.body, res);
-    });
+    //TODO so nicht, das sind viel zu große daten die da übertragen werden
+    // entweder mit stream api oder sowas wie socket io maybe
+    // oder mit geobuf format vllt?
+    this.osmRouter.get(
+      "/calculateMask",
+      async (req: Request, res: Response, next: NextFunction) => {
+        const param = req.query.polygonData;
+        if (!param) {
+          return res.send("No data or wrong data format passed in request!");
+        }
+
+        const data = JSON.parse(param as string);
+        console.log(data);
+
+        let unionResult: any = data[0];
+        for (let index = 1; index < data.length; index++) {
+          const element = data[index];
+          unionResult = union(unionResult, element);
+        }
+        console.log(unionResult);
+
+        fs.writeFile("./unionResult.geojson", JSON.stringify(unionResult), (err) => {
+          if (err) {
+            throw err;
+          }
+          console.log("Union Result saved successfully!");
+        });
+
+        return res.send(unionResult);
+      }
+    );
   }
 
   //Express middleware function to check Redis Cache

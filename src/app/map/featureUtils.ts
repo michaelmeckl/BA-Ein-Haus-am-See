@@ -1,8 +1,16 @@
+import type {
+  LineString,
+  MultiLineString,
+  MultiPoint,
+  MultiPolygon,
+  Point,
+  Polygon,
+} from "geojson";
 /**
  * This file provides mapbox util and helper functions to query and extract features from sources and layers.
  */
 import { chunk } from "lodash";
-import mapboxgl from "mapbox-gl";
+import mapboxgl, { LngLatLike } from "mapbox-gl";
 import { map } from "./mapboxConfig";
 
 //TODO has to be called after layer is loaded!
@@ -160,7 +168,8 @@ export function getPointsInRadius(map: mapboxgl.Map) {
   });
 }
 
-export function getDataFromMap(filters: Set<string>) {
+//TODO use geojson-coords() to flatten all to the format necessary for the custom layer
+export function getDataFromMap(filters: Set<string>): number[] {
   const allGeoData = getDataforFeaturesInSelection(filters);
   console.log("QuerySourceFeatures: ");
   console.log(allGeoData);
@@ -178,7 +187,9 @@ export function getDataFromMap(filters: Set<string>) {
     //addTurfCircle(element, 0.5);
   });
 
-  const MercatorCoordinates = newArray.map((el) => mapboxgl.MercatorCoordinate.fromLngLat(el));
+  const MercatorCoordinates = newArray.map((el) =>
+    mapboxgl.MercatorCoordinate.fromLngLat(el as LngLatLike)
+  );
   console.log("Mercator:", MercatorCoordinates);
   /*
 	  console.log([].concat(...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))));
