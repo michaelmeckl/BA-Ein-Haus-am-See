@@ -28,6 +28,7 @@ import mapLayerManager from "./mapLayerManager";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
 import { featureCollection } from "@turf/helpers";
+import geojsonCoords from "@mapbox/geojson-coords";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -133,7 +134,8 @@ export default class MapController {
     //mapboxUtils.testTilequeryAPI();
     //refetch all data for the current viewport
     //TODO !!
-    this.reloadData();
+    //this.reloadData();
+    //this.blurMap();
   }
 
   onSourceLoaded(): void {
@@ -337,7 +339,20 @@ export default class MapController {
     const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
 
     //mapboxUtils.getDifferenceBetweenViewportAndFeature([...this.currentPoints]);
-    mapboxUtils.showDifferenceBetweenViewportAndFeature(allFeatures);
+    mapboxUtils.showDifferenceBetweenViewportAndFeature(allFeatures).then((data) => {
+      console.log("returned data: ", data);
+      //this.addDeckLayer(data);
+
+      let newData = geojsonCoords(data);
+      console.log("Data after geojson coords: ", newData);
+      newData = newData.slice(5, newData.length); //remove the first 5 because they are clipspace coords from turf.mask
+      console.log("Data after slice: ", newData);
+      const MercatorCoordinates = newData.map((el: any) =>
+        mapboxgl.MercatorCoordinate.fromLngLat(el)
+      );
+      const customData = MercatorCoordinates.flatMap((x: any) => [x.x, x.y]);
+      this.addWebGlLayer(customData);
+    });
 
     mapLayerManager.removeAllLayersForSource("currFeatures");
 
@@ -464,7 +479,7 @@ export default class MapController {
   });
   */
 
-  addWebGlLayer(): void {
+  addWebGlLayer(data: any): void {
     if (map.getLayer("webglCustomLayer")) {
       // the layer exists already; remove it
       map.removeLayer("webglCustomLayer");
@@ -472,9 +487,10 @@ export default class MapController {
 
     console.log("adding webgl data...");
 
-    const mapData = getDataFromMap(this.activeFilters);
-
-    const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
+    //const mapData = getDataFromMap(this.activeFilters);
+    //const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
+    //TODO
+    const customLayer = new MapboxCustomLayer(data) as CustomLayerInterface;
 
     //const firstSymbolId = mapLayerManager.findLayerByType(map, "symbol");
     // Insert the layer beneath the first symbol layer in the layer stack if one exists.
@@ -490,8 +506,9 @@ export default class MapController {
     mapboxUtils.addLegend();
   }
 
-  addDeckLayer(): void {
+  addDeckLayer(data: any): void {
     //* für normale Deck Layer:
+    //const deck = getDeckGlLayer("GeojsonLayer", data, "geojsonLayer-1");
     const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson", "geojsonLayer-1");
     const layer = (deck as unknown) as CustomLayerInterface;
 

@@ -1,5 +1,13 @@
 import axios from "axios";
-import type { FeatureCollection, GeoJsonProperties, Geometry, GeometryObject } from "geojson";
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonProperties,
+  Geometry,
+  GeometryObject,
+  MultiPolygon,
+  Polygon,
+} from "geojson";
 import osmtogeojson from "osmtogeojson";
 import Benchmark from "../../shared/benchmarking";
 
@@ -12,6 +20,8 @@ export async function testGuide(): Promise<any> {
 
     //* search bringt eher nichts
     //http://localhost:8553/v1/search?limit=100&search=park
+
+    //TODO kann das limit auch z.B. 10000 sein?? oder gibts da ne grenze?
 
     const response = await axios.get(url);
     console.log(Benchmark.stopMeasure("Request client side"));
@@ -188,3 +198,26 @@ export async function fetchOsmData(mapBounds: string, query: string): Promise<st
   }
 }
 */
+
+export async function fetchMaskData(
+  polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+): Promise<any> {
+  try {
+    const params = new URLSearchParams({
+      polygonData: JSON.stringify(polygonFeatures),
+    });
+    const url = "/calculateMask?" + params;
+
+    Benchmark.startMeasure("Request calc mask");
+
+    const response = await axios.get(url);
+    Benchmark.stopMeasure("Request calc mask");
+
+    console.log(response.data);
+
+    return response.data;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}

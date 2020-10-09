@@ -10,15 +10,15 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
 module.exports = {
     mode: "development",
-    devtool: "none",
+    devtool: "inline-source-map",
     //watch: true,
     entry: [
         "./src/app/main.ts",
     ],
     output: {
+        publicPath: "./dist/",
         filename: "bundle.js",
         path: path.resolve(__dirname, "./public/dist"),
-        pathinfo: false,
     },
     resolve: {
         // Bundle '.ts' files as well as '.js' files.
@@ -30,6 +30,16 @@ module.exports = {
     },
     module: {
         rules: [{
+                test: /\.worker\.ts$/,
+                use: {
+                    loader: 'worker-loader',
+                    /*
+                    options: {
+                        // for cors - problems:
+                        inline: 'fallback'
+                    },*/
+                },
+            }, {
                 test: /\.tsx?$/,
                 use: [{
                     loader: "ts-loader",

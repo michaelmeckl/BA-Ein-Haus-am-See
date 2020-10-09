@@ -16,8 +16,9 @@ import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
 import { addBufferToFeature } from "./turfUtils";
 import { logMemoryUsage } from "../utils";
 import mapLayerManager from "./mapLayerManager";
-import convex from "@turf/convex";
 import { featureCollection } from "@turf/helpers";
+import { fetchMaskData } from "../network/networkUtils";
+import WebWorker from "worker-loader!../worker";
 // TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
 
 export async function testTilequeryAPI(): Promise<void> {
@@ -208,9 +209,9 @@ function findIntersections(
   return allIntersections;
 }
 
-export function calculateMaskAndIntersections(
+export async function calculateMaskAndIntersections(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
-): any {
+): Promise<any> {
   Benchmark.startMeasure("convertAllFeaturesToPolygons");
   const polygonFeatures = convertAllFeaturesToPolygons(features, 150);
   Benchmark.stopMeasure("convertAllFeaturesToPolygons");
@@ -221,11 +222,12 @@ export function calculateMaskAndIntersections(
   }
 
   Benchmark.startMeasure("performUnion");
-
   //combine / union all circles to one polygon
-  //const unionPolygons = union(...polygonFeatures);
   const unionPolygons = performUnion(polygonFeatures);
-  console.log("Unioned Polygons: ", unionPolygons);
+  //TODO load from server!
+  //const unionPolygons = await fetchMaskData(polygonFeatures);
+  console.log("MaskData: ", unionPolygons);
+
   Benchmark.stopMeasure("performUnion");
 
   Benchmark.startMeasure("findIntersections");
@@ -296,13 +298,56 @@ function showMask(mask: any): void {
   });
 }
 
+let webWorker: Worker | undefined;
+
+function stopWorker(): void {
+  webWorker?.terminate();
+  webWorker = undefined;
+}
+
 //Idee: mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
 //den Unterschied vom Polygon und der Bounding Box nehmen und das dann einfärben mit fill-color!
-export function showDifferenceBetweenViewportAndFeature(
+export async function showDifferenceBetweenViewportAndFeature(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
-): void {
+): Promise<any> {
+  /*
+  const featureObject = await calculateMaskAndIntersections([...features]);
+  const maske = featureObject.unionPolygons;
+  //const intersects = featureObject.intersections;
+  const result = mask(maske);
+  return result;
+  */
+
+  //TODO
+  if (typeof Worker !== "undefined") {
+    if (typeof webWorker === "undefined") {
+      //worker = new Worker("../worker.js", { type: "module" });
+      webWorker = new WebWorker();
+    }
+
+    webWorker.postMessage(features);
+    console.log("Message posted to worker");
+
+    webWorker.onmessage = (event) => {
+      console.log("worker result: ", event.data);
+      stopWorker();
+    };
+    webWorker.onerror = (ev) => {
+      console.error("Worker error: ", ev);
+      stopWorker();
+    };
+    webWorker.onmessageerror = (ev) => {
+      console.error("Worker Message error: ", ev);
+      stopWorker();
+    };
+  } else {
+    console.warn("No Web Worker support!");
+  }
+
+  //TODO alte version:
+  /*
   Benchmark.startMeasure("calculateMaskAndIntersections");
-  const featureObject = calculateMaskAndIntersections([...features]);
+  const featureObject = await calculateMaskAndIntersections([...features]);
   Benchmark.stopMeasure("calculateMaskAndIntersections");
 
   const maske = featureObject.unionPolygons;
@@ -310,17 +355,15 @@ export function showDifferenceBetweenViewportAndFeature(
 
   logMemoryUsage();
 
-  /*
   //* slower than the mask version (around 7 - 10 ms), also some incorrect artifacts at the edges
-  Benchmark.startMeasure("turf-difference");
-  const result = difference(getViewportAsPolygon(), maske);
-  Benchmark.stopMeasure("turf-difference");
+  // Benchmark.startMeasure("turf-difference");
+  // const result = difference(getViewportAsPolygon(), maske);
+  // Benchmark.stopMeasure("turf-difference");
 
   //* also a little bit slower than the auto version below (ca. 4-6 ms), also some incorrect artifacts at the edges
-  Benchmark.startMeasure("turf-mask");
-  const result = mask(maske, getViewportAsPolygon());
-  Benchmark.stopMeasure("turf-mask");
-  */
+  // Benchmark.startMeasure("turf-mask");
+  // const result = mask(maske, getViewportAsPolygon());
+  // Benchmark.stopMeasure("turf-mask");
 
   //! this is the fastest version (ca. 1 - 3 ms) and the only one that doesn't produce any incorrect rendering artifacts
   Benchmark.startMeasure("turf-mask-auto");
@@ -328,6 +371,10 @@ export function showDifferenceBetweenViewportAndFeature(
   Benchmark.stopMeasure("turf-mask-auto");
 
   showMask(result);
+  */
+
+  //! auf den mapCanvas die canvas operationen und blend modes anwenden, um die intersections besser
+  // darzustellen? geht das so wie bei Julien??
 
   /*
   //show intersections

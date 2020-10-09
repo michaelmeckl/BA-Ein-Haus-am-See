@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "module": "commonjs",
+    "module": "commonjs", // necessary as node is used
     "lib": ["esnext", "es6", "dom", "dom.iterable"],
     "allowJs": true,
     //"allowSyntheticDefaultImports": true,
