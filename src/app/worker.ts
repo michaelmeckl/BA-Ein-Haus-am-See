@@ -2,6 +2,8 @@ import buffer from "@turf/buffer";
 import circle from "@turf/circle";
 import mask from "@turf/mask";
 import union from "@turf/union";
+import geobuf from "geobuf";
+import Pbf from "pbf";
 import Benchmark from "../shared/benchmarking";
 
 const ctx: Worker = self as any;
@@ -26,6 +28,7 @@ function convertAllFeaturesToPolygons(features: string | any[], bufferSize = 100
       // add a buffer to all lines and polygons
       // This also replaces all line features with buffered polygon features as turf.buffer() returns
       // Polygons (or Multipolygons).
+      //@ts-expect-error
       polygonFeatures.push(buffer(feature, bufferSize, { units: "meters" }));
     } else {
       break;
@@ -84,11 +87,16 @@ ctx.addEventListener("message", async (event) => {
   //const intersects: any[] = featureObject.intersections;
 
   Benchmark.startMeasure("turf-mask-auto");
-  const workerResult = mask(maske);
+  const resultGeo = mask(maske);
   Benchmark.stopMeasure("turf-mask-auto");
 
   // return result to main thread
-  ctx.postMessage(workerResult);
+  /*
+  Benchmark.startMeasure("encode geobuf");
+  const workerResult = geobuf.encode(resultGeo, new Pbf());
+  Benchmark.stopMeasure("encode geobuf");
+  */
+  ctx.postMessage(resultGeo);
 });
 
 /*

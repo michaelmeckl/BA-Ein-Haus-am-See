@@ -308,6 +308,8 @@ function stopWorker(): void {
   webWorker = undefined;
 }
 
+//perf results: 720 ms, 845 ms, 1030 ms, 980 ms, 760 ms => avg: 867 ms
+// with geobuf a little bit better, but not much (ca. 30-40 ms)
 function setupWebWorker(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
 ): void {
@@ -317,12 +319,20 @@ function setupWebWorker(
       webWorker = new WebWorker();
     }
 
+    Benchmark.startMeasure("showing mask data");
     webWorker.postMessage(features);
-    console.log("Message posted to worker");
 
     webWorker.onmessage = (event) => {
       console.log("worker result: ", event.data);
+
+      //TODO use geobuf format to send the data to the server?
+      /*
+      Benchmark.startMeasure("decode geobuf");
+      const geojsonMask = geobuf.decode(new Pbf(event.data));
+      Benchmark.stopMeasure("decode geobuf");
+      */
       showMask(event.data);
+      Benchmark.stopMeasure("showing mask data");
       stopWorker();
     };
     webWorker.onerror = (ev) => {
@@ -339,17 +349,19 @@ function setupWebWorker(
 export async function showDifferenceBetweenViewportAndFeature(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
 ): Promise<any> {
-  setupWebWorker(features);
+  //setupWebWorker(features);
 
-  /*
+  // perf-results without web worker: 304 ms, 611 ms, 521 ms, 247 ms, 962ms => avg: 529 ms
+  Benchmark.startMeasure("showing mask data");
+
   Benchmark.startMeasure("calculateMaskAndIntersections");
   const featureObject = await calculateMaskAndIntersections([...features]);
   Benchmark.stopMeasure("calculateMaskAndIntersections");
 
   const maske = featureObject.unionPolygons;
-  const intersects: any[] = featureObject.intersections;
+  //const intersects: any[] = featureObject.intersections;
 
-  logMemoryUsage();
+  //logMemoryUsage();
 
   //* slower than the mask version (around 7 - 10 ms), also some incorrect artifacts at the edges
   // Benchmark.startMeasure("turf-difference");
@@ -367,7 +379,8 @@ export async function showDifferenceBetweenViewportAndFeature(
   Benchmark.stopMeasure("turf-mask-auto");
 
   showMask(result);
-  */
+  Benchmark.stopMeasure("showing mask data");
+
   //! auf den mapCanvas die canvas operationen und blend modes anwenden, um die intersections besser
   // darzustellen? geht das so wie bei Julien??
   /*
