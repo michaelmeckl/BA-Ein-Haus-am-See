@@ -1,8 +1,9 @@
 /* eslint-env browser */
 import Benchmark from "../shared/benchmarking";
 import { Config } from "../shared/config";
+import { showMask } from "./map/mapboxUtils";
 import MapController from "./map/mapController";
-import { fetchOsmData } from "./network/networkUtils";
+import { fetchMaskData, fetchOsmData, testGuide } from "./network/networkUtils";
 import OsmTags from "./osmModel/osmTagCollection";
 import { showSnackbar, SnackbarType } from "./utils";
 
@@ -137,10 +138,20 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   const data = await fetchOsmData(bounds, inputQuery);
   console.log(Benchmark.stopMeasure("Fetching data from osm"));
 
+  //console.log(await Benchmark.getAverageTime(fetchOsmDataFromClientVersionSequential, [bounds, inputQuery], 30));
+  //console.log(await Benchmark.getAverageTime(fetchOsmDataFromClientVersionParallel, [bounds, inputQuery], 30));
+  //const data =null;
+
+  //TODO
   /*
   const data = await testGuide();
   console.log(data);
   */
+
+  //TODO kann das zu race conditions führen? z.B. wenn die berechnung der maske noch nicht fertig ist??
+  Benchmark.startMeasure("Fetching mask from server");
+  const maskData = await fetchMaskData(inputQuery);
+  Benchmark.stopMeasure("Fetching mask from server");
 
   if (data) {
     const t0 = performance.now();
@@ -150,8 +161,10 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
     const t1 = performance.now();
     console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 
-    console.log("Finished adding data to map!");
+    showMask(maskData);
   }
+
+  console.log("Finished adding data to map!");
 }
 
 function setupUI(mapController: MapController): void {

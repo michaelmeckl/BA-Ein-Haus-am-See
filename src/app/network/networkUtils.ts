@@ -10,11 +10,18 @@ import type {
 } from "geojson";
 import osmtogeojson from "osmtogeojson";
 import Benchmark from "../../shared/benchmarking";
+import geobuf from "geobuf";
+import Pbf from "pbf";
+
+//TODO mögliches Perf-Problem: man kann immer nur einen poitype gleichzeitig suchen, d.h. es müssen mehrere
+//TODO  hintereinander ausgeführt werden; keine Parallelisierung wie bei Overpass API möglich!
+
+//! nochmal nachschauen die Performance unterschiede für parallele overpass und serielle und auch den code kopieren hier rüber!
 
 export async function testGuide(): Promise<any> {
   try {
     Benchmark.startMeasure("Request client side");
-    const url = `http://127.0.0.1:8553/v1/guide?radius=${5000}&limit=${50}&poitype=${"bar"}&lng=${12.1}&lat=${49.008}`;
+    const url = `http://127.0.0.1:8553/v1/guide?radius=${50000}&limit=${500}&poitype=${"bar"}&lng=${12.1}&lat=${49.008}`;
     //* diese query funktioniert: (limit ist nötig, sonst ist default 50)
     // http://localhost:8553/v1/guide?radius=20000&limit=200&poitype=bar&lng=12.1&lat=49.008
 
@@ -22,6 +29,7 @@ export async function testGuide(): Promise<any> {
     //http://localhost:8553/v1/search?limit=100&search=park
 
     //TODO kann das limit auch z.B. 10000 sein?? oder gibts da ne grenze?
+    //* gibt offenbar keine, z.B. radius 500km und limit 30000 geht, aber es dauert relativ lange (ca. 16s)
 
     const response = await axios.get(url);
     console.log(Benchmark.stopMeasure("Request client side"));
@@ -31,6 +39,7 @@ export async function testGuide(): Promise<any> {
 
     Benchmark.startMeasure("o2geo client");
     //TODO das ergebnis von guide ist kein json, das mit osmtogeojson in geojson umgewandelt werden könnte
+    // -> muss also zunächst noch geparst werden (wir vermutlich etwas länger dauern als omstogeojson, da nicht einfach nur json -> geojson)
     const geoJson = osmtogeojson(response.data.results);
     Benchmark.stopMeasure("o2geo client");
 
@@ -77,6 +86,22 @@ function buildOverpassQuery(bounds: string, userQuery: string): string {
   */
 
   const query = `${querySettings}(${request});${output}`;
+  return query;
+}
+
+function buildParallelOverpassQuery(bounds: string): string {
+  const request = `nwr[amenity=cafe];`;
+  const request2 = `nwr[amenity=bar];`;
+  const request3 = `nwr[amenity=restaurant];`;
+  const request4 = `nwr[leisure=park];`;
+  const request5 = `nwr[building=university];`;
+  const request6 = `nwr[shop=supermarket];`;
+  const request7 = `nwr[waterway=river];`;
+
+  const querySettings = `[out:json][timeout:25][bbox:${bounds}];`;
+
+  const output = "out geom qt;";
+  const query = `${querySettings}(${request}${request2}${request3}${request4}${request5}${request6}${request7});${output}`;
   return query;
 }
 
@@ -152,8 +177,6 @@ export async function fetchOsmData(
     const response = await axios.get(url);
     console.log(Benchmark.stopMeasure("Request client side"));
 
-    console.log(response.data);
-
     Benchmark.startMeasure("o2geo client");
     const geoJson = osmtogeojson(response.data);
     Benchmark.stopMeasure("o2geo client");
@@ -162,6 +185,64 @@ export async function fetchOsmData(
   } catch (error) {
     console.error(error);
     return null;
+  }
+}
+
+// benchmark version sequential
+// langsamer als parallel um ca. 2100 ms
+export async function fetchOsmDataFromClientVersionSequential(
+  mapBounds: string,
+  query: string
+): Promise<void> {
+  try {
+    const queries = [
+      "amenity=cafe",
+      "amenity=bar",
+      "amenity=restaurant",
+      "leisure=park",
+      "building=university",
+      "shop=supermarket",
+      "waterway=river",
+    ];
+
+    for (const q of queries) {
+      const overpassQuery = new URLSearchParams({
+        data: buildOverpassQuery(mapBounds, q),
+      });
+      console.log(q);
+      Benchmark.startMeasure("Request client side");
+      const url = `http://192.168.99.100:12347/api/interpreter?${overpassQuery}`;
+
+      const response = await axios.get(url);
+      console.log(response.data);
+      console.log(Benchmark.stopMeasure("Request client side"));
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// benchmark version parallel (ca. 6696 ms über 30 Iterationen)
+export async function fetchOsmDataFromClientVersionParallel(
+  mapBounds: string,
+  query: string
+): Promise<void> {
+  try {
+    const overpassQuery = new URLSearchParams({
+      data: buildParallelOverpassQuery(mapBounds),
+    });
+
+    //Benchmark.startMeasure("Request client side");
+    const url = `http://192.168.99.100:12347/api/interpreter?${overpassQuery}`;
+    const response = await axios.get(url);
+    console.log(response.data);
+    //console.log(Benchmark.stopMeasure("Request client side"));
+    //const geoJson = osmtogeojson(response.data);
+    //Benchmark.stopMeasure("o2geo client");
+
+    //return geoJson;
+  } catch (error) {
+    console.error(error);
   }
 }
 
@@ -199,22 +280,25 @@ export async function fetchOsmData(mapBounds: string, query: string): Promise<st
 }
 */
 
-export async function fetchMaskData(
-  polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
-): Promise<any> {
+export async function fetchMaskData(query: string): Promise<any> {
   try {
     const params = new URLSearchParams({
-      polygonData: JSON.stringify(polygonFeatures),
+      filter: query,
     });
-    const url = "/calculateMask?" + params;
+    const url = "/getMask?" + params;
 
-    Benchmark.startMeasure("Request calc mask");
+    Benchmark.startMeasure("Request get mask");
 
-    const response = await axios.get(url);
-    Benchmark.stopMeasure("Request calc mask");
+    const response = await axios.get(url, {
+      //responseType: "arraybuffer", // default is json,
+    });
+    Benchmark.stopMeasure("Request get mask");
 
     console.log(response.data);
-
+    /*
+    const geoJson = osmtogeojson(response.data);
+    return geoJson;
+    */
     return response.data;
   } catch (error) {
     console.error(error);

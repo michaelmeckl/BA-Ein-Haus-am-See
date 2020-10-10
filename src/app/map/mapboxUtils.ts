@@ -8,7 +8,7 @@ import intersect from "@turf/intersect";
 import mask from "@turf/mask";
 import union from "@turf/union";
 import type { Feature, GeoJsonProperties, LineString, MultiPolygon, Point, Polygon } from "geojson";
-import mapboxgl from "mapbox-gl";
+import mapboxgl, { LngLat, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { map } from "./mapboxConfig";
 import * as turfHelpers from "@turf/helpers";
@@ -226,14 +226,9 @@ export async function calculateMaskAndIntersections(
   Benchmark.startMeasure("performUnion");
   //combine / union all circles to one polygon
   const unionPolygons = performUnion(polygonFeatures);
-  //TODO load from server!
-  //const unionPolygons = await fetchMaskData(polygonFeatures);
-  console.log("MaskData: ", unionPolygons);
-
   Benchmark.stopMeasure("performUnion");
 
   Benchmark.startMeasure("findIntersections");
-
   //get all intersections and remove all null values
   const intersections = findIntersections(polygonFeatures).filter((it) => it !== null);
   console.log("Intersections: ", intersections);
@@ -252,7 +247,8 @@ export async function calculateMaskAndIntersections(
   return { unionPolygons: unionPolygons, intersections: intersections };
 }
 
-function showMask(mask: any): void {
+export function showMask(mask: any): void {
+  console.log("in showMask: ", mask);
   mapLayerManager.removeAllLayersForSource("maske");
 
   if (map.getSource("maske")) {
@@ -325,7 +321,6 @@ function setupWebWorker(
     webWorker.onmessage = (event) => {
       console.log("worker result: ", event.data);
 
-      //TODO use geobuf format to send the data to the server?
       /*
       Benchmark.startMeasure("decode geobuf");
       const geojsonMask = geobuf.decode(new Pbf(event.data));
@@ -351,6 +346,12 @@ export async function showDifferenceBetweenViewportAndFeature(
 ): Promise<any> {
   //setupWebWorker(features);
 
+  Benchmark.startMeasure("calculateMaskAndIntersections");
+  const featureObject = await calculateMaskAndIntersections([...features]);
+  Benchmark.stopMeasure("calculateMaskAndIntersections");
+  console.log(featureObject);
+
+  /*
   // perf-results without web worker: 304 ms, 611 ms, 521 ms, 247 ms, 962ms => avg: 529 ms
   Benchmark.startMeasure("showing mask data");
 
@@ -359,7 +360,7 @@ export async function showDifferenceBetweenViewportAndFeature(
   Benchmark.stopMeasure("calculateMaskAndIntersections");
 
   const maske = featureObject.unionPolygons;
-  //const intersects: any[] = featureObject.intersections;
+  const intersects: any[] = featureObject.intersections;
 
   //logMemoryUsage();
 
@@ -381,9 +382,6 @@ export async function showDifferenceBetweenViewportAndFeature(
   showMask(result);
   Benchmark.stopMeasure("showing mask data");
 
-  //! auf den mapCanvas die canvas operationen und blend modes anwenden, um die intersections besser
-  // darzustellen? geht das so wie bei Julien??
-  /*
   //show intersections
   map.addSource("intersect", {
     type: "geojson",
@@ -400,4 +398,18 @@ export async function showDifferenceBetweenViewportAndFeature(
     },
   });
   */
+}
+
+/**
+ * Util-Function to convert LngLat coordinates to pixel coordinates on the screen.
+ */
+export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
+  return map.project(coord);
+}
+
+/**
+ * Util-Function to convert pixel coordinates to LngLat coordinates.
+ */
+export function convertToLatLngCoord(point: mapboxgl.PointLike): LngLat {
+  return map.unproject(point);
 }

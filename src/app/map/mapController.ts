@@ -13,21 +13,24 @@ import type {
 } from "geojson";
 import mapboxgl, { CustomLayerInterface, Layer, LngLatLike } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
-import { fetchOsmData } from "../network/networkUtils";
+import { fetchMaskData, fetchOsmData } from "../network/networkUtils";
 import { renderAndBlur } from "../webgl/blurFilter";
 import LumaLayer from "../webgl/lumaLayer";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { addBlurredImage, addCanvasOverlay } from "./canvasUtils";
 import ClusterManager from "./clusterManager";
 import { getDeckGlLayer } from "./deckLayer";
-import { getDataFromMap, getPointsInRadius } from "./featureUtils";
+import { getDataFromMap } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import mapLayerManager from "./mapLayerManager";
 import { loadSidebar } from "./mapTutorialStoreTest";
 import { PerformanceMeasurer } from "./performanceMeasurer";
-import { featureCollection } from "@turf/helpers";
+import { featureCollection, point } from "@turf/helpers";
+import circle from "@turf/circle";
+import bbpolygon from "@turf/bbox-polygon";
+import bbox from "@turf/bbox";
 import geojsonCoords from "@mapbox/geojson-coords";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
@@ -239,6 +242,60 @@ export default class MapController {
     return `${southLat},${westLng},${northLat},${eastLng}`;
   }
 
+  //TODO
+  getBBoxForBayern(): string {
+    const mittelpunktOberpfalz = point([12.136, 49.402]);
+    const radiusOberpfalz = 100; //km
+
+    const mittelpunktBayern = point([11.404, 48.946]);
+    const radiusBayern = 200; //km
+
+    const centerPoint = circle(mittelpunktOberpfalz, radiusOberpfalz, { units: "kilometers" });
+
+    map.addSource("centre", {
+      type: "geojson",
+      buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
+      tolerance: 0.45, // higher means simpler geometries and increased performance
+      data: centerPoint, // url or inline geojson
+    });
+
+    map.addLayer({
+      id: "l2-l3",
+      type: "fill",
+      source: "centre",
+      paint: {
+        "fill-outline-color": "rgba(0,0,0,0.1)",
+        "fill-color": "rgba(255,255,0,0.1)",
+      },
+    });
+
+    const bboxExtent = bbox(centerPoint);
+    console.log("Bbox: ", bboxExtent);
+
+    const bboxExtent2 = bbpolygon(bboxExtent);
+
+    map.addSource("bbox", {
+      type: "geojson",
+      buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
+      tolerance: 0.45, // higher means simpler geometries and increased performance
+      data: bboxExtent2, // url or inline geojson
+    });
+
+    /*
+    map.addLayer({
+      id:  "l3-l3",
+      type: "fill",
+      source: "bbox",
+      paint: {
+        "fill-outline-color": "rgba(0,0,0,0.1)",
+        "fill-color": "rgba(0,0,255,0.7)",
+      },
+    });
+    */
+
+    return `${bboxExtent[0]},${bboxExtent[1]},${bboxExtent[2]},${bboxExtent[3]}`;
+  }
+
   addVectorData(data: string): void {
     mapLayerManager.addVectorLayer(data);
   }
@@ -388,8 +445,8 @@ export default class MapController {
     mapLayerManager.removeAllLayersForSource(sourceName);
 
     //TODO
-    this.preprocessGeoData(data);
-    return;
+    //this.preprocessGeoData(data);
+    //return;
 
     if (map.getSource(sourceName)) {
       // the source already exists, only update the data
@@ -402,8 +459,6 @@ export default class MapController {
 
     //show the source data on the map
     mapLayerManager.addLayers(sourceName);
-
-    //testGettingNearbyFeatures(sourceName);
   }
 
   blurMap(): void {
@@ -506,6 +561,8 @@ export default class MapController {
     mapboxUtils.addLegend();
   }
 
+  //TODO die polygon maske sollte am besten direkt vom server (und da aus der lokalen datei) ins deckgl geojson layer
+  // geladen werden!
   addDeckLayer(data: any): void {
     //* für normale Deck Layer:
     //const deck = getDeckGlLayer("GeojsonLayer", data, "geojsonLayer-1");

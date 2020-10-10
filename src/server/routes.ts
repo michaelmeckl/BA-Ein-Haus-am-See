@@ -1,16 +1,30 @@
 import axios from "axios";
 import express, { NextFunction, Request, Response, Router } from "express";
 import type { ReadStream } from "fs";
-import type { GeoJsonObject } from "geojson";
-import { OK } from "http-status-codes";
+import type {
+  Feature,
+  GeoJsonObject,
+  GeoJsonProperties,
+  LineString,
+  MultiPolygon,
+  Point,
+  Polygon,
+} from "geojson";
+import { INTERNAL_SERVER_ERROR, OK } from "http-status-codes";
 import pbf2json from "pbf2json";
 import querystring from "querystring";
 import through from "through2";
 import union from "@turf/union";
+import circle from "@turf/circle";
+import buffer from "@turf/buffer";
 import Benchmark from "../shared/benchmarking";
 import RedisCache from "./redisCache";
 import fs from "fs";
 import * as ServerUtils from "./serverUtils";
+import geobuf from "geobuf";
+import Pbf from "pbf";
+import osmtogeojson from "osmtogeojson";
+import { features } from "process";
 //import pg from "pg";  //postgres
 
 export default class OsmRouter {
@@ -103,6 +117,50 @@ export default class OsmRouter {
             RedisCache.cacheData(compositeKey, geoData.data, 3600);
             Benchmark.stopMeasure("Caching data");
 
+            const geoJson = osmtogeojson(geoData.data);
+            //console.log(geoJson);
+            //@ts-expect-error
+            const geoBuf = geobuf.encode(geoJson, new Pbf());
+
+            //TODO save all only as geobufs so less space is needed
+
+            fs.writeFile(`./public/data/${query}.geojson`, JSON.stringify(geoJson), (err) => {
+              if (err) {
+                throw err;
+              }
+              console.log("geojson saved successfully!");
+
+              const features = this.filterGeojson(geoJson);
+
+              const polygonFeatures = this.convertAllFeaturesToPolygons(features, 150);
+
+              const unionResult = this.performUnion(polygonFeatures);
+
+              //TODO test intersections on server??
+
+              //TODO calculate mask with turf!!
+
+              fs.writeFile(
+                `./public/data/unionResult${query}.geojson`,
+                JSON.stringify(unionResult),
+                (err) => {
+                  if (err) {
+                    throw err;
+                  }
+                  console.log("Union Result saved successfully!");
+                }
+              );
+            });
+
+            /*
+            fs.writeFile(`./public/data/${query}`, geoBuf, (err) => {
+              if (err) {
+                throw err;
+              }
+              console.log("geoBuf saved successfully!");
+            });
+            */
+
             return res.status(OK).json(geoData.data);
           } catch (error) {
             if (error.response) {
@@ -184,37 +242,29 @@ export default class OsmRouter {
       }
     );
 
-    //TODO so nicht, das sind viel zu große daten die da übertragen werden
-    // entweder mit stream api oder sowas wie socket io maybe
-    // oder mit geobuf format vllt?
-    this.osmRouter.get(
-      "/calculateMask",
-      async (req: Request, res: Response, next: NextFunction) => {
-        const param = req.query.polygonData;
-        if (!param) {
-          return res.send("No data or wrong data format passed in request!");
-        }
-
-        const data = JSON.parse(param as string);
-        console.log(data);
-
-        let unionResult: any = data[0];
-        for (let index = 1; index < data.length; index++) {
-          const element = data[index];
-          unionResult = union(unionResult, element);
-        }
-        console.log(unionResult);
-
-        fs.writeFile("./unionResult.geojson", JSON.stringify(unionResult), (err) => {
-          if (err) {
-            throw err;
-          }
-          console.log("Union Result saved successfully!");
-        });
-
-        return res.send(unionResult);
+    this.osmRouter.get("/getMask", async (req: Request, res: Response, next: NextFunction) => {
+      const queryParam = req.query.filter;
+      if (!queryParam) {
+        //console.log("Something, somewhere went horribly wrong!");
+        return res
+          .status(INTERNAL_SERVER_ERROR)
+          .send("Couldn't get the queryParameter, something might be wrong with the request!");
       }
-    );
+
+      //TODO use the local pbf files with osmium or something like this?
+      /*
+      fs.readFile("./public/assets/ny_extract.osm.pbf", (err, pbfFile) => {
+        if (err) {
+          console.error(err);
+          return;
+        }
+        console.log("\nPbf-file: ", pbfFile);
+      });
+      */
+
+      //! vllt direkt eine URL schicken? sonst muss alles mit in den browser übertragen werden!
+      return res.send(`../data/unionResult${queryParam}.geojson`);
+    });
   }
 
   //Express middleware function to check Redis Cache
@@ -236,4 +286,110 @@ export default class OsmRouter {
       next();
     }
   };
+
+  filterGeojson(geoJson: any): any {
+    const currentPoints = new Set<Feature<Point, GeoJsonProperties>>();
+    const currentWays = new Set<Feature<LineString, GeoJsonProperties>>();
+    const currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
+
+    for (let index = 0; index < geoJson.features.length; index++) {
+      const element = geoJson.features[index];
+
+      switch (element.geometry.type) {
+        case "Point":
+          currentPoints.add(element as Feature<Point, GeoJsonProperties>);
+          break;
+
+        case "MultiPoint":
+          for (const coordinate of element.geometry.coordinates) {
+            const point = {
+              geometry: { type: "Point", coordinates: coordinate },
+              properties: { ...element.properties },
+              type: "Feature",
+            } as Feature<Point, GeoJsonProperties>;
+
+            currentPoints.add(point);
+          }
+          break;
+
+        case "LineString": {
+          currentWays.add(element as Feature<LineString, GeoJsonProperties>);
+          break;
+        }
+        case "MultiLineString":
+          for (const coordinate of element.geometry.coordinates) {
+            const way = {
+              geometry: { type: "LineString", coordinates: coordinate },
+              properties: { ...element.properties },
+              type: "Feature",
+            } as Feature<LineString, GeoJsonProperties>;
+
+            currentWays.add(way);
+          }
+          break;
+
+        case "Polygon": {
+          currentPolygons.add(element as Feature<Polygon, GeoJsonProperties>);
+          break;
+        }
+        case "MultiPolygon":
+          for (const coordinate of element.geometry.coordinates) {
+            // construct a new polygon for every coordinate array in the multipolygon
+            const polygon = {
+              geometry: { type: "Polygon", coordinates: coordinate },
+              properties: { ...element.properties },
+              type: "Feature",
+            } as Feature<Polygon, GeoJsonProperties>;
+
+            currentPolygons.add(polygon);
+          }
+          break;
+
+        default:
+          throw new Error("Unknown geojson geometry type in data!");
+      }
+    }
+
+    return [...currentPoints, ...currentWays, ...currentPolygons];
+  }
+
+  convertAllFeaturesToPolygons(
+    features: Feature<Point | LineString | Polygon, GeoJsonProperties>[],
+    bufferSize = 100
+  ): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
+    const polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
+
+    for (let index = 0; index < features.length; index++) {
+      const feature = features[index];
+
+      if (feature.geometry.type === "Point") {
+        //! turf can add properties mit turf.point([...], {additional Props hierher})
+        const circleOptions = { steps: 80, units: "meters" /*, properties: {foo: 'bar'}*/ };
+        // replace all point features with circle polygon features
+        polygonFeatures.push(
+          //@ts-expect-errorö
+          circle(feature as Feature<Point, GeoJsonProperties>, bufferSize, circleOptions)
+        );
+      } else if (feature.geometry.type === "LineString" || feature.geometry.type === "Polygon") {
+        // add a buffer to all lines and polygons
+        // This also replaces all line features with buffered polygon features as turf.buffer() returns
+        // Polygons (or Multipolygons).
+        //@ts-expect-error
+        polygonFeatures.push(buffer(feature, bufferSize, { units: "meters" }));
+      } else {
+        break;
+      }
+    }
+
+    return polygonFeatures;
+  }
+
+  performUnion(polygonFeatures: any): any {
+    let unionResult: any = polygonFeatures[0];
+    for (let index = 1; index < polygonFeatures.length; index++) {
+      const element = polygonFeatures[index];
+      unionResult = union(unionResult, element);
+    }
+    return unionResult;
+  }
 }
