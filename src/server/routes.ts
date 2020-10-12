@@ -136,9 +136,9 @@ export default class OsmRouter {
 
               const unionResult = this.performUnion(polygonFeatures);
 
-              //TODO test intersections on server??
+              // TODO test intersections on server??
 
-              //TODO calculate mask with turf!!
+              // TODO calculate mask with turf!!
 
               fs.writeFile(
                 `./public/data/unionResult${query}.geojson`,
@@ -262,8 +262,13 @@ export default class OsmRouter {
       });
       */
 
-      //! vllt direkt eine URL schicken? sonst muss alles mit in den browser übertragen werden!
-      return res.send(`../data/unionResult${queryParam}.geojson`);
+      const filePath = `../data/unionResult${queryParam}.geojson`;
+
+      if (fs.existsSync(filePath)) {
+        //! vllt direkt eine URL schicken? sonst muss alles in data mit in den browser übertragen werden oder?
+        return res.status(OK).send(filePath);
+      }
+      return res.status(INTERNAL_SERVER_ERROR).send("Mask File not found!");
     });
   }
 
@@ -363,7 +368,6 @@ export default class OsmRouter {
       const feature = features[index];
 
       if (feature.geometry.type === "Point") {
-        //! turf can add properties mit turf.point([...], {additional Props hierher})
         const circleOptions = { steps: 80, units: "meters" /*, properties: {foo: 'bar'}*/ };
         // replace all point features with circle polygon features
         polygonFeatures.push(

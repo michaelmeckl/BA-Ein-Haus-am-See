@@ -1,4 +1,5 @@
 import axios from "axios";
+import * as rax from "retry-axios";
 import type {
   Feature,
   FeatureCollection,
@@ -13,11 +14,11 @@ import Benchmark from "../../shared/benchmarking";
 import geobuf from "geobuf";
 import Pbf from "pbf";
 
+// attach the retry interceptor to the global axios instance, so all requests are retried if they fail
+const interceptorId = rax.attach();
+
 //TODO mögliches Perf-Problem: man kann immer nur einen poitype gleichzeitig suchen, d.h. es müssen mehrere
 //TODO  hintereinander ausgeführt werden; keine Parallelisierung wie bei Overpass API möglich!
-
-//! nochmal nachschauen die Performance unterschiede für parallele overpass und serielle und auch den code kopieren hier rüber!
-
 export async function testGuide(): Promise<any> {
   try {
     Benchmark.startMeasure("Request client side");
@@ -289,8 +290,17 @@ export async function fetchMaskData(query: string): Promise<any> {
 
     Benchmark.startMeasure("Request get mask");
 
-    const response = await axios.get(url, {
+    const response = await axios({
+      url: url,
       //responseType: "arraybuffer", // default is json,
+      raxConfig: {
+        // Retry 3 times on requests that return a response (500, etc) before giving up.  Defaults to 3.
+        retry: 3,
+        onRetryAttempt: (err): void => {
+          const cfg = rax.getConfig(err);
+          console.log(`Retrying request to /getMask! Attempt #${cfg?.currentRetryAttempt}`);
+        },
+      },
     });
     Benchmark.stopMeasure("Request get mask");
 
