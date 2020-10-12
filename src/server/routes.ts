@@ -23,9 +23,14 @@ import fs from "fs";
 import * as ServerUtils from "./serverUtils";
 import geobuf from "geobuf";
 import Pbf from "pbf";
+import Util from "util";
 import osmtogeojson from "osmtogeojson";
 import { features } from "process";
+import intersect from "@turf/intersect";
+import mask from "@turf/mask";
 //import pg from "pg";  //postgres
+
+const readFile = Util.promisify(fs.readFile);
 
 export default class OsmRouter {
   private readonly osmRouter: Router;
@@ -117,49 +122,7 @@ export default class OsmRouter {
             RedisCache.cacheData(compositeKey, geoData.data, 3600);
             Benchmark.stopMeasure("Caching data");
 
-            const geoJson = osmtogeojson(geoData.data);
-            //console.log(geoJson);
-            //@ts-expect-error
-            const geoBuf = geobuf.encode(geoJson, new Pbf());
-
-            //TODO save all only as geobufs so less space is needed
-
-            fs.writeFile(`./public/data/${query}.geojson`, JSON.stringify(geoJson), (err) => {
-              if (err) {
-                throw err;
-              }
-              console.log("geojson saved successfully!");
-
-              const features = this.filterGeojson(geoJson);
-
-              const polygonFeatures = this.convertAllFeaturesToPolygons(features, 150);
-
-              const unionResult = this.performUnion(polygonFeatures);
-
-              // TODO test intersections on server??
-
-              // TODO calculate mask with turf!!
-
-              fs.writeFile(
-                `./public/data/unionResult${query}.geojson`,
-                JSON.stringify(unionResult),
-                (err) => {
-                  if (err) {
-                    throw err;
-                  }
-                  console.log("Union Result saved successfully!");
-                }
-              );
-            });
-
-            /*
-            fs.writeFile(`./public/data/${query}`, geoBuf, (err) => {
-              if (err) {
-                throw err;
-              }
-              console.log("geoBuf saved successfully!");
-            });
-            */
+            //this.saveGeoData(geoData.data, query);
 
             return res.status(OK).json(geoData.data);
           } catch (error) {
@@ -252,23 +215,24 @@ export default class OsmRouter {
       }
 
       //TODO use the local pbf files with osmium or something like this?
-      /*
-      fs.readFile("./public/assets/ny_extract.osm.pbf", (err, pbfFile) => {
-        if (err) {
-          console.error(err);
-          return;
-        }
-        console.log("\nPbf-file: ", pbfFile);
-      });
-      */
 
-      const filePath = `../data/unionResult${queryParam}.geojson`;
+      //const filePath = `./public/data/mask_${queryParam}.geojson`;
+      const filePath = `./public/data/mask_${queryParam}`;
 
-      if (fs.existsSync(filePath)) {
+      try {
+        //check if the file exists
+        await fs.promises.access(filePath);
+        // it does
+        const pbfFile = await readFile(filePath);
+        const geoBufMask = geobuf.decode(new Pbf(pbfFile));
+        return res.status(OK).send(geoBufMask);
+
         //! vllt direkt eine URL schicken? sonst muss alles in data mit in den browser übertragen werden oder?
-        return res.status(OK).send(filePath);
+        //return res.status(OK).send(`../data/mask_${queryParam}.geojson`);
+      } catch (error) {
+        console.error("File does not exist: ", error);
+        return res.status(INTERNAL_SERVER_ERROR).send("Mask File not found!");
       }
-      return res.status(INTERNAL_SERVER_ERROR).send("Mask File not found!");
     });
   }
 
@@ -291,6 +255,30 @@ export default class OsmRouter {
       next();
     }
   };
+
+  saveGeoData(geoData: any, query: string): void {
+    const geoJson = osmtogeojson(geoData.data);
+    const features = this.filterGeojson(geoJson);
+
+    const polygonFeatures = this.convertAllFeaturesToPolygons(features, 150);
+
+    const unionResult = this.performUnion(polygonFeatures);
+
+    //get all intersections and remove all null values
+    //const intersections = this.findIntersections(polygonFeatures).filter((it) => it !== null);
+
+    //const unionIntersections = performUnion(intersections);
+
+    const geoMask = mask(unionResult);
+    const geoBufMask = geobuf.encode(geoMask, new Pbf());
+
+    fs.writeFile(`./public/data/mask_${query}`, geoBufMask, (err) => {
+      if (err) {
+        throw err;
+      }
+      console.log("GeoBuf Mask saved successfully!");
+    });
+  }
 
   filterGeojson(geoJson: any): any {
     const currentPoints = new Set<Feature<Point, GeoJsonProperties>>();
@@ -395,5 +383,41 @@ export default class OsmRouter {
       unionResult = union(unionResult, element);
     }
     return unionResult;
+  }
+
+  findIntersections(
+    features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+  ): Feature<any, GeoJsonProperties>[] {
+    const allIntersections: Feature<any, GeoJsonProperties>[] = [];
+
+    /*
+    //* create a lookup object to improve performance from O(m*n) to O(m+n)
+    // see https://bytes.com/topic/javascript/insights/699379-optimize-loops-compare-two-arrays
+    const lookup: any = {};
+  
+    for (const key in features) {
+      if (Object.prototype.hasOwnProperty.call(features, key)) {
+        lookup[features[key]] = features[key];
+      }
+    }
+  
+    for (const i in features) {
+      if (typeof lookup[list1[i]] !== "undefined") {
+          alert("found " + list1[i] + " in both lists");
+          break;
+        }
+    }
+    */
+
+    //TODO make this more efficient than O(m^2)!
+    for (const feature1 of features) {
+      for (const feature2 of features) {
+        if (feature1 !== feature2) {
+          allIntersections.push(intersect(feature1, feature2));
+        }
+      }
+    }
+
+    return allIntersections;
   }
 }

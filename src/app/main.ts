@@ -148,10 +148,11 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   console.log(data);
   */
 
-  //TODO kann das zu race conditions führen? z.B. wenn die berechnung der maske noch nicht fertig ist??
+  /*
   Benchmark.startMeasure("Fetching mask from server");
   const maskData = await fetchMaskData(inputQuery);
   Benchmark.stopMeasure("Fetching mask from server");
+  */
 
   if (data) {
     const t0 = performance.now();
@@ -161,7 +162,7 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
     const t1 = performance.now();
     console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 
-    showMask(maskData);
+    //showMask(maskData);
   }
 
   console.log("Finished adding data to map!");
