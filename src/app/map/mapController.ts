@@ -20,7 +20,7 @@ import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { addBlurredImage, addCanvasOverlay } from "./canvasUtils";
 import ClusterManager from "./clusterManager";
 import { getDeckGlLayer } from "./deckLayer";
-import { getDataFromMap } from "./featureUtils";
+import { getAllRenderedFeatures, getAllSourceFeatures, getDataFromMap } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
@@ -172,6 +172,10 @@ export default class MapController {
 
     //addWebglCircle(map);
     */
+
+    //TODO
+    //getAllRenderedFeatures(undefined, undefined, ["==", "class", "park"]);
+    //getAllSourceFeatures("amenity=restaurant");
   }
 
   addMapControls(): void {
@@ -250,50 +254,15 @@ export default class MapController {
     const mittelpunktBayern = point([11.404, 48.946]);
     const radiusBayern = 200; //km
 
+    //@ts-expect-error
     const centerPoint = circle(mittelpunktOberpfalz, radiusOberpfalz, { units: "kilometers" });
 
-    map.addSource("centre", {
-      type: "geojson",
-      buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
-      tolerance: 0.45, // higher means simpler geometries and increased performance
-      data: centerPoint, // url or inline geojson
-    });
-
-    map.addLayer({
-      id: "l2-l3",
-      type: "fill",
-      source: "centre",
-      paint: {
-        "fill-outline-color": "rgba(0,0,0,0.1)",
-        "fill-color": "rgba(255,255,0,0.1)",
-      },
-    });
-
     const bboxExtent = bbox(centerPoint);
-    console.log("Bbox: ", bboxExtent);
+    //console.log("Bbox: ", bboxExtent);
 
     const bboxExtent2 = bbpolygon(bboxExtent);
 
-    map.addSource("bbox", {
-      type: "geojson",
-      buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
-      tolerance: 0.45, // higher means simpler geometries and increased performance
-      data: bboxExtent2, // url or inline geojson
-    });
-
-    /*
-    map.addLayer({
-      id:  "l3-l3",
-      type: "fill",
-      source: "bbox",
-      paint: {
-        "fill-outline-color": "rgba(0,0,0,0.1)",
-        "fill-color": "rgba(0,0,255,0.7)",
-      },
-    });
-    */
-
-    return `${bboxExtent[0]},${bboxExtent[1]},${bboxExtent[2]},${bboxExtent[3]}`;
+    return `${bboxExtent[1]},${bboxExtent[0]},${bboxExtent[3]},${bboxExtent[2]}`;
   }
 
   addVectorData(data: string): void {
@@ -542,14 +511,14 @@ export default class MapController {
 
     console.log("adding webgl data...");
 
-    //const mapData = getDataFromMap(this.activeFilters);
-    //const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
-    //TODO
-    const customLayer = new MapboxCustomLayer(data) as CustomLayerInterface;
+    const mapData = getDataFromMap(this.activeFilters);
+    const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
+    //TODO zieht mit den mask-Daten nur Triangles zwischen den einzelnen punkten, was dazu führt,
+    //TODO dass letzlich nur eine Art dünne linie um alle gezogen wird
+    //const customLayer = new MapboxCustomLayer(data) as CustomLayerInterface;
 
     //const firstSymbolId = mapLayerManager.findLayerByType(map, "symbol");
     // Insert the layer beneath the first symbol layer in the layer stack if one exists.
-    //map.addLayer(customLayer, firstSymbolId);
     map.addLayer(customLayer, "waterway-label");
 
     console.log("Finished adding webgl data!");
