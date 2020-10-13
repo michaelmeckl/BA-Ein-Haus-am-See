@@ -1,6 +1,6 @@
 /* eslint-disable no-magic-numbers */
 import { HeatmapLayer, HexagonLayer } from "@deck.gl/aggregation-layers";
-import { Deck, Layer, PostProcessEffect, RGBAColor } from "@deck.gl/core";
+import { Deck, Layer, LayerExtension, PostProcessEffect, RGBAColor } from "@deck.gl/core";
 import type { DeckProps, InitialViewStateProps } from "@deck.gl/core/lib/deck";
 import type { DataSet, LayerProps } from "@deck.gl/core/lib/layer";
 import { GeoJsonLayer, PathLayer, ScatterplotLayer } from "@deck.gl/layers";
@@ -29,12 +29,13 @@ const postProcessEffect = new PostProcessEffect(triangleBlur, {
 });
 
 const mapCanvas = map.getCanvas();
+const deckCanvas = document.querySelector("#deck_canvas") as HTMLCanvasElement;
 
 const deckProperties: DeckProps = {
-  //canvas: document.querySelector("#test_canvas") as HTMLCanvasElement,
-  //canvas: document.createElement("canvas") as HTMLCanvasElement,
-  width: mapCanvas.clientWidth,
-  height: mapCanvas.clientHeight,
+  //TODO soll laut docu mit canvas gemacht werden, geht aber nicht richtig mit camera dann?
+  //canvas: deckCanvas,
+  width: "100%",
+  height: "100%",
   initialViewState: initialViewState,
   controller: true,
   effects: [], // add postprocess effects to the layers
@@ -63,7 +64,114 @@ const deckProperties: DeckProps = {
 
 let deckglLayer: Deck;
 
-//TODO 2 geojson layer? eins für die kreise und eins für die stroke?
+// * Layer Extension, see https://deck.gl/docs/developer-guide/custom-layers/layer-extensions
+// can now be used even with composite layers like the GeojsonsLayer without overriding each of the layers its made of
+class RedFilter extends LayerExtension {
+  getShaders() {
+    return {
+      inject: {
+        // Declare custom uniform
+        "fs:#decl": "uniform bool highlightRed;",
+        // Standard injection hook - see "Writing Shaders"
+        "fs:DECKGL_FILTER_COLOR": `
+          if (highlightRed) {
+            if (color.r / max(color.g, 0.001) > 2. && color.r / max(color.b, 0.001) > 2.) {
+              // is red
+              color = vec4(1.0, 0.0, 0.0, 1.0);
+            } else {
+              discard;
+            }
+          }
+        `,
+      },
+    };
+  }
+
+  updateState(params) {
+    const { highlightRed = true } = params.props;
+    for (const model of this.getModels()) {
+      model.setUniforms({ highlightRed });
+    }
+  }
+
+  //FIXME
+  getSubLayerProps() {
+    const { highlightRed = true } = params.props;
+    return {
+      highlightRed,
+    };
+  }
+}
+
+const customFragmentShader = `\
+#define SHADER_NAME custom-scatterplot-layer-fragment-shader
+
+precision highp float;
+
+uniform float cornerRadius;
+
+varying vec4 vFillColor;
+varying vec2 unitPosition;
+
+void main(void) {
+
+  float distToCenter = length(unitPosition);
+
+  /* Calculate the cutoff radius for the rounded corners */
+  float threshold = sqrt(2.0) * (1.0 - cornerRadius) + 1.0 * cornerRadius;
+  if (distToCenter <= threshold) {
+    gl_FragColor = vFillColor;
+  } else {
+    discard;
+  }
+
+  gl_FragColor = picking_filterHighlightColor(gl_FragColor);
+
+  gl_FragColor = picking_filterPickingColor(gl_FragColor);
+}
+`;
+
+// * example for subclassing the ScatterplotLayer with custom shader
+//TODO hiermit könnte ich die shader und die daten im decklayer direkt manipulieren -> bringt mir das so viel??
+export default class CustomScatterplotLayer extends ScatterplotLayer<any> {
+  initializeState() {
+    super.initializeState();
+
+    // * für attribute data in vertex shader:
+    this.state.attributeManager.addInstanced({
+      instanceRadiusPixels: { size: 1, accessor: "getRadius" },
+    });
+  }
+
+  draw({ uniforms }) {
+    super.draw({
+      uniforms: {
+        ...uniforms,
+        cornerRadius: this.props.cornerRadius,
+      },
+    });
+  }
+
+  getShaders() {
+    // use object.assign to make sure we don't overwrite existing fields like `vs`, `modules`...
+    return Object.assign({}, super.getShaders(), {
+      fs: customFragmentShader,
+    });
+  }
+}
+
+CustomScatterplotLayer.defaultProps = {
+  //* für attribute oben
+  getRadius: { type: "accessor", value: 1 },
+
+  // cornerRadius: the amount of rounding at the rectangle corners
+  // 0 - rectangle. 1 - circle.
+  cornerRadius: 0.1,
+};
+
+//* 2 geojson layer? eins für die kreise und eins für die stroke?
+// -> entweder mit separatem DeckLayer und einer neuen Deck Instance oder (vermutlich besser) als Composite-Layer
+// vgl. https://deck.gl/docs/developer-guide/custom-layers/composite-layers
 function createGeojsonLayer(data: string, name: string): GeoJsonLayer<any> {
   return new GeoJsonLayer({
     id: name,
@@ -83,69 +191,10 @@ function createGeojsonLayer(data: string, name: string): GeoJsonLayer<any> {
     // Interactive props
     pickable: true,
     //parameters: () => GL.BLEND_DST_RGB,
+    //extensions: [new RedFilter()], //TODO not working right now
   });
 }
 
-function createGeojsonLayer2(data: string, name: string): GeoJsonLayer<any> {
-  return new GeoJsonLayer({
-    id: name,
-    data: data,
-    // Styles
-    stroked: true,
-    filled: false,
-    opacity: 0.8,
-    pointRadiusMinPixels: 2,
-    pointRadiusScale: 200,
-    //accessors
-    getRadius: 1.7,
-    getLineColor: [0, 0, 0, 20],
-    getLineWidth: 60,
-    // Interactive props
-    pickable: true,
-  });
-}
-
-export function createOverlay(data: string): Deck {
-  const layer = createGeojsonLayer2(data, "2");
-
-  //* separates deck mit anderen props muss angeleget werden, sonst gehts nicht
-  const deckLayer = new Deck({
-    width: mapCanvas.clientWidth,
-    height: mapCanvas.clientHeight,
-    initialViewState: initialViewState,
-    controller: true,
-    effects: [], // add postprocess effects to the layers
-    layers: [] as Layer<any, LayerProps<any>>[], // init as an empty array of Deckgl Layer Type
-    // change the map's viewstate whenever the view state of deck.gl changes
-    onViewStateChange: (change: {
-      interactionState: {
-        inTransition?: boolean;
-        isDragging?: boolean;
-        isPanning?: boolean;
-        isRotating?: boolean;
-        isZooming?: boolean;
-      };
-      viewState: any;
-      oldViewState: any;
-    }): any => {
-      //console.log(change);
-      map.jumpTo({
-        center: [change.viewState.longitude, change.viewState.latitude],
-        zoom: change.viewState.zoom,
-        bearing: change.viewState.bearing,
-        pitch: change.viewState.pitch,
-      });
-    },
-  });
-
-  deckLayer.setProps({
-    layers: [layer],
-    effects: [postProcessEffect],
-  });
-  return deckLayer;
-}
-
-//TODO
 function createPathLayer(data: DataSet<any>, name: string): PathLayer<any> {
   const testData = [
     {
@@ -170,29 +219,31 @@ function createPathLayer(data: DataSet<any>, name: string): PathLayer<any> {
 }
 
 function createScatterplotLayer(data: string, name: string): ScatterplotLayer<any> {
-  return new ScatterplotLayer({
+  //return new ScatterplotLayer({
+  //TODO
+  return new CustomScatterplotLayer({
     id: name,
     //data: data,
     data: [
       {
         position: [12.09582, 49.01343],
         color: [255, 0, 0],
-        radius: 100,
+        radius: 200,
       },
       {
-        position: [12.29579, 49.01323],
+        position: [12.11579, 49.01323],
         color: [0, 0, 255],
-        radius: 100,
+        radius: 300,
       },
       {
-        position: [12.09572, 49.03443],
+        position: [12.09572, 49.02443],
         color: [255, 0, 255],
-        radius: 40,
+        radius: 150,
       },
       {
-        position: [12.12533, 49.01343],
-        color: [255, 255, 0],
-        radius: 100,
+        position: [12.08533, 49.01343],
+        color: [0, 255, 0],
+        radius: 200,
       },
     ],
     // accessors loop over the provided data
@@ -252,8 +303,6 @@ export function getDeckGlLayer(layerType: supportedLayers, data: string, name: s
       break;
     case "GeojsonLayer":
       layer = createGeojsonLayer(data, name);
-      //deckProperties.layers?.push(layer);
-      //layer = createGeojsonLayer2(data, `${name}-2`);
       break;
     case "PathLayer":
       layer = createPathLayer(data, name);
@@ -284,14 +333,40 @@ export function removeDeckLayer(layerId: string): void {
   }
 }
 
-type BaseLayerType = typeof GeoJsonLayer | typeof HeatmapLayer | typeof ScatterplotLayer;
+type BaseLayerType =
+  | typeof GeoJsonLayer
+  | typeof HeatmapLayer
+  | typeof ScatterplotLayer
+  | typeof CustomScatterplotLayer;
 
 export function createMapboxLayer(geoData: string, baseType: BaseLayerType): MapboxLayer<any> {
   const l = new MapboxLayer({
     id: "mapboxLayer",
     // @ts-expect-error
     type: baseType,
-    data: geoData,
+    //data: geoData,
+    data: [
+      {
+        position: [12.09582, 49.01343],
+        color: [255, 0, 0],
+        radius: 100,
+      },
+      {
+        position: [12.11579, 49.01323],
+        color: [0, 0, 255],
+        radius: 100,
+      },
+      {
+        position: [12.09572, 49.02443],
+        color: [255, 0, 255],
+        radius: 40,
+      },
+      {
+        position: [12.08533, 49.01343],
+        color: [0, 255, 0],
+        radius: 100,
+      },
+    ],
     renderingMode: "2d",
     filled: true,
     //getPosition: (d: { position: any }) => d.position,

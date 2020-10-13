@@ -19,7 +19,7 @@ import LumaLayer from "../webgl/lumaLayer";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { addBlurredImage, addCanvasOverlay } from "./canvasUtils";
 import ClusterManager from "./clusterManager";
-import { getDeckGlLayer } from "./deckLayer";
+import CustomScatterplotLayer, { createMapboxLayer, getDeckGlLayer } from "./deckLayer";
 import { getAllRenderedFeatures, getAllSourceFeatures, getDataFromMap } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -32,6 +32,7 @@ import circle from "@turf/circle";
 import bbpolygon from "@turf/bbox-polygon";
 import bbox from "@turf/bbox";
 import geojsonCoords from "@mapbox/geojson-coords";
+import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -535,7 +536,8 @@ export default class MapController {
   addDeckLayer(data: any): void {
     //* für normale Deck Layer:
     //const deck = getDeckGlLayer("GeojsonLayer", data, "geojsonLayer-1");
-    const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson", "geojsonLayer-1");
+    //const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson", "geojsonLayer-1");
+    const deck = getDeckGlLayer("ScatterplotLayer", "../assets/data.geojson", "customscatterplot");
     const layer = (deck as unknown) as CustomLayerInterface;
 
     //const deck2 = createOverlay("../assets/data.geojson");
@@ -543,7 +545,7 @@ export default class MapController {
 
     //* für Mapbox Layer:
     //const layer = createMapboxLayer("../assets/data.geojson", HeatmapLayer);  //TODO um die heatmap auszuprobieren brauch ich andere Daten als Geojson
-    //const layer = createMapboxLayer("../assets/data.geojson", GeoJsonLayer);
+    //const layer = createMapboxLayer("../assets/data.geojson", CustomScatterplotLayer);
     //const layerAround = createNewMapboxLayer("../assets/data.geojson", GeoJsonLayer, 500);
 
     //* add the layer before the waterway-label to make sure it is placed below map labels!
