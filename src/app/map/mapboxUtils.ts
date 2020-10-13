@@ -4,6 +4,7 @@
 import bboxPolygon from "@turf/bbox-polygon";
 import circle from "@turf/circle";
 import difference from "@turf/difference";
+import distance from "@turf/distance";
 import intersect from "@turf/intersect";
 import mask from "@turf/mask";
 import union from "@turf/union";
@@ -52,6 +53,20 @@ export function getMeterRatioForZoomLevel(meters: number, zoom: number): number 
   // see https://docs.mapbox.com/help/glossary/zoom-level/
   const metersPerPixel = 78271.484 / 2 ** zoom;
   return meters / metersPerPixel /*/ Math.cos((latitude * Math.PI) / 180)*/;
+}
+
+export function getRadiusAndCenterOfViewport(): any {
+  const centerPoint = map.getCenter();
+  const northEastPoint = map.getBounds().getNorthEast();
+  /*
+  const radius = distance(
+    turfHelpers.point(centerPoint.toArray()),
+    turfHelpers.point(northEastPoint)
+  ); // in km
+  */
+  const radius = centerPoint.distanceTo(northEastPoint); // in meters
+
+  return { center: centerPoint, radius: radius };
 }
 
 /**

@@ -219,6 +219,18 @@ export default class MapController {
       }
     });
 
+    //TODO mal mit requestAnimationFrame versuchen zum updaten statt ein neues Layer bei jeder Bewegung zu machen?
+    /*
+    requestAnimationFrame(function draw() {
+      requestAnimationFrame(draw);
+
+      clear(gl, {
+          color: [0, 0, 0, 1]
+      });
+      customLayer.draw();
+    });
+    */
+
     //TODO use this callback instead of the code above to reload on every move?
     /*
     // after the GeoJSON data is loaded, update markers on the screen and do so on every map move/moveend
@@ -470,17 +482,6 @@ export default class MapController {
   }
 
   /**
-   * TODO statt dem Custom Layer wäre es vllt sinnvoller auf events wie load, render oder layer added zu lauschen 
-   * und bevor es gezeichnet wird in dem Moment dann das mit dem Canvas und dem Blurren etc. zu machen?
-   * Beispiel:
-   map.on("render", function() {
-    if(map.loaded()) {
-      map.featuresIn(...);
-    }
-   });
-   */
-
-  /**
    * TODO 21.09
    * 1. geojson daten speichern bevor zu layer hinzufügen, am besten separat pro layer und per type (point, linestring, polygon)
    * 2. diese dann an vertex shader übergeben
@@ -491,18 +492,6 @@ export default class MapController {
    * * für linestring könnte man einen buffer mit der vom nutzer angegebenen breite an beide seiten des linestrings anfügen und den blurren?
    * * bei polygon entweder auch das oder vllt das zentrum der umschließenden bounding box nehmen?
    */
-
-  //TODO mal mit requestAnimationFrame versuchen zum updaten statt ein neues Layer bei jeder Bewegung zu machen?
-  /*
-  requestAnimationFrame(function draw() {
-    requestAnimationFrame(draw);
-
-    clear(gl, {
-        color: [0, 0, 0, 1]
-    });
-    customLayer.draw();
-  });
-  */
 
   addWebGlLayer(data: any): void {
     if (map.getLayer("webglCustomLayer")) {

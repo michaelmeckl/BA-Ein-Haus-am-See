@@ -1,4 +1,5 @@
 //Example for offscreen canvas:
+//TODO use the worker.ts file to implement this
 
 //on the main thread:
 function createOffscreenCanvas(): void {

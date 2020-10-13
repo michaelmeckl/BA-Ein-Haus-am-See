@@ -1,3 +1,6 @@
+import { FRAGMENT_SHADER, VERTEX_SHADER } from "@luma.gl/constants";
+import { type } from "os";
+
 /**
  * Create a GLSL source for the vertex shader.
  */
@@ -302,13 +305,46 @@ export function computeKernelWeight(kernel: number[]): number {
   return weight <= 0 ? 1 : weight;
 }
 
-export function bindFramebufferAndSetViewport(gl: WebGLRenderingContext, fb, width, height): void {
+export function bindFramebufferAndSetViewport(
+  gl: WebGLRenderingContext,
+  fb: WebGLFramebuffer | null,
+  width: number,
+  height: number
+): void {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   gl.viewport(0, 0, width, height);
 }
 
+export function createProgramInfo(
+  gl: WebGLRenderingContext,
+  shaderProgram: WebGLProgram,
+  attribs?: any[],
+  uniforms?: any[]
+): any {
+  //TODO extract attributes and uniforms automatically and push them to the object:
+  const programInfo = {
+    program: shaderProgram,
+    attribLocations: {
+      vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
+      vertexColor: gl.getAttribLocation(shaderProgram, "aVertexColor"),
+    },
+    uniformLocations: {
+      projectionMatrix: gl.getUniformLocation(shaderProgram, "uProjectionMatrix"),
+      modelViewMatrix: gl.getUniformLocation(shaderProgram, "uModelViewMatrix"),
+    },
+  };
+
+  return programInfo;
+}
+
+type shaderType = WebGLRenderingContext["VERTEX_SHADER"] | WebGLRenderingContext["FRAGMENT_SHADER"];
+
 // see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
-export function createShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader {
+export function createShader(
+  gl: WebGLRenderingContext,
+  type: shaderType,
+  source: string
+): WebGLShader {
   // Create the shader object
   const shader = gl.createShader(type);
   if (!shader) {
@@ -321,7 +357,7 @@ export function createShader(gl: WebGLRenderingContext, type: number, source: st
   // Check if it compiled successfully
   const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
   if (!success) {
-    console.log(gl.getShaderInfoLog(shader));
+    console.error(gl.getShaderInfoLog(shader));
     gl.deleteShader(shader);
   }
 
@@ -349,7 +385,7 @@ export function createProgram(
   // check if creating the program was successfull
   const success = gl.getProgramParameter(program, gl.LINK_STATUS);
   if (!success) {
-    console.log(gl.getProgramInfoLog(program));
+    console.error(gl.getProgramInfoLog(program));
     gl.deleteProgram(program);
   }
 
@@ -386,9 +422,19 @@ function resetDepth(gl: WebGLRenderingContext): void {
  * Clear the canvas and reset depth.
  */
 export function clearCanvas(gl: WebGLRenderingContext): void {
-  gl.clearColor(0, 0, 0, 0);
-  //TODO ? resetDepth(gl);
+  gl.clearColor(0, 0, 0, 1.0);
   gl.enable(gl.DEPTH_TEST);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+}
+
+//* Kombination of the two methods above
+function resetCanvas(gl: WebGLRenderingContext): void {
+  gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
+  gl.clearDepth(1.0); // Clear everything
+  gl.enable(gl.DEPTH_TEST); // Enable depth testing
+  gl.depthFunc(gl.LEQUAL); // Near things obscure far things
+
+  // Clear the canvas before we start drawing on it.
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
