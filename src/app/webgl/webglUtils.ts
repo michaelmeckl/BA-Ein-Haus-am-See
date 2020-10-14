@@ -1,6 +1,14 @@
 import { FRAGMENT_SHADER, VERTEX_SHADER } from "@luma.gl/constants";
 import { type } from "os";
 
+//TODO: alle shader in webgl2 schreiben (bzw. in opengl es 300)
+/**
+ * * in WebGL 2:
+ * * varying becomes out in fragment shader and in in vertexShader
+ * * attribute is replaced by in
+ * * gl_Fragcolor is not set anymore, instead use out for color in fragment shader
+ */
+
 /**
  * Create a GLSL source for the vertex shader.
  */
@@ -58,9 +66,9 @@ export function defaultLumaShaders(): any {
   return { vertexSource, fragmentSource };
 }
 
+// TODO ist von shadertoy -> umschreiben
 // see https://www.shadertoy.com/view/MdyBzG
 export function applyKawaseBlurFilter() {
-  //TODO hier wird webgl 2 verwendet -> umschreiben
   const source = `
   void mainImage( out vec4 fragColor, in vec2 fragCoord )
   {
@@ -306,7 +314,7 @@ export function computeKernelWeight(kernel: number[]): number {
 }
 
 export function bindFramebufferAndSetViewport(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   fb: WebGLFramebuffer | null,
   width: number,
   height: number
@@ -316,7 +324,7 @@ export function bindFramebufferAndSetViewport(
 }
 
 export function createProgramInfo(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   shaderProgram: WebGLProgram,
   attribs?: any[],
   uniforms?: any[]
@@ -337,11 +345,13 @@ export function createProgramInfo(
   return programInfo;
 }
 
-type shaderType = WebGLRenderingContext["VERTEX_SHADER"] | WebGLRenderingContext["FRAGMENT_SHADER"];
+type shaderType =
+  | WebGL2RenderingContext["VERTEX_SHADER"]
+  | WebGL2RenderingContext["FRAGMENT_SHADER"];
 
 // see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
 export function createShader(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   type: shaderType,
   source: string
 ): WebGLShader {
@@ -369,7 +379,7 @@ export function createShader(
  * see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
  */
 export function createProgram(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   vertexShader: WebGLShader,
   fragmentShader: WebGLShader
 ): WebGLProgram {
@@ -412,7 +422,7 @@ export function resizeCanvas(canvas: HTMLCanvasElement): void {
   }
 }
 
-function resetDepth(gl: WebGLRenderingContext): void {
+function resetDepth(gl: WebGL2RenderingContext): void {
   gl.clearDepth(1.0); // Clear depth
   gl.enable(gl.DEPTH_TEST); // Enable depth testing
   gl.depthFunc(gl.LEQUAL); // Near things obscure far things
@@ -421,14 +431,14 @@ function resetDepth(gl: WebGLRenderingContext): void {
 /**
  * Clear the canvas and reset depth.
  */
-export function clearCanvas(gl: WebGLRenderingContext): void {
+export function clearCanvas(gl: WebGL2RenderingContext): void {
   gl.clearColor(0, 0, 0, 1.0);
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
 //* Kombination of the two methods above
-function resetCanvas(gl: WebGLRenderingContext): void {
+function resetCanvas(gl: WebGL2RenderingContext): void {
   gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
   gl.clearDepth(1.0); // Clear everything
   gl.enable(gl.DEPTH_TEST); // Enable depth testing
@@ -440,7 +450,7 @@ function resetCanvas(gl: WebGLRenderingContext): void {
 
 //TODO delete me later
 // simple function that sets a color to a gl context, can be usefult for troubleshooting
-export function setColor(gl: WebGLRenderingContext) {
+export function setColor(gl: WebGL2RenderingContext) {
   gl.clearColor(1, 0, 1, 1); // magenta
   gl.clear(gl.COLOR_BUFFER_BIT);
 }

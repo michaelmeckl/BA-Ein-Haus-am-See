@@ -451,7 +451,7 @@ export default class MapController {
 
     const mapCanvas = map.getCanvas();
 
-    //const gl = mapCanvas.getContext("webgl");
+    //const gl = mapCanvas.getContext("webgl2");
     //console.log("Mapbox GL context: ", gl);
     //console.log("viewport:", gl?.VIEWPORT);
     //if (!gl) return;

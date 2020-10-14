@@ -28,7 +28,7 @@ export class MapboxCustomLayer {
    * method called when the layer is added to the map,
    * see https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
    */
-  onAdd(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
+  onAdd(map: mapboxgl.Map, gl: WebGL2RenderingContext): void {
     const vertexSource = webglUtils.createVertexShaderSource();
     const fragmentSource = webglUtils.createFragmentShaderSource();
     //TODO add blur shader instead:
@@ -58,7 +58,7 @@ export class MapboxCustomLayer {
    *               coordinates. The mercator coordinate  [0, 0] represents the top left corner of
    *               the mercator world and  [1, 1] represents the bottom right corner.
    */
-  render(gl: WebGLRenderingContext, matrix: number[]): void {
+  render(gl: WebGL2RenderingContext, matrix: number[]): void {
     //console.log("in render: ", gl.canvas);
 
     //TODO cleart die ganze map
@@ -111,7 +111,7 @@ export class MapboxCustomLayer {
    * Optional method called when the layer has been removed from the Map with Map#removeLayer.
    * This gives the layer a chance to clean up gl resources and event listeners.
    */
-  onRemove(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
+  onRemove(map: mapboxgl.Map, gl: WebGL2RenderingContext): void {
     // Cleanup resources
     this.buffer = null;
   }
@@ -122,15 +122,15 @@ export class MapboxCustomLayer {
    * The layer cannot make any assumptions about the current GL state and must bind a framebuffer
    * before rendering.
    */
-  prerender(gl: WebGLRenderingContext, matrix: number[]): void {
+  prerender(gl: WebGL2RenderingContext, matrix: number[]): void {
     //TODO If the layer needs to render to a texture, it should implement the `prerender` method
     // to do this and only use the `render` method for drawing directly into the main framebuffer.
   }
 
   //TODO test this in the render func above:
   /*
-  renderWithStencilBuffer(glCtx: WebGLRenderingContext, matrix: number[]): void {
-    const gl = someCanvasElement.getContext("webgl", { stencil: true });
+  renderWithStencilBuffer(glCtx: WebGL2RenderingContext, matrix: number[]): void {
+    const gl = someCanvasElement.getContext("webgl2", { stencil: true });
     gl.enable(gl.STENCIL_TEST);
 
     // Set up the test so it always passes and set the reference value to 1
@@ -167,7 +167,7 @@ export class MapboxCustomLayer {
 
   exampleStencilBuffer() {
     const m4 = twgl.m4;
-    const gl = document.querySelector("canvas").getContext("webgl", { stencil: true });
+    const gl = document.querySelector("canvas").getContext("webgl2", { stencil: true });
 
     const vs = `
       attribute vec4 position;
@@ -265,7 +265,7 @@ export class MapboxCustomLayer {
 
     function initGL() {
       var glcanvas = document.getElementById("glcanvas");
-      gl = glcanvas.getContext("webgl", { stencil: true });
+      gl = glcanvas.getContext("webgl2", { stencil: true });
     }
 
     function createAndCompileShader(type, source) {

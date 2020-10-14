@@ -26,9 +26,9 @@ class CustomLayer {
     this.coordinates = coordinates;
   }
 
-  onAdd(m: mapboxgl.Map, gl: WebGLRenderingContext): void {
+  onAdd(m: mapboxgl.Map, gl: WebGL2RenderingContext): void {
     //für separaten canvas, die 2 methoden nehmen:
-    //const gl = instrumentGLContext(canvas.getContext('webgl'));
+    //const gl = instrumentGLContext(canvas.getContext('webgl2'));
     //gl.clearColor(0, 0, 0, 1);
 
     instrumentGLContext(gl);
@@ -79,7 +79,7 @@ class CustomLayer {
     });
   }
 
-  render(gl: WebGLRenderingContext, matrix: number[]): void {
+  render(gl: WebGL2RenderingContext, matrix: number[]): void {
     // Mapbox passes us a projection matrix
     this.model
       .setUniforms({

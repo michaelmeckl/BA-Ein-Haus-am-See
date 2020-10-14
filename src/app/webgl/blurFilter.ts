@@ -8,25 +8,7 @@ import {
   vertexShaderCanvas,
 } from "./webglUtils";
 
-export function setRectangle(
-  gl: WebGLRenderingContext,
-  x: number,
-  y: number,
-  width: number,
-  height: number
-): void {
-  const x1 = x;
-  const x2 = x + width;
-  const y1 = y;
-  const y2 = y + height;
-  gl.bufferData(
-    gl.ARRAY_BUFFER,
-    new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
-    gl.STATIC_DRAW
-  );
-}
-
-function createTexture(glContext: WebGLRenderingContext): void {
+function createTexture(glContext: WebGL2RenderingContext): void {
   if (!glContext) {
     return;
   }
@@ -35,6 +17,8 @@ function createTexture(glContext: WebGLRenderingContext): void {
   const texture = glContext.createTexture();
   glContext.bindTexture(glContext.TEXTURE_2D, texture);
 
+  //TODO in webgl 2 sollten die 4 zeilen nicht mehr nötig sein, weil webgl2 auch mit
+  //TODO nicht ^2 bildern zurechtkommt, oder ? Testen!
   // Set the parameters so we can render any size image.
   glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_S, glContext.CLAMP_TO_EDGE);
   glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_T, glContext.CLAMP_TO_EDGE);
@@ -43,7 +27,8 @@ function createTexture(glContext: WebGLRenderingContext): void {
 }
 
 function initBuffers(
-  glContext: WebGLRenderingContext
+  glContext: WebGL2RenderingContext,
+  image: HTMLImageElement
 ): {
   positionBuffer: WebGLBuffer | null;
   texcoordBuffer: WebGLBuffer | null;
@@ -52,6 +37,16 @@ function initBuffers(
   const positionBuffer = glContext.createBuffer();
   // bind buffer (think of it as ARRAY_BUFFER = positionBuffer)
   glContext.bindBuffer(glContext.ARRAY_BUFFER, positionBuffer);
+  // Set a rectangle the same size as the image at (0, 0).
+  const x1 = 0;
+  const x2 = 0 + image.width;
+  const y1 = 0;
+  const y2 = 0 + image.height;
+  glContext.bufferData(
+    glContext.ARRAY_BUFFER,
+    new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
+    glContext.STATIC_DRAW
+  );
 
   // provide texture coordinates for the rectangle.
   const texcoordBuffer = glContext.createBuffer();
@@ -68,10 +63,11 @@ function initBuffers(
   };
 }
 
+// see https://stackoverflow.com/questions/12590685/blend-two-canvases-onto-one-with-webgl
 export function renderAndBlur(image: HTMLImageElement): HTMLCanvasElement | null {
   const newCanvas = document.querySelector("#test_canvas") as HTMLCanvasElement;
   // const newCanvas = document.createElement("canvas"); // in-memory canvas
-  const glContext = newCanvas.getContext("webgl");
+  const glContext = newCanvas.getContext("webgl2");
 
   if (!glContext) {
     //eslint-disable-next-line
@@ -98,10 +94,7 @@ export function renderAndBlur(image: HTMLImageElement): HTMLCanvasElement | null
   const kernelLocation = glContext.getUniformLocation(program, "u_kernel[0]");
   const kernelWeightLocation = glContext.getUniformLocation(program, "u_kernelWeight");
 
-  const { positionBuffer, texcoordBuffer } = initBuffers(glContext);
-
-  // Set a rectangle the same size as the image at (0, 0). Necessary to show the image on the canvas.
-  setRectangle(glContext, 0, 0, image.width, image.height);
+  const { positionBuffer, texcoordBuffer } = initBuffers(glContext, image);
 
   createTexture(glContext);
 
@@ -175,12 +168,10 @@ export function renderAndBlur(image: HTMLImageElement): HTMLCanvasElement | null
   return newCanvas;
 }
 
-//TODO oder man nutzt einfach das CustomLayer unten (das ist vermutlich fast am sinnvollsten?)
+//TODO oder man nutzt einfach das CustomLayer (das ist vermutlich fast am sinnvollsten?)
 /**
    * Einen Canvas darüber zu legen ist laut https://github.com/mapbox/mapbox-gl-js/issues/6456 nicht allzu 
    * gut für die Performance, stattdessen Custom Layer verwenden! Probleme:
         - Severe performance hit; browsers have a hard time compositing two GL contexts.
         - You can only draw on top of a Mapbox map — there’s no way to draw something in between
    */
-
-//TODO  -> d.h. ich kann einfach die turf Kreise blurren und die dann als Image/canvassource darüberlegen
