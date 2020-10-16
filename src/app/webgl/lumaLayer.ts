@@ -13,17 +13,24 @@ class CustomLayer {
   type: string;
   renderingMode: string;
   coordinates: mapboxgl.MercatorCoordinate[];
+  coordinates2: mapboxgl.MercatorCoordinate[];
 
   //needed for webgl and luma
   positionBuffer!: Buffer;
   colorBuffer!: Buffer;
   model!: Model;
+  model2!: Model;
+  positionBuffer2!: Buffer;
 
-  constructor(coordinates: MercatorCoordinate[]) {
+  constructor(coordinates: MercatorCoordinate[], coordinates2: MercatorCoordinate[]) {
     this.id = "lumagl-layer";
     this.type = "custom";
     this.renderingMode = "2d";
     this.coordinates = coordinates;
+    this.coordinates2 = coordinates2;
+
+    console.log(coordinates);
+    console.log(coordinates2);
   }
 
   onAdd(m: mapboxgl.Map, gl: WebGL2RenderingContext): void {
@@ -77,6 +84,26 @@ class CustomLayer {
       //modules: [triangleBlur],
       vertexCount: this.coordinates.length,
     });
+
+    const positions2 = new Float32Array(this.coordinates2.length * 2);
+    this.coordinates2.forEach((coords, i) => {
+      positions2[i * 2] = coords.x;
+      positions2[i * 2 + 1] = coords.y;
+    });
+
+    this.positionBuffer2 = new Buffer(gl, new Float32Array(positions2));
+
+    this.model2 = new Model(gl, {
+      id: "lumaModel2",
+      vs: vertexSource,
+      fs: fragmentSource,
+      drawMode: gl.TRIANGLE_STRIP,
+      attributes: {
+        positions: this.positionBuffer2,
+        colors: this.colorBuffer,
+      },
+      vertexCount: this.coordinates2.length,
+    });
   }
 
   render(gl: WebGL2RenderingContext, matrix: number[]): void {
@@ -86,19 +113,26 @@ class CustomLayer {
         uPMatrix: matrix,
       })
       .draw();
+    this.model2
+      .setUniforms({
+        uPMatrix: matrix,
+      })
+      .draw();
   }
 
   onRemove(): void {
     // Cleanup
     this.positionBuffer.delete();
+    this.positionBuffer2.delete();
     this.colorBuffer.delete();
     this.model.delete();
+    this.model2.delete();
   }
 }
 
 export default class LumaLayer {
-  constructor(geoData: mapboxgl.MercatorCoordinate[]) {
-    const custLayer = new CustomLayer(geoData) as CustomLayerInterface;
+  constructor(geoData: mapboxgl.MercatorCoordinate[], geoData2: any[]) {
+    const custLayer = new CustomLayer(geoData, geoData2) as CustomLayerInterface;
     map.addLayer(custLayer, "waterway-label");
   }
 

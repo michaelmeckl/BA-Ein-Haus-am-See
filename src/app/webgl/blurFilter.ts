@@ -1,11 +1,10 @@
+import { vertexShaderCanvas, fragmentShaderCanvas } from "./shaders";
 import {
   computeKernelWeight,
   createProgram,
   createShader,
-  fragmentShaderCanvas,
   getBlurFilterKernel,
   resizeCanvas,
-  vertexShaderCanvas,
 } from "./webglUtils";
 
 function createTexture(glContext: WebGL2RenderingContext): void {
@@ -15,13 +14,15 @@ function createTexture(glContext: WebGL2RenderingContext): void {
 
   // Create a texture.
   const texture = glContext.createTexture();
+  //needed on some drivers, see. https://learnopengl.com/Getting-started/Textures at "Texture Units":
+  glContext.activeTexture(glContext.TEXTURE0);
   glContext.bindTexture(glContext.TEXTURE_2D, texture);
 
-  //TODO in webgl 2 sollten die 4 zeilen nicht mehr nötig sein, weil webgl2 auch mit
-  //TODO nicht ^2 bildern zurechtkommt, oder ? Testen!
-  // Set the parameters so we can render any size image.
+  // Set the parameters so we can render any size image:
+  //these properties let you upload textures of any size (defaul would be to repeat, but clamping makes more sense here)
   glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_S, glContext.CLAMP_TO_EDGE);
   glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_T, glContext.CLAMP_TO_EDGE);
+  //these determine how interpolation is made if the image is being scaled up or down
   glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MIN_FILTER, glContext.NEAREST);
   glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MAG_FILTER, glContext.NEAREST);
 }
@@ -171,7 +172,7 @@ export function renderAndBlur(image: HTMLImageElement): HTMLCanvasElement | null
 //TODO oder man nutzt einfach das CustomLayer (das ist vermutlich fast am sinnvollsten?)
 /**
    * Einen Canvas darüber zu legen ist laut https://github.com/mapbox/mapbox-gl-js/issues/6456 nicht allzu 
-   * gut für die Performance, stattdessen Custom Layer verwenden! Probleme:
+   * gut für die Performance, stattdessen Custom Layer verwenden! Probleme mit canvas:
         - Severe performance hit; browsers have a hard time compositing two GL contexts.
         - You can only draw on top of a Mapbox map — there’s no way to draw something in between
    */

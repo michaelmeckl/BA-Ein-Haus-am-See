@@ -152,7 +152,7 @@ export function getViewportAsPolygon(): Feature<Polygon, GeoJsonProperties> {
   return bboxPolygon(viewportBounds);
 }
 
-function convertAllFeaturesToPolygons(
+export function convertAllFeaturesToPolygons(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[],
   bufferSize = 100
 ): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {

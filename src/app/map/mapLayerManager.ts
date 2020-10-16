@@ -252,7 +252,7 @@ class MapLayerManager {
       paint: {
         //"fill-outline-color": "rgba(0,0,0,0.3)",
         "fill-outline-color": "rgba(255,255,255,0.9)", //to render white outlines around the polygon
-        "fill-color": "rgba(0,210,237,0.1)",
+        "fill-color": "rgba(123,123,255,0.6)",
         "fill-opacity": 0.6,
       },
     };

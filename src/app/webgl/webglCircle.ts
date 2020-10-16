@@ -92,7 +92,7 @@ function initBuffers(gl: WebGLRenderingContext, startingPosition: mapboxgl.Merca
   };
 }
 
-function createPerspectiveMatrix(gl: WebGLRenderingContext, programInfo): any {
+function createPerspectiveMatrix(gl: WebGLRenderingContext, programInfo: any): any {
   // Create a perspective matrix, a special matrix that is
   // used to simulate the distortion of perspective in a camera.
   // Our field of view is 45 degrees, with a width/height
@@ -127,7 +127,11 @@ function createPerspectiveMatrix(gl: WebGLRenderingContext, programInfo): any {
   };
 }
 
-function setPositionInformation(gl: WebGLRenderingContext, programInfo, buffers): void {
+function setPositionInformation(
+  gl: WebGLRenderingContext,
+  programInfo: { attribLocations: { vertexPosition: number } },
+  buffers: { position: WebGLBuffer | null }
+): void {
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute
   const numComponents = 2;
@@ -147,7 +151,11 @@ function setPositionInformation(gl: WebGLRenderingContext, programInfo, buffers)
   gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
 }
 
-function setColorInformation(gl: WebGLRenderingContext, programInfo, buffers): void {
+function setColorInformation(
+  gl: WebGLRenderingContext,
+  programInfo: { attribLocations: { vertexColor: number } },
+  buffers: { color: WebGLBuffer | null }
+): void {
   // Tell WebGL how to pull out the colors from the color buffer
   // into the vertexColor attribute.
   const numComponents = 2;
@@ -170,7 +178,7 @@ function setColorInformation(gl: WebGLRenderingContext, programInfo, buffers): v
 //
 // Draw the scene.
 //
-function drawScene(gl: WebGLRenderingContext, programInfo, buffers) {
+function drawScene(gl: WebGLRenderingContext, programInfo: any, buffers: any) {
   //webglUtils.clearCanvas(gl);
 
   const matrices = createPerspectiveMatrix(gl, programInfo);
@@ -217,6 +225,8 @@ function loadCustomData(): any {
     lat: 49.0016276,
   });
 
+  console.log([uniSouthEast, uniNorthEast, uniSouthWest, uniNorthWest]);
+
   return [uniSouthEast, uniNorthEast, uniSouthWest, uniNorthWest];
 }
 
@@ -226,12 +236,13 @@ export function addWebglCircle(map: mapboxgl.Map): void {
   let buffers: any;
 
   const vertices = loadCustomData();
+  console.log(vertices);
 
   const glCircleLayer: CustomLayerInterface = {
     id: "colorCircle",
     type: "custom",
 
-    onAdd: (map: mapboxgl.Map, gl: WebGLRenderingContext) => {
+    onAdd: (map: mapboxgl.Map, gl: WebGL2RenderingContext) => {
       const vertexSource = getCircleVertexSource();
       const fragmentSource = getCircleFragmentSource();
       // create a vertex and a fragment shader
@@ -260,11 +271,19 @@ export function addWebglCircle(map: mapboxgl.Map): void {
       //buffers = initBuffers(gl, vertices[0]);
     },
 
-    render: function (gl: WebGLRenderingContext, matrix: number[]): void {
+    render: function (gl: WebGL2RenderingContext, matrix: number[]): void {
+      console.log("in for each: ", vertices[3]);
+      buffers = initBuffers(gl, vertices[3]);
+      drawScene(gl, programInfo, buffers);
+
+      //TODO only draws one circle:
+      // look at the windgl code, there are many things rendered at the same time
+      /*
       vertices.forEach((element: mapboxgl.MercatorCoordinate) => {
+        console.log("in for each: ", element);
         buffers = initBuffers(gl, element);
         drawScene(gl, programInfo, buffers);
-      });
+      });*/
     },
   };
 

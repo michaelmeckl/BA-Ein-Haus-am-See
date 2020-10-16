@@ -102,7 +102,6 @@ function convertToMercatorCoordinates(arr: number[][]): number[] {
     mapboxgl.MercatorCoordinate.fromLngLat(el as LngLatLike)
   );
   //console.log("Mercator:", MercatorCoordinates);
-
   return MercatorCoordinates.flatMap((x) => [x.x, x.y]);
 }
 
@@ -122,6 +121,6 @@ export function getDataFromMap(filters: Set<string>): number[] {
   //console.log("newArray after lodash:", pointCoords);
 
   const customData = convertToMercatorCoordinates(pointCoords);
-  //console.log(customData);
+  //console.log("after toMercator: ", customData);
   return customData;
 }

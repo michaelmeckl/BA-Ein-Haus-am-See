@@ -1,5 +1,8 @@
-import { map } from "../map/mapboxConfig";
+import { drawBufferInfo } from "twgl.js";
+import { createFragmentShaderSource, createVertexShaderSource } from "./shaders";
 import * as webglUtils from "./webglUtils";
+
+//TODO das custom Layer unterstützt nur webgl1 !
 
 // Mapbox Custom layer implemented as ES6 class
 export class MapboxCustomLayer {
@@ -29,19 +32,23 @@ export class MapboxCustomLayer {
    * see https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
    */
   onAdd(map: mapboxgl.Map, gl: WebGL2RenderingContext): void {
-    const vertexSource = webglUtils.createVertexShaderSource();
-    const fragmentSource = webglUtils.createFragmentShaderSource();
+    //console.log("in onAdd: ", gl.canvas.getContext("webgl"));
+    //console.log("in onAdd: ", gl.canvas.getContext("webgl2"));
+
+    const vertexSource = createVertexShaderSource();
+    const fragmentSource = createFragmentShaderSource();
     //TODO add blur shader instead:
     //const fragmentSource = webglUtils.fragmentShaderCanvas();
 
+    /*
     // create a vertex and a fragment shader
     const vertexShader = webglUtils.createShader(gl, gl.VERTEX_SHADER, vertexSource);
     const fragmentShader = webglUtils.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-
-    //TODO die vertex und fragment shader sollten nachdem sie nicht mehr benutzt werden, sofort gelöscht werden, s. WebGL Best Practices
-
     // link the two shaders into a WebGL program
     this.program = webglUtils.createProgram(gl, vertexShader, fragmentShader);
+    */
+    const programinfo = webglUtils.setupWebGLProgram(gl, vertexSource, fragmentSource);
+    this.program = programinfo.program;
 
     // look up where the vertex data needs to go.
     this.aPos = gl.getAttribLocation(this.program, "a_pos");
@@ -87,16 +94,18 @@ export class MapboxCustomLayer {
     // used for blending pixel arithmetic for RGB and alpha components separately:
     //gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-    const primitiveType = gl.TRIANGLE_STRIP;
+    // * Lines für Umrisse, Triangle_fan für fill
+    const primitiveType = gl.TRIANGLE_FAN;
     const offset = 0; // 0 for offset means start at the beginning of the buffer.
-    // eslint-disable-next-line no-magic-numbers
     const count = this.data.length / 2;
     gl.drawArrays(primitiveType, offset, count);
+    //TODO use drawElements or type = gl.Triangles instead??
 
     //TODO
     /*
     gl.enable(gl.STENCIL_TEST);
 
+    //TODO
     ...
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

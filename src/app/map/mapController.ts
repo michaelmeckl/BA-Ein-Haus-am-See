@@ -33,6 +33,7 @@ import bbpolygon from "@turf/bbox-polygon";
 import bbox from "@turf/bbox";
 import geojsonCoords from "@mapbox/geojson-coords";
 import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { addWebglCircle } from "../webgl/webglCircle";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -53,6 +54,8 @@ export default class MapController {
   private currentPoints = new Set<Feature<Point, GeoJsonProperties>>();
   private currentWays = new Set<Feature<LineString, GeoJsonProperties>>();
   private currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
+  //TODO
+  private allPolygonFeatures: any[] = [];
 
   private activeFilters: Set<string> = new Set();
 
@@ -170,9 +173,11 @@ export default class MapController {
 
     //!not working rigth now
     //sortDistances(e.lngLat);
-
-    //addWebglCircle(map);
     */
+
+    addWebglCircle(map);
+
+    //this.showCurrentViewportCircle();
 
     //TODO
     //getAllRenderedFeatures(undefined, undefined, ["==", "class", "park"]);
@@ -278,6 +283,23 @@ export default class MapController {
     return `${bboxExtent[1]},${bboxExtent[0]},${bboxExtent[3]},${bboxExtent[2]}`;
   }
 
+  showCurrentViewportCircle(): void {
+    const { center, radius } = mapboxUtils.getRadiusAndCenterOfViewport();
+    //@ts-expect-error
+    const viewportCirclePolygon = circle([center.lng, center.lat], radius, { units: "meters" });
+
+    mapLayerManager.addNewGeojsonSource("viewportCircle", viewportCirclePolygon);
+    const newLayer: Layer = {
+      id: "viewportCircleLayer",
+      source: "viewportCircle",
+      type: "fill",
+      paint: {
+        "fill-color": "rgba(255, 255, 0, 0.15)",
+      },
+    };
+    mapLayerManager.addNewLayer(newLayer, true);
+  }
+
   addVectorData(data: string): void {
     mapLayerManager.addVectorLayer(data);
   }
@@ -307,11 +329,10 @@ export default class MapController {
   }
 
   preprocessGeoData(data: FeatureCollection<GeometryObject, any>): void {
-    //TODO reset the classSets so there are always only the current features in them ??
-    // another option would be to let them be and use them as a client side cache later???
-    this.currentPoints = new Set();
-    this.currentWays = new Set();
-    this.currentPolygons = new Set();
+    // TODO another option would be to let them be and use them as a client side cache later???
+    this.currentPoints.clear();
+    this.currentWays.clear();
+    this.currentPolygons.clear();
 
     for (let index = 0; index < data.features.length; index++) {
       const element = data.features[index];
@@ -376,7 +397,17 @@ export default class MapController {
     console.log("this.currentPolygons: ", this.currentPolygons);
 
     const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
+    this.allPolygonFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures);
+    //this.showPreprocessedData(allFeatures);
+  }
 
+  showPreprocessedData(
+    allFeatures: (
+      | Feature<Point, GeoJsonProperties>
+      | Feature<LineString, GeoJsonProperties>
+      | Feature<Polygon, GeoJsonProperties>
+    )[]
+  ): void {
     //mapboxUtils.getDifferenceBetweenViewportAndFeature([...this.currentPoints]);
     mapboxUtils.showDifferenceBetweenViewportAndFeature(allFeatures).then((data) => {
       console.log("returned data: ", data);
@@ -427,7 +458,7 @@ export default class MapController {
     mapLayerManager.removeAllLayersForSource(sourceName);
 
     //TODO
-    //this.preprocessGeoData(data);
+    this.preprocessGeoData(data);
     //return;
 
     if (map.getSource(sourceName)) {
@@ -482,15 +513,10 @@ export default class MapController {
   }
 
   /**
-   * TODO 21.09
+   * TODO test this again!
    * 1. geojson daten speichern bevor zu layer hinzufügen, am besten separat pro layer und per type (point, linestring, polygon)
    * 2. diese dann an vertex shader übergeben
    * 3. in fragment shader dann kreis um alle punkte zeichnen -> fill gray -> am ende dann blur
-   */
-
-  /**
-   * * für linestring könnte man einen buffer mit der vom nutzer angegebenen breite an beide seiten des linestrings anfügen und den blurren?
-   * * bei polygon entweder auch das oder vllt das zentrum der umschließenden bounding box nehmen?
    */
 
   addWebGlLayer(data: any): void {
@@ -503,13 +529,29 @@ export default class MapController {
 
     const mapData = getDataFromMap(this.activeFilters);
     const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
-    //TODO zieht mit den mask-Daten nur Triangles zwischen den einzelnen punkten, was dazu führt,
-    //TODO dass letzlich nur eine Art dünne linie um alle gezogen wird
-    //const customLayer = new MapboxCustomLayer(data) as CustomLayerInterface;
-
-    //const firstSymbolId = mapLayerManager.findLayerByType(map, "symbol");
-    // Insert the layer beneath the first symbol layer in the layer stack if one exists.
     map.addLayer(customLayer, "waterway-label");
+
+    //TODO das rendert immer nur eines!
+    /*
+    for (const element of this.allPolygonFeatures) {
+      const newData = geojsonCoords(element);
+      //console.log("Data after geojson coords: ", newData);
+      const MercatorCoordinates = newData.map((el: any) =>
+        mapboxgl.MercatorCoordinate.fromLngLat(el)
+      );
+      const mapData = MercatorCoordinates.flatMap((x: any) => [x.x, x.y]);
+
+      //console.log("MapData: ", mapData);
+      const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
+      //TODO zieht mit den mask-Daten nur Triangles zwischen den einzelnen punkten, was dazu führt,
+      //TODO dass letzlich nur eine Art dünne linie um alle gezogen wird
+      //const customLayer = new MapboxCustomLayer(data) as CustomLayerInterface;
+
+      //const firstSymbolId = mapLayerManager.findLayerByType(map, "symbol");
+      // Insert the layer beneath the first symbol layer in the layer stack if one exists.
+      map.addLayer(customLayer, "waterway-label");
+    }
+    */
 
     console.log("Finished adding webgl data!");
   }
@@ -564,6 +606,26 @@ export default class MapController {
 
     const data = [uniSouthEast, uniNorthWest, uniSouthWest];
 
-    const animationLoop = new LumaLayer(data);
+    const data2 = [
+      mapboxgl.MercatorCoordinate.fromLngLat({
+        lng: 12.091103196144104,
+        lat: 49.01015216135008,
+      }),
+      mapboxgl.MercatorCoordinate.fromLngLat({
+        lng: 12.10141897201538,
+        lat: 49.0095997290631,
+      }),
+      mapboxgl.MercatorCoordinate.fromLngLat({
+        lng: 12.095990180969238,
+        lat: 49.016689397702294,
+      }),
+
+      mapboxgl.MercatorCoordinate.fromLngLat({
+        lng: 12.59177370071411,
+        lat: 49.0198169751917,
+      }),
+    ];
+
+    const animationLoop = new LumaLayer(data, data2);
   }
 }
