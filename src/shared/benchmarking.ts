@@ -1,5 +1,10 @@
 //import { performance } from "perf_hooks";
 
+//TODO using performance.now() might be a little bit more accurate, but it works a little bit different on the
+// node server than on the client, which might make measurements inaccurate?? -> Test more with this!
+
+const NUMBER_OF_EXECUTIONS = 50;
+
 /**
  * Singleton-Class for measuring execution time.
  */
@@ -8,6 +13,10 @@ class Benchmark {
 
   private timeStamps: Map<string, number>;
   private accuracy: number;
+
+  public loggingFunction = function (name: string, time: number) {
+    console.log(`${name} took ${time} ms.`);
+  };
 
   // the constructor has to be explicitly marked as private
   private constructor() {
@@ -31,7 +40,7 @@ class Benchmark {
     */
   }
 
-  public stopMeasure(actionName: string): string | void {
+  public stopMeasure(actionName: string): number {
     /*
     // check if this actionName exists
     if (!this.timeStamps.has(actionName)) {
@@ -41,7 +50,8 @@ class Benchmark {
     // calculate the difference between the start timestamp for the given action and the current timestamp
     const start = this.timeStamps.get(actionName) as number;
     const now = performance.now();
-    const timeTaken = `${actionName} took ${(now - start).toFixed(this.accuracy)} milliseconds.`;
+    const timeTaken = (now - start).toFixed(this.accuracy);
+    console.log(`${actionName} took ${timeTaken} milliseconds.`;);
 
     // remove the this action from the timestamps map
     //this.timeStamps.delete(actionName);
@@ -49,7 +59,45 @@ class Benchmark {
     return timeTaken;
     */
     console.timeEnd(actionName);
-    return "";
+    return 0;
+  }
+
+  //TODO use performance.now() here only when the others use it too!
+  // but performance.now() is necessary as console.time() doesn't return its value
+  public async getAverageTime(
+    fn: (...args: any[]) => any,
+    args: any[],
+    n = NUMBER_OF_EXECUTIONS
+  ): Promise<number> {
+    const times: number[] = [];
+
+    for (let index = 0; index < n; index++) {
+      const start = performance.now();
+      await fn(...args);
+      const taken = performance.now() - start;
+      console.log(taken + " ms");
+      times.push(taken);
+    }
+
+    const average = times.reduce((prev, curr) => prev + curr, 0) / times.length;
+    console.log(`Average time taken over ${n} executions: ${average} milliseconds`);
+    return average;
+  }
+
+  /**
+   * Util-Function to measure execution time for the given function and return its result if any.
+   */
+  public measureTimeForFunction<T>(
+    loggingFunction: (name: string, time: number) => void,
+    fn: (...args: any[]) => T,
+    args: any[]
+  ): T {
+    const startTime = performance.now();
+    const result: T = fn(...args);
+    const taken = performance.now() - startTime;
+    loggingFunction(name, taken);
+
+    return result;
   }
 }
 

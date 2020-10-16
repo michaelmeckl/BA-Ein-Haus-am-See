@@ -1,33 +1,33 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "module": "commonjs",
-    "lib": [
-      "esnext",
-      "es6",
-      "dom",
-      "dom.iterable",
-    ],
+    "module": "commonjs", // necessary as node is used
+    "lib": ["esnext", "es6", "dom", "dom.iterable"],
     "allowJs": true,
     //"allowSyntheticDefaultImports": true,
     "declaration": false,
     "esModuleInterop": true,
+    "importHelpers": true,
     "importsNotUsedAsValues": "error",
     "moduleResolution": "node",
-    /* noEmit - We only use TypeScript for type checking not compiling. */
+    /* We only use TypeScript for type checking not compiling. */
     "noEmit": true,
     //"noImplicitAny": false
-    "pretty": true,
     "resolveJsonModule": true,
+    "removeComments": true,
     "rootDir": ".",
     "skipLibCheck": true,
-    "sourceMap": false,
+    "sourceMap": true, //TODO
     "strict": true,
+    "typeRoots": [
+      "node_modules/@danmarshall/deckgl-typings", // necessary to find the types for deck.gl
+      "node_modules/@types",
+      "src/types"
+    ]
   },
-  "include": [
-    "src/**/*.ts",
-  ],
-  "exclude": [
-    "node_modules",
-  ]
+  "ts-node": {
+    "files": true //* VERY IMPORTANT so typescript uses the own type definitions in src/types on startup as well
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
 }

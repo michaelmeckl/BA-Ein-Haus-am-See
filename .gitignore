@@ -6,6 +6,7 @@ dist
 # Others
 .env
 node_modules
+public/data/
 
 # Local History for Visual Studio
 .localhistory/
