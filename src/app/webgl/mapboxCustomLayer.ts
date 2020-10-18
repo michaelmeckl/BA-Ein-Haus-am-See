@@ -94,6 +94,12 @@ export class MapboxCustomLayer {
     // used for blending pixel arithmetic for RGB and alpha components separately:
     //gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
+    //TODO oder:
+    /*
+    gl.blendFuncSeparate(gl.ONE_MINUS_DST_ALPHA, gl.ONE_MINUS_DST_ALPHA, gl.ONE, gl.ONE);
+    gl.blendEquation(gl.FUNC_ADD);
+    */
+
     // * Lines für Umrisse, Triangle_fan für fill
     const primitiveType = gl.TRIANGLE_FAN;
     const offset = 0; // 0 for offset means start at the beginning of the buffer.

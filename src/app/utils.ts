@@ -35,3 +35,8 @@ export function logMemoryUsage(): void {
   //@ts-expect-error
   console.log(performance.memory.usedJSHeapSize / (8 * 1024 * 1024) + " mb"); // how much you're currently using
 }
+
+// Returns a random integer from 0 to range - 1.
+export function randomInt(range: number): number {
+  return Math.floor(Math.random() * range);
+}

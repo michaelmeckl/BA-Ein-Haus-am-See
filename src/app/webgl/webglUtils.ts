@@ -59,6 +59,36 @@ export function computeKernelWeight(kernel: number[]): number {
   return weight <= 0 ? 1 : weight;
 }
 
+// Fills the buffer with the values that define a rectangle.
+export function setRectangle(
+  gl: WebGLRenderingContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  const x1 = x;
+  const x2 = x + width;
+  const y1 = y;
+  const y2 = y + height;
+
+  // NOTE: gl.bufferData(gl.ARRAY_BUFFER, ...) will affect
+  // whatever buffer is bound to the `ARRAY_BUFFER` bind point
+  // but so far we only have one buffer. If we had more than one
+  // buffer we'd want to bind that buffer to `ARRAY_BUFFER` first.
+
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
+    gl.STATIC_DRAW
+  );
+}
+
+export function drawWebglElements(gl: WebGL2RenderingContext, bufferInfo: twgl.BufferInfo): void {
+  //* this uses either drawArrays or drawElements automatically based on the supplied buffer info
+  return twgl.drawBufferInfo(gl, bufferInfo);
+}
+
 export function bindFramebufferAndSetViewport(
   gl: WebGL2RenderingContext,
   fb: WebGLFramebuffer | null,
@@ -101,7 +131,7 @@ export function setupWebGLProgram(
 
 // see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
 export function createShader(
-  gl: WebGL2RenderingContext,
+  gl: WebGLRenderingContext,
   type: shaderType,
   source: string
 ): WebGLShader {
@@ -129,7 +159,7 @@ export function createShader(
  * see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
  */
 export function createProgram(
-  gl: WebGL2RenderingContext,
+  gl: WebGLRenderingContext,
   vertexShader: WebGLShader,
   fragmentShader: WebGLShader
 ): WebGLProgram {
@@ -203,6 +233,24 @@ function resetCanvas(gl: WebGL2RenderingContext): void {
  */
 export function setupAttribVAO(gl: WebGL2RenderingContext, geometries: any[], attribs: any[]): any {
   // at init time
+
+  /*
+  //TODO
+  const bufferInfo = twgl.createBufferInfoFromArrays(gl, {
+    position: {
+      numComponents: 2,
+      data: [-x, -y, x, -y, -x, y, -x, y, x, -y, x, y],
+    },
+    texcoord: [0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0],
+    id: {
+      numComponents: 1,
+      data: ids,
+      divisor: 1,
+    },
+  });
+  twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
+  */
+
   //for each model / geometry / ...
   for (let index = 0; index < geometries.length; index++) {
     const vao = gl.createVertexArray();

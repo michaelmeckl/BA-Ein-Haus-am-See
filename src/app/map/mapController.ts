@@ -34,6 +34,7 @@ import bbox from "@turf/bbox";
 import geojsonCoords from "@mapbox/geojson-coords";
 import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { addWebglCircle } from "../webgl/webglCircle";
+import { testCampusExampes } from "../webgl/successfulExamples";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -175,7 +176,9 @@ export default class MapController {
     //sortDistances(e.lngLat);
     */
 
-    addWebglCircle(map);
+    //addWebglCircle(map);
+
+    testCampusExampes();
 
     //this.showCurrentViewportCircle();
 

@@ -2,6 +2,35 @@ import { mat4 } from "gl-matrix";
 import mapboxgl, { CustomLayerInterface } from "mapbox-gl";
 import * as webglUtils from "./webglUtils";
 
+//! folgendes geht nicht, da webgl 2 und webgl2 wird von mapbox custom layer noch nicht unterstützt!
+/*
+// Create a vertex array object (attribute state)
+vao = gl.createVertexArray();
+
+// and make it the one we're currently working with
+gl.bindVertexArray(vao);
+
+// Turn on the attribute
+gl.enableVertexAttribArray(positionAttributeLocation);
+
+// in render
+// Bind the attribute/buffer set we want.
+// gl.bindVertexArray(vao);
+
+*/
+
+//! clear and resize nicht nötig in render bei custom layer, sonst schon!
+/*
+twgl.resizeCanvasToDisplaySize(gl.canvas);
+
+// Tell WebGL how to convert from clip space to pixels
+gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+// Clear the canvas
+gl.clearColor(0, 0, 0, 0);
+gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+*/
+
 function getCircleVertexSource(): string {
   // Vertex shader program
 
@@ -39,7 +68,7 @@ function getCircleFragmentSource(): string {
 // Initialize the buffers we'll need. For this demo, we just
 // have one object -- a simple two-dimensional square.
 //
-function initBuffers(gl: WebGLRenderingContext, startingPosition: mapboxgl.MercatorCoordinate) {
+function initBuffers(gl: WebGLRenderingContext, startingPositions: mapboxgl.MercatorCoordinate[]) {
   // Create a buffer for the square's positions.
   const positionBuffer = gl.createBuffer();
 
@@ -48,6 +77,24 @@ function initBuffers(gl: WebGLRenderingContext, startingPosition: mapboxgl.Merca
 
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
+  const positions: any[] = [];
+  for (const pos of startingPositions) {
+    //positions.push(...[pos.x, pos.y]);
+    const positions = [pos.x, pos.y];
+
+    // use 100 points to draw the circle
+    const totalPoints = 100;
+    for (let i = 0; i <= totalPoints; i++) {
+      positions.push(Math.cos((i * 2 * Math.PI) / totalPoints));
+      positions.push(Math.sin((i * 2 * Math.PI) / totalPoints));
+    }
+
+    console.log(positions);
+
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+  }
+
+  /*
   const positions = [startingPosition.x, startingPosition.y];
 
   // use 100 points to draw the circle
@@ -56,6 +103,7 @@ function initBuffers(gl: WebGLRenderingContext, startingPosition: mapboxgl.Merca
     positions.push(Math.cos((i * 2 * Math.PI) / totalPoints));
     positions.push(Math.sin((i * 2 * Math.PI) / totalPoints));
   }
+  */
 
   //console.log(positions);
 
@@ -63,7 +111,7 @@ function initBuffers(gl: WebGLRenderingContext, startingPosition: mapboxgl.Merca
   // shape. We do this by creating a Float32Array from the
   // JavaScript array, then use it to fill the current buffer.
 
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+  //gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
   // Now set up the colors for the vertices
 
@@ -202,7 +250,7 @@ function drawScene(gl: WebGLRenderingContext, programInfo: any, buffers: any) {
   );
 
   const offset = 0;
-  const vertexCount = 102;
+  const vertexCount = 816;
   gl.drawArrays(gl.TRIANGLE_FAN, offset, vertexCount);
 }
 
@@ -224,8 +272,6 @@ function loadCustomData(): any {
     lng: 12.0989967,
     lat: 49.0016276,
   });
-
-  console.log([uniSouthEast, uniNorthEast, uniSouthWest, uniNorthWest]);
 
   return [uniSouthEast, uniNorthEast, uniSouthWest, uniNorthWest];
 }
@@ -272,125 +318,206 @@ export function addWebglCircle(map: mapboxgl.Map): void {
     },
 
     render: function (gl: WebGL2RenderingContext, matrix: number[]): void {
-      console.log("in for each: ", vertices[3]);
-      buffers = initBuffers(gl, vertices[3]);
-      drawScene(gl, programInfo, buffers);
-
       //TODO only draws one circle:
       // look at the windgl code, there are many things rendered at the same time
+
       /*
       vertices.forEach((element: mapboxgl.MercatorCoordinate) => {
         console.log("in for each: ", element);
         buffers = initBuffers(gl, element);
         drawScene(gl, programInfo, buffers);
-      });*/
+      });
+      */
+      buffers = initBuffers(gl, vertices);
+      drawScene(gl, programInfo, buffers);
     },
   };
 
   map.addLayer(glCircleLayer);
 }
 
-//Alternative funktion für circle in fragment shader:
 /*
-function main() {
-  const gl = document.querySelector("canvas").getContext("webgl");
-  const ext = gl.getExtension("ANGLE_instanced_arrays");
-  if (!ext) {
-    return alert("need ANGLE_instanced_arrays");
-  }
-  twgl.addExtensionsToContext(gl);
 
-  const vs = `
-  attribute float id;
-  attribute vec4 position;
-  attribute vec2 texcoord;
-  
-  uniform float time;
-  
-  varying vec2 v_texcoord;
-  varying vec4 v_color;
-  
-  void main() {
-    float o = id + time;
-    gl_Position = position + vec4(
-        vec2(
-             fract(o * 0.1373),
-             fract(o * 0.5127)) * 2.0 - 1.0,
-        0, 0);
-        
-    v_texcoord = texcoord;
-    v_color = vec4(fract(vec3(id) * vec3(0.127, 0.373, 0.513)), 1);
-  }`;
-
-  const fs = `
-  precision mediump float;
-  varying vec2 v_texcoord;
-  varying vec4 v_color;
-  void main() {
-    gl_FragColor = mix(
-       v_color, 
-       vec4(0), 
-       step(1.0, length(v_texcoord.xy * 2. - 1.)));
-  }
-  `;
-
-  // compile shaders, link program, look up locations
-  const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
-
-  const maxCount = 250000;
-  const ids = new Float32Array(maxCount);
-  for (let i = 0; i < ids.length; ++i) {
-    ids[i] = i;
-  }
-  const x = (16 / 300) * 2;
-  const y = (16 / 150) * 2;
-
-  const bufferInfo = twgl.createBufferInfoFromArrays(gl, {
-    position: {
-      numComponents: 2,
-      data: [-x, -y, x, -y, -x, y, -x, y, x, -y, x, y],
-    },
-    texcoord: [0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0],
-    id: {
-      numComponents: 1,
-      data: ids,
-      divisor: 1,
-    },
-  });
-  twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
-
-  const fpsElem = document.querySelector("#fps");
-  const countElem = document.querySelector("#count");
-
-  let count;
-  function getCount() {
-    count = Math.min(maxCount, parseInt(countElem.value));
-  }
-
-  countElem.addEventListener("input", getCount);
-  getCount();
-
-  const maxHistory = 60;
-  const fpsHistory = new Array(maxHistory).fill(0);
-  let historyNdx = 0;
-  let historyTotal = 0;
-
-  let then = 0;
-  function render(now) {
-    const deltaTime = now - then;
-    then = now;
-
-    historyTotal += deltaTime - fpsHistory[historyNdx];
-    fpsHistory[historyNdx] = deltaTime;
-    historyNdx = (historyNdx + 1) % maxHistory;
-
-    fpsElem.textContent = (1000 / (historyTotal / maxHistory)).toFixed(1);
+function drawLoop(
+  gl: WebGL2RenderingContext,
+  objectsToDraw: any[],
+  bufferInfo: twgl.BufferInfo
+): void {
+  // ------ Draw the objects --------
+  objectsToDraw.forEach(function (object) {
+    const programInfo = object.programInfo;
 
     gl.useProgram(programInfo.program);
-    twgl.setUniforms(programInfo, { time: now * 0.001 });
-    ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, 6, count);
-    requestAnimationFrame(render);
+
+    // Setup all the needed attributes.
+    gl.bindVertexArray(object.vertexArray);
+
+    // Set the uniforms.
+    twgl.setUniforms(programInfo, object.uniforms);
+
+    // Draw
+    twgl.drawBufferInfo(gl, bufferInfo);
+  });
+}
+
+export function setupCircles(): void {
+  const canvas = document.querySelector("#test_canvas") as HTMLCanvasElement;
+  const gl = canvas.getContext("webgl2");
+  if (!gl) {
+    return;
   }
-  requestAnimationFrame(render);
+  canvas.style.position = "relative";
+
+  const vertices = loadCustomData();
+  console.log(vertices);
+
+  const vs = getCircleVertexSource();
+  const fs = getCircleFragmentSource();
+
+  // setup GLSL program
+  const programinfo = twgl.createProgramInfo(gl, [vs, fs]);
+  const program = programinfo.program;
+  const uniformSetters = twgl.createUniformSetters(gl, program);
+  const attribSetters = twgl.createAttributeSetters(gl, program);
+
+  const positions: any[] = [];
+  for (const pos of vertices) {
+    positions.push(...[pos.x, pos.y]);
+
+    // use 100 points to draw the circle
+    const totalPoints = 100;
+    for (let i = 0; i <= totalPoints; i++) {
+      positions.push(Math.cos((i * 2 * Math.PI) / totalPoints));
+      positions.push(Math.sin((i * 2 * Math.PI) / totalPoints));
+    }
+  }
+
+  twgl.setAttributePrefix("a_");
+
+  // a single triangle
+  const arrays: twgl.Arrays = {
+    position: { numComponents: 3, data: [0, -10, 0, 10, 10, 0, -10, 10, 0] },
+    texcoord: { numComponents: 2, data: [0.5, 0, 1, 1, 0, 1] },
+    normal: { numComponents: 3, data: [0, 0, 1, 0, 0, 1, 0, 0, 1] },
+  };
+  const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+  // Now set up the colors for the vertices
+
+  const colors = [
+    1.0,
+    1.0,
+    1.0,
+    1.0, // RGBA COLOR
+  ];
+
+  for (let i = 0; i <= 100; i++) {
+    if (i % 2 === 0) {
+      colors.push(1.0, 0.0, 0.0, 1.0);
+    } else {
+      colors.push(1.0, 0.0, 1.0, 1.0);
+    }
+  }
+
+  const sphereBufferInfo = primitives.createSphereBufferInfo(gl, 10, 12, 6);
+  const cubeBufferInfo = primitives.createCubeBufferInfo(gl, 20);
+  const coneBufferInfo = primitives.createTruncatedConeBufferInfo(
+    gl,
+    10,
+    0,
+    20,
+    12,
+    1,
+    true,
+    false
+  );
+
+  //const vao = twgl.createVAOFromBufferInfo(gl, attribSetters, bufferInfo) as WebGLVertexArrayObject;
+  const vao = twgl.createVAOFromBufferInfo(gl, attribSetters, bufferInfo);
+
+  const uniformsThatAreTheSameForAllObjects = {
+    uniformMatrix: [-50, 30, 100],
+  };
+
+  const uniformsThatAreComputedForEachObject = {
+    uniformProjectionMatrix: twgl.m4.identity(),
+  };
+
+  const objectsToDraw = [
+    {
+      programInfo: programInfo,
+      bufferInfo: sphereBufferInfo,
+      vertexArray: sphereVAO,
+      uniforms: sphereUniforms,
+    },
+    {
+      programInfo: programInfo,
+      bufferInfo: cubeBufferInfo,
+      vertexArray: cubeVAO,
+      uniforms: cubeUniforms,
+    },
+    {
+      programInfo: programInfo,
+      bufferInfo: coneBufferInfo,
+      vertexArray: coneVAO,
+      uniforms: coneUniforms,
+    },
+  ];
+
+  const textures: string | any[] = [];
+
+  // Draw the scene.
+  function drawScene(time: number) {
+    if (!gl) {
+      return;
+    }
+
+    // eslint-disable-next-line no-param-reassign
+    time = 5 + time * 0.0001;
+
+    twgl.resizeCanvasToDisplaySize(gl.canvas as HTMLCanvasElement);
+
+    // Tell WebGL how to convert from clip space to pixels
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+    gl.enable(gl.DEPTH_TEST);
+
+    // Compute the projection matrix
+    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    const projectionMatrix = twgl.m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
+
+    // Compute the camera's matrix using look at.
+    const cameraPosition = [0, 0, 100];
+    const target = [0, 0, 0];
+    const up = [0, 1, 0];
+    const cameraMatrix = twgl.m4.lookAt(
+      cameraPosition,
+      target,
+      up,
+      uniformsThatAreTheSameForAllObjects.u_viewInverse
+    );
+
+    // Make a view matrix from the camera matrix.
+    const viewMatrix = twgl.m4.inverse(cameraMatrix);
+
+    const viewProjectionMatrix = twgl.m4.multiply(projectionMatrix, viewMatrix);
+
+    gl.useProgram(program);
+
+    // Setup all the needed attributes.
+    gl.bindVertexArray(vao);
+
+    // Set the uniforms that are the same for all objects.
+    twgl.setUniforms(uniformSetters, uniformsThatAreTheSameForAllObjects);
+    drawLoop(gl, objectsToDraw, bufferInfo);
+
+    requestAnimationFrame(drawScene);
+  }
+
+  requestAnimationFrame(drawScene);
 }
 */
