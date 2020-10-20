@@ -366,8 +366,7 @@ export default class OsmRouter {
         // add a buffer to all lines and polygons
         // This also replaces all line features with buffered polygon features as turf.buffer() returns
         // Polygons (or Multipolygons).
-        //@ts-expect-error
-        polygonFeatures.push(buffer(feature, bufferSize, { units: "meters" }));
+        polygonFeatures.push(buffer(feature, bufferSize, "meters"));
       } else {
         break;
       }

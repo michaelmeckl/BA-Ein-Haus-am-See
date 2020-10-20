@@ -42,7 +42,7 @@
     "@turf/boolean-contains": "^6.0.1",
     "@turf/boolean-point-in-polygon": "^6.0.1",
     "@turf/boolean-within": "^6.0.1",
-    "@turf/buffer": "^5.1.5",
+    "@turf/buffer": "^4.7.3",
     "@turf/centroid": "^6.0.2",
     "@turf/circle": "^6.0.1",
     "@turf/clean-coords": "^6.0.1",

@@ -429,6 +429,7 @@ export default class MapController {
 
     mapLayerManager.removeAllLayersForSource("currFeatures");
 
+    /*
     // show the points
     const layer: Layer = {
       id: "points",
@@ -450,6 +451,7 @@ export default class MapController {
 
     mapLayerManager.addNewLayer(layer, true);
     //mapLayerManager.addLayers("currFeatures");
+    */
   }
 
   showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
@@ -460,7 +462,6 @@ export default class MapController {
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(sourceName);
 
-    //TODO
     this.preprocessGeoData(data);
     //return;
 

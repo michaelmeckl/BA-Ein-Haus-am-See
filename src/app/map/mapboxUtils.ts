@@ -3,25 +3,16 @@
  */
 import bboxPolygon from "@turf/bbox-polygon";
 import circle from "@turf/circle";
-import difference from "@turf/difference";
-import distance from "@turf/distance";
 import intersect from "@turf/intersect";
-import mask from "@turf/mask";
 import union from "@turf/union";
 import type { Feature, GeoJsonProperties, LineString, MultiPolygon, Point, Polygon } from "geojson";
 import mapboxgl, { LngLat, LngLatLike } from "mapbox-gl";
+import WebWorker from "worker-loader!../worker";
 import Benchmark from "../../shared/benchmarking";
 import { map } from "./mapboxConfig";
-import * as turfHelpers from "@turf/helpers";
+import mapLayerManager from "./mapLayerManager";
 import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
 import { addBufferToFeature } from "./turfUtils";
-import { logMemoryUsage } from "../utils";
-import mapLayerManager from "./mapLayerManager";
-import { featureCollection } from "@turf/helpers";
-import { fetchMaskData } from "../network/networkUtils";
-import geobuf from "geobuf";
-import Pbf from "pbf";
-import WebWorker from "worker-loader!../worker";
 // TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
 
 export async function testTilequeryAPI(): Promise<void> {
@@ -160,22 +151,22 @@ export function convertAllFeaturesToPolygons(
 
   for (let index = 0; index < features.length; index++) {
     const feature = features[index];
+    // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
+    polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
 
+    /*
     if (feature.geometry.type === "Point") {
-      //! turf can add properties mit turf.point([...], {additional Props hierher})
-      const circleOptions = { steps: 80, units: "meters" /*, properties: {foo: 'bar'}*/ };
       // replace all point features with circle polygon features
-      polygonFeatures.push(
-        circle(feature as Feature<Point, GeoJsonProperties>, bufferSize, circleOptions)
-      );
+      const circleOptions = { steps: 80, units: "meters"};
+      polygonFeatures.push(circle(feature as Feature<Point, GeoJsonProperties>, bufferSize, circleOptions));
     } else if (feature.geometry.type === "LineString" || feature.geometry.type === "Polygon") {
       // add a buffer to all lines and polygons
       // This also replaces all line features with buffered polygon features as turf.buffer() returns
       // Polygons (or Multipolygons).
-      polygonFeatures.push(addBufferToFeature(feature, "meters", bufferSize));
+      polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
     } else {
       break;
-    }
+    }*/
   }
 
   return polygonFeatures;
@@ -361,12 +352,6 @@ export async function showDifferenceBetweenViewportAndFeature(
 ): Promise<any> {
   //setupWebWorker(features);
 
-  Benchmark.startMeasure("calculateMaskAndIntersections");
-  const featureObject = await calculateMaskAndIntersections([...features]);
-  Benchmark.stopMeasure("calculateMaskAndIntersections");
-  console.log(featureObject);
-
-  /*
   // perf-results without web worker: 304 ms, 611 ms, 521 ms, 247 ms, 962ms => avg: 529 ms
   Benchmark.startMeasure("showing mask data");
 
@@ -374,6 +359,7 @@ export async function showDifferenceBetweenViewportAndFeature(
   const featureObject = await calculateMaskAndIntersections([...features]);
   Benchmark.stopMeasure("calculateMaskAndIntersections");
 
+  /*
   const maske = featureObject.unionPolygons;
   const intersects: any[] = featureObject.intersections;
 
@@ -428,3 +414,26 @@ export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
 export function convertToLatLngCoord(point: mapboxgl.PointLike): LngLat {
   return map.unproject(point);
 }
+
+//! doesn't seem to work unfortunately :(
+/*
+// add webgl 2 support to the mapbox canvas even though it is not supported officially yet
+// this function was taken from this issue: https://github.com/mapbox/mapbox-gl-js/issues/8581
+export function addWebgl2Support(): void {
+  //include webgl2 in mapboxgl
+  if (mapboxgl.Map.prototype._setupPainter.toString().indexOf("webgl2") == -1) {
+    var _setupPainter_old = mapboxgl.Map.prototype._setupPainter;
+    mapboxgl.Map.prototype._setupPainter = function () {
+      getContext_old = this._canvas.getContext;
+      this._canvas.getContext = function (name, attrib) {
+        return (
+          getContext_old.apply(this, ["webgl2", attrib]) ||
+          getContext_old.apply(this, ["webgl", attrib]) ||
+          getContext_old.apply(this, ["experimental-webgl", attrib])
+        );
+      };
+      _setupPainter_old.apply(this);
+      this._canvas.getContext = getContext_old;
+    };
+  }
+}*/
