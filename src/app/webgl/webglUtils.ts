@@ -228,6 +228,16 @@ function resetCanvas(gl: WebGL2RenderingContext): void {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
+// Util to enable VAO extension for Webgl 1
+function enableVAOExtension(gl: WebGLRenderingContext): void {
+  const ext = gl.getExtension("OES_vertex_array_object");
+  if (!ext) {
+    // tell user they don't have the required extension or work around it
+  } else {
+    const someVAO = ext.createVertexArrayOES();
+  }
+}
+
 /**
  * * Use this at init time for performance improvement (only useful with WebGL2 though!)
  */

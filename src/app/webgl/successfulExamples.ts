@@ -3,6 +3,10 @@ import { map } from "../map/mapboxConfig";
 import * as twgl from "twgl.js";
 import { setRectangle } from "./webglUtils";
 
+/**
+ * for drawing Rectangles and Circles around map points
+ */
+
 const defaultVertexSource = `
 
 attribute vec2 a_pos;
