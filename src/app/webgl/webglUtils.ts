@@ -59,6 +59,21 @@ export function computeKernelWeight(kernel: number[]): number {
   return weight <= 0 ? 1 : weight;
 }
 
+export function getPixelsFromImage(texture: HTMLImageElement): Uint8Array | null {
+  // use canvas to get the pixel data array of the image
+  const canvas = document.createElement("canvas");
+  canvas.width = texture.width;
+  canvas.height = texture.width;
+  const ctx = canvas.getContext("2d");
+  ctx?.drawImage(texture, 0, 0);
+  const imageData = ctx?.getImageData(0, 0, texture.width, texture.height);
+  if (!imageData) {
+    return null;
+  }
+  const pixels = new Uint8Array(imageData.data.buffer);
+  return pixels;
+}
+
 // Fills the buffer with the values that define a rectangle.
 export function setRectangle(
   gl: WebGLRenderingContext,
@@ -76,7 +91,6 @@ export function setRectangle(
   // whatever buffer is bound to the `ARRAY_BUFFER` bind point
   // but so far we only have one buffer. If we had more than one
   // buffer we'd want to bind that buffer to `ARRAY_BUFFER` first.
-
   gl.bufferData(
     gl.ARRAY_BUFFER,
     new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
@@ -127,6 +141,69 @@ export function setupWebGLProgram(
   fs: string
 ): twgl.ProgramInfo {
   return twgl.createProgramInfo(glContext, [vs, fs]);
+}
+
+export function createTexture(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  data: Uint8Array | HTMLImageElement,
+  unit = 0,
+  filter: number = gl.NEAREST,
+  width = 1,
+  height = 1
+): WebGLTexture | null {
+  const texture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+
+  if (data instanceof Uint8Array) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  } else {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  }
+
+  //gl.bindTexture(gl.TEXTURE_2D, null);
+  return texture;
+}
+
+export function createBuffer(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  data: any
+): WebGLBuffer | null {
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  return buffer;
+}
+
+export function bindAttribute(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  buffer: WebGLBuffer | null,
+  attribute: number,
+  numComponents = 2
+): void {
+  // bind the corresponding buffer
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  // turn the attribute on
+  gl.enableVertexAttribArray(attribute);
+  // tell the attribute how to get data out of the buffer
+  gl.vertexAttribPointer(attribute, numComponents, gl.FLOAT, false, 0, 0);
+}
+
+export function setupCanvasForDrawing(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  clearColor: [number, number, number, number] = [0, 0, 0, 0]
+): void {
+  // Tell WebGL how to convert from clip space to pixels
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+  // Clear the canvas
+  gl.clearColor(...clearColor);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
 // see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html

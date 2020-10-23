@@ -457,15 +457,13 @@ export default class MapController {
     */
   }
 
-  //TODO als sourceName nur das hinter dem = nehmen? (mit regex z.B. const regex = /ab+/;)
   showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
     console.log("original Data:", data);
     console.log("now adding to map...");
     console.log(sourceName);
 
-    const name = sourceName.split("=");
-    console.log(name);
-    console.log(name[1]);
+    //TODO als sourceName nur das hinter dem = nehmen? (mit regex z.B. const regex = /ab+/;)
+    //const name = sourceName.split("=")[1];
 
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(sourceName);
@@ -500,8 +498,6 @@ export default class MapController {
     //if (!gl) return;
 
     const img = new Image();
-    img.src = mapCanvas.toDataURL();
-    //console.log(img.src); // um bild anzuschauen copy paste in adress bar in browser
 
     img.onload = () => {
       img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
@@ -522,6 +518,8 @@ export default class MapController {
         //addBlurredImage(img, canvas);
       }
     };
+    img.src = mapCanvas.toDataURL();
+    //console.log(img.src); // um bild anzuschauen copy paste in adress bar in browser
   }
 
   /**
@@ -767,6 +765,7 @@ export default class MapController {
 
     // ########################  Overlay Stuff ends #######################
 
+    //* Lumagl code:
     /*
     console.log("adding luma layer ...");
 
