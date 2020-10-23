@@ -8,6 +8,7 @@ import type {
   GeoJsonProperties,
   GeometryObject,
   LineString,
+  MultiPolygon,
   Point,
   Polygon,
 } from "geojson";
@@ -35,6 +36,7 @@ import geojsonCoords from "@mapbox/geojson-coords";
 import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { addWebglCircle } from "../webgl/webglCircle";
 import { testCampusExampes } from "../webgl/successfulExamples";
+import createOverlay from "../webgl/overlayCreator";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -55,8 +57,8 @@ export default class MapController {
   private currentPoints = new Set<Feature<Point, GeoJsonProperties>>();
   private currentWays = new Set<Feature<LineString, GeoJsonProperties>>();
   private currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
-  //TODO
-  private allPolygonFeatures: any[] = [];
+  //prettier-ignore
+  private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
 
   private activeFilters: Set<string> = new Set();
 
@@ -178,7 +180,7 @@ export default class MapController {
 
     //addWebglCircle(map);
 
-    testCampusExampes();
+    //testCampusExampes();
 
     //this.showCurrentViewportCircle();
 
@@ -331,7 +333,7 @@ export default class MapController {
     mapLayerManager.removeSource(sourceName);
   }
 
-  preprocessGeoData(data: FeatureCollection<GeometryObject, any>): void {
+  preprocessGeoData(data: FeatureCollection<GeometryObject, any>, dataName: string): void {
     // TODO another option would be to let them be and use them as a client side cache later???
     this.currentPoints.clear();
     this.currentWays.clear();
@@ -400,7 +402,8 @@ export default class MapController {
     console.log("this.currentPolygons: ", this.currentPolygons);
 
     const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
-    this.allPolygonFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures);
+    const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures, 250);
+    this.allPolygonFeatures.set(dataName, polyFeatures);
     //this.showPreprocessedData(allFeatures);
   }
 
@@ -454,15 +457,20 @@ export default class MapController {
     */
   }
 
+  //TODO als sourceName nur das hinter dem = nehmen? (mit regex z.B. const regex = /ab+/;)
   showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
     console.log("original Data:", data);
     console.log("now adding to map...");
     console.log(sourceName);
 
+    const name = sourceName.split("=");
+    console.log(name);
+    console.log(name[1]);
+
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(sourceName);
 
-    this.preprocessGeoData(data);
+    this.preprocessGeoData(data, sourceName);
     //return;
 
     if (map.getSource(sourceName)) {
@@ -593,20 +601,22 @@ export default class MapController {
   }
 
   addLumaGlLayer(): void {
-    console.log("adding luma layer ...");
-
-    const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat({
+    const usw = {
       lng: 12.089283,
       lat: 48.9920256,
-    });
-    const uniSouthEast = mapboxgl.MercatorCoordinate.fromLngLat({
+    };
+    const use = {
       lng: 12.1025303,
       lat: 48.9941069,
-    });
-    const uniNorthWest = mapboxgl.MercatorCoordinate.fromLngLat({
+    };
+    const unw = {
       lng: 12.0909411,
       lat: 49.0012031,
-    });
+    };
+
+    const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat(usw);
+    const uniSouthEast = mapboxgl.MercatorCoordinate.fromLngLat(use);
+    const uniNorthWest = mapboxgl.MercatorCoordinate.fromLngLat(unw);
 
     const data = [uniSouthEast, uniNorthWest, uniSouthWest];
 
@@ -625,11 +635,142 @@ export default class MapController {
       }),
 
       mapboxgl.MercatorCoordinate.fromLngLat({
-        lng: 12.59177370071411,
+        lng: 12.12177370071411,
         lat: 49.0198169751917,
       }),
     ];
 
+    //TODO this should of course happen somewhere else later but for now just test it here:
+    // ########################  Overlay Stuff starts #######################
+
+    const ab = {
+      lng: 12.09822,
+      lat: 49.006714,
+    };
+
+    const cd = {
+      lng: 12.09299,
+      lat: 49.006714,
+    };
+
+    const ef = {
+      lng: 12.084302,
+      lat: 49.017167,
+    };
+
+    const gh = {
+      lng: 12.083916,
+      lat: 49.015225,
+    };
+
+    const ij = {
+      lng: 12.0873,
+      lat: 49.014634,
+    };
+
+    const kl = {
+      lng: 12.088203,
+      lat: 49.015844,
+    };
+
+    const aa = { lng: 12.106899071216729, lat: 49.011636152227666 };
+    const aaa = { lng: 12.106187741742344, lat: 49.012298273504406 };
+    const ac = { lng: 12.105293115952813, lat: 49.012856640245396 };
+    const ad = { lng: 12.104249578251874, lat: 49.01328978965319 };
+    const ae = { lng: 12.103097240488244, lat: 49.013581072390174 };
+    const af = { lng: 12.101880399066786, lat: 49.01371929295886 };
+    const ag = { lng: 12.100645830727052, lat: 49.013699140192415 };
+    const ah = { lng: 12.099440992775836, lat: 49.01352139127261 };
+    const aj = { lng: 12.098312197267857, lat: 49.01319288144877 };
+    const ak = { lng: 12.097302829613584, lat: 49.01272624068412 };
+    const al = { lng: 12.096451680322966, lat: 49.012139407453525 };
+    const am = { lng: 12.095791454144237, lat: 49.011454938505246 };
+    const an = { lng: 12.095347513915694, lat: 49.01069914124463 };
+
+    console.log(this.allPolygonFeatures);
+    console.log(this.allPolygonFeatures.size);
+
+    const overlayAlternative: mapboxgl.Point[][][] = [];
+
+    const poly0 = [usw, use, ab];
+    const poly1 = [usw, use, unw, ab, cd];
+    const poly2 = [ef, gh, ij, kl];
+    const poly3 = [usw, use, ab, cd];
+    const kreis = [aa, aa, aaa, ac, ad, ae, af, ag, ah, aj, ak, al, am, an];
+
+    // layer 1
+    overlayAlternative[0] = []; //! WICHTIG
+    overlayAlternative[0].push(poly1.map((el) => mapboxUtils.convertToPixelCoord(el)));
+    overlayAlternative[0].push(poly2.map((el) => mapboxUtils.convertToPixelCoord(el)));
+    // layer 2
+    overlayAlternative[1] = [];
+    overlayAlternative[1].push(poly0.map((el) => mapboxUtils.convertToPixelCoord(el)));
+    overlayAlternative[1].push(kreis.map((el) => mapboxUtils.convertToPixelCoord(el)));
+    // layer 3
+    overlayAlternative[2] = [];
+    overlayAlternative[2].push(poly3.map((el) => mapboxUtils.convertToPixelCoord(el)));
+
+    /*
+    const currentMapData: Feature<Polygon | MultiPolygon, GeoJsonProperties>[][][] = [];
+    let ii = 0;
+    this.activeFilters.forEach((filter) => {
+      const polyData = this.allPolygonFeatures.get(filter);
+      if (polyData) {
+        currentMapData[ii] = []; // needs to be initialized before adding data!
+        currentMapData[ii].push(polyData);
+      }
+      ii++;
+    });
+    console.log("currentMapData: ", currentMapData);
+    */
+
+    const overlayData: mapboxgl.Point[][][] = [];
+    console.log(this.activeFilters);
+
+    //! wenn die polygon features sonst nirgendwo gebraucht werden, könnt man gleich oben wenn sie in die Map
+    //! gespeichert werden, sie zu Punkten umwandeln, dann könnte man vllt die doppelte for-schleife hier vermeiden
+
+    let i = 0;
+    for (const features of this.allPolygonFeatures.values()) {
+      overlayData[i] = [];
+      for (let index = 0; index < features.length; index++) {
+        const feature = features[index];
+        const coords = feature.geometry.coordinates;
+
+        // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
+        if (coords.length > 1) {
+          //? oder will ich hier das das zu einem array "flatten" und nur dieses pushen??
+          console.log("Multipolygon: ", coords);
+          //const flattened = [];
+          //TODO Multipolygone führen aber so zum Beispiel bei der Donau zu vollkommen falschen Renderergebnissen!!
+          //TODO vllt doch direkt im shader statt mit turf ?
+          for (const coordPart of coords) {
+            //@ts-expect-error
+            //prettier-ignore
+            overlayData[i].push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+          }
+          //overlayData[i].push(flattened);
+        } else {
+          console.log("Polygon");
+          //@ts-expect-error
+          //prettier-ignore
+          overlayData[i].push(coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+        }
+      }
+      i++;
+    }
+
+    console.log("OverlayData: ", overlayData);
+    console.log("OverlayAlternative: ", overlayAlternative);
+
+    createOverlay(overlayAlternative);
+
+    // ########################  Overlay Stuff ends #######################
+
+    /*
+    console.log("adding luma layer ...");
+
     const animationLoop = new LumaLayer(data, data2);
+    */
   }
 }

@@ -218,7 +218,7 @@ export function clearCanvas(gl: WebGL2RenderingContext): void {
 }
 
 //* Kombination of the two methods above
-function resetCanvas(gl: WebGL2RenderingContext): void {
+export function resetCanvas(gl: WebGL2RenderingContext | WebGLRenderingContext): void {
   gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
   gl.clearDepth(1.0); // Clear everything
   gl.enable(gl.DEPTH_TEST); // Enable depth testing

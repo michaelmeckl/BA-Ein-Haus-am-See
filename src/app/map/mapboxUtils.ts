@@ -13,6 +13,11 @@ import { map } from "./mapboxConfig";
 import mapLayerManager from "./mapLayerManager";
 import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
 import { addBufferToFeature } from "./turfUtils";
+import geojsonCoords from "@mapbox/geojson-coords";
+import { chunk } from "lodash";
+import { type } from "os";
+import { Position } from "@turf/helpers";
+import { convertToMercatorCoordinates } from "./featureUtils";
 // TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
 
 export async function testTilequeryAPI(): Promise<void> {
@@ -145,14 +150,18 @@ export function getViewportAsPolygon(): Feature<Polygon, GeoJsonProperties> {
 
 export function convertAllFeaturesToPolygons(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[],
-  bufferSize = 100
+  bufferSize = 500
 ): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
   const polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
+
+  Benchmark.startMeasure("adding buffer to all features");
 
   for (let index = 0; index < features.length; index++) {
     const feature = features[index];
     // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
+    Benchmark.startMeasure("adding buffer to feature");
     polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
+    Benchmark.stopMeasure("adding buffer to feature");
 
     /*
     if (feature.geometry.type === "Point") {
@@ -168,6 +177,7 @@ export function convertAllFeaturesToPolygons(
       break;
     }*/
   }
+  Benchmark.stopMeasure("adding buffer to all features");
 
   return polygonFeatures;
 }
@@ -413,6 +423,68 @@ export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
  */
 export function convertToLatLngCoord(point: mapboxgl.PointLike): LngLat {
   return map.unproject(point);
+}
+
+export function getPixelCoordinates(
+  features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+): mapboxgl.Point[] {
+  const pixelCoords: mapboxgl.Point[] = [];
+
+  for (const feature of features) {
+    const coords = feature.geometry.coordinates;
+    for (const coord of coords) {
+      // check if this is a multidimensional array
+      if (Array.isArray(coords[0])) {
+        for (const coordPart of coord) {
+          pixelCoords.push(convertToPixelCoord(coordPart as LngLatLike));
+        }
+      } else {
+        pixelCoords.push(convertToPixelCoord((coord as unknown) as LngLatLike));
+      }
+    }
+  }
+
+  console.log("pixelCoords: ", pixelCoords);
+
+  return pixelCoords;
+}
+
+export function convertToMercatorCoordinates(arr: number[][]): number[] {
+  const MercatorCoordinates = arr.map((el) =>
+    mapboxgl.MercatorCoordinate.fromLngLat(el as LngLatLike)
+  );
+  //console.log("Mercator:", MercatorCoordinates);
+  return MercatorCoordinates.flatMap((x) => [x.x, x.y]);
+}
+
+export function getMercatorCoordinates(
+  features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+): mapboxgl.MercatorCoordinate[] {
+  const mercatorCoords: mapboxgl.MercatorCoordinate[] = [];
+
+  console.log(features);
+
+  for (const feature of features) {
+    const coords = feature.geometry.coordinates;
+
+    for (const coord of coords) {
+      // check if this is a multidimensional array
+      if (Array.isArray(coords[0])) {
+        for (const coordPart of coord) {
+          mercatorCoords.push(
+            mapboxgl.MercatorCoordinate.fromLngLat({ lng: coordPart[0], lat: coordPart[1] })
+          );
+        }
+      } else {
+        const mapCoord = ({ lng: coord[0], lat: coord[1] } as unknown) as LngLatLike;
+        mercatorCoords.push(mapboxgl.MercatorCoordinate.fromLngLat(mapCoord));
+      }
+    }
+  }
+
+  console.log("mercatorCoords: ", mercatorCoords);
+
+  return mercatorCoords;
 }
 
 //! doesn't seem to work unfortunately :(

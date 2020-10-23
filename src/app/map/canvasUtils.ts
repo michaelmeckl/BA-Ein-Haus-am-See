@@ -59,7 +59,7 @@ export function testCanvasBlurring(allPoints: any[]): void {
 }
 
 export function addImageOverlay(image: HTMLImageElement) {
-  // wait till map is loaded, then add a imageSource (or a canvas source alternatively)
+  // wait till map is loaded, then add a imageSource
   if (!map.loaded()) {
     return;
   }
@@ -67,13 +67,6 @@ export function addImageOverlay(image: HTMLImageElement) {
   map.addSource("myImageSource", {
     type: "image",
     url: image.src,
-    /*
-      coordinates: [
-        [-80.425, 46.437],
-        [-71.516, 46.437],
-        [-71.516, 37.936],
-        [-80.425, 37.936],
-      ],*/
   });
 
   map.addLayer({
