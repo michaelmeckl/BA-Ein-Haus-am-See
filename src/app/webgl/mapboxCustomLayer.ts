@@ -219,6 +219,9 @@ export class MapboxCustomLayer {
     // TODO oder:
     // desallocate memory after send data to avoid memory leak issues
     //gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+    // delete the gl context
+    //delete this.gl;
   }
 
   /**

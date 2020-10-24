@@ -385,7 +385,6 @@ class Overlay {
  `;
 
   private vs1 = `
-
     attribute vec2 a_position;
     attribute vec2 a_texCoord;
 
@@ -394,48 +393,50 @@ class Overlay {
     varying vec2 v_texCoord;
 
     void main() {
-    // convert the rectangle from pixels to 0.0 to 1.0
-    vec2 zeroToOne = a_position / u_resolution;
+        // convert the rectangle from pixels to 0.0 to 1.0
+        vec2 zeroToOne = a_position / u_resolution;
 
-    // convert from 0->1 to 0->2
-    vec2 zeroToTwo = zeroToOne * 2.0;
+        // convert from 0->1 to 0->2
+        vec2 zeroToTwo = zeroToOne * 2.0;
 
-    // convert from 0->2 to -1->+1 (clipspace)
-    vec2 clipSpace = zeroToTwo - 1.0;
+        // convert from 0->2 to -1->+1 (clipspace)
+        vec2 clipSpace = zeroToTwo - 1.0;
 
-    gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+        gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
 
-    // pass the texCoord to the fragment shader
-    // The GPU will interpolate this value between points.
-    v_texCoord = a_texCoord;
+        // pass the texCoord to the fragment shader
+        // The GPU will interpolate this value between points.
+        v_texCoord = a_texCoord;
     }
-    `;
+  `;
 
   //* hier muss Webgl1 verwendet werden, sonst gehen keine dynamischen Variablen in der for-Schleife!
   private fs1 = `
-    precision mediump float;
+    precision mediump float;    // mediump should be enough and highp isn't supported on all devices
 
     #define NUM_TEXTURES ${this.textureCount}
 
-    // our textures
-    uniform sampler2D u_image0;
-    uniform sampler2D u_image1;
-
-    uniform sampler2D textures[NUM_TEXTURES];
+    // array of textures
+    uniform sampler2D u_textures[NUM_TEXTURES];
 
     // the texCoords passed in from the vertex shader.
     varying vec2 v_texCoord;
 
     void main() {
-        vec4 color0 = texture2D(u_image0, v_texCoord);
-        vec4 color1 = texture2D(u_image1, v_texCoord);
+        vec4 overlayColor = vec4(0.0);
 
-        vec4 overlayColor = color0 * 0.5 + color1 * 0.5;
+        for (int i = 0; i < NUM_TEXTURES; ++i)
+        {
+            float weight = 1.0 / float(NUM_TEXTURES);  // jedes Layer erhält im Moment die gleiche Gewichtung!
+            overlayColor += texture2D(u_textures[i], v_texCoord) * weight;
+        }
+
+        // switch to premultiplied alpha to blend correctly
         overlayColor.rgb *= overlayColor.a;
 
         gl_FragColor = overlayColor;
         
-        //if(gl_FragColor.a == 0.0) discard;
+        //if(gl_FragColor.a == 0.0) discard;    // discard pixels with 100% transparency
     }
     `;
 
@@ -443,6 +444,9 @@ class Overlay {
   combineOverlays(textureLayers: HTMLImageElement[]): HTMLCanvasElement {
     console.log("in combine overlays at the start");
     console.log(textureLayers);
+
+    // set the number of texture to use
+    this.textureCount = textureLayers.length;
 
     // create an in-memory canvas and set width and height to fill the whole map on screen
     const canvas = document.createElement("canvas");
@@ -463,9 +467,8 @@ class Overlay {
     // lookup uniforms
     const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
 
-    // lookup the sampler locations.
-    const uImage0Location = gl.getUniformLocation(program, "u_image0");
-    const uImage1Location = gl.getUniformLocation(program, "u_image1");
+    // lookup the location for the textures
+    const textureLoc = gl.getUniformLocation(program, "u_textures[0]");
 
     // setup buffers
     const positionBuffer = gl.createBuffer();
@@ -485,7 +488,7 @@ class Overlay {
       textures.push(texture);
     }
 
-    // ##### drawing code #####
+    // ##### drawing code: #####
 
     webglUtils.setupCanvasForDrawing(gl, [0, 0, 0, 0]);
 
@@ -499,32 +502,16 @@ class Overlay {
     // set the resolution
     gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
 
-    // set which texture units to render with.
-    gl.uniform1i(uImage0Location, 0); // texture unit 0
-    gl.uniform1i(uImage1Location, 1); // texture unit 1
-
-    /*
-    // Set each texture unit to use a particular texture.
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, textures[1]);
-    */
-
-    /*
-    const textureLoc = gl.getUniformLocation(program, "textures[0]");
-    // Tell the shader to use texture units 0 to 3
-    //gl.uniform1iv(textureLoc, [0, 1, 2, 3]); //uniform variable location and texture Index (or array of indices)
-    gl.uniform1iv(textureLoc, [0, 1]);
-
-    */
+    // Tell the shader to use texture units 0 to textureCount - 1
+    gl.uniform1iv(textureLoc, Array.from(Array(this.textureCount).keys())); //uniform variable location and texture Index (or array of indices)
 
     //TODO Blending hier oder doch mit custom layer??
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     //gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    const vertexCount = 6; // 2 triangles for a rectangle
+    gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
     //TODO cleanup resources and delete canvas afterwards?
 

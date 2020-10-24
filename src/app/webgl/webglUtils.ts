@@ -180,6 +180,17 @@ export function createBuffer(
   return buffer;
 }
 
+export function bindFramebuffer(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  framebuffer: WebGLFramebuffer | null,
+  texture: WebGLTexture | null
+): void {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+  if (texture) {
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+  }
+}
+
 export function bindAttribute(
   gl: WebGL2RenderingContext | WebGLRenderingContext,
   buffer: WebGLBuffer | null,

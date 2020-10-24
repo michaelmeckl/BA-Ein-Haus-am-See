@@ -1,3 +1,5 @@
+import Benchmark from "../shared/benchmarking";
+
 const SNACKBAR_DEFAULT_DURATION = 3000; // 3 seconds
 
 export const enum SnackbarType {
@@ -39,4 +41,17 @@ export function logMemoryUsage(): void {
 // Returns a random integer from 0 to range - 1.
 export function randomInt(range: number): number {
   return Math.floor(Math.random() * range);
+}
+
+function benchmarkTest(): void {
+  Benchmark.getAverageTime(Array.from, [Array(10).keys()], "From");
+
+  const func = function () {
+    const res2 = [];
+    for (let index = 0; index < 10; index++) {
+      res2[index] = index;
+    }
+  };
+
+  Benchmark.getAverageTime(func, [], "Simple For Loop");
 }
