@@ -1,7 +1,7 @@
+//import Reset from "gl-reset";
 import Benchmark from "../../shared/benchmarking";
 import * as webglUtils from "./webglUtils";
 import * as twgl from "twgl.js";
-import Reset from "gl-reset";
 import { addBlurredImage, addCanvasOverlay, addImageOverlay } from "../map/canvasUtils";
 import { map } from "../map/mapboxConfig";
 import { renderAndBlur } from "./blurFilter";
@@ -79,75 +79,68 @@ void main() {
 }
 `;
 
-// ###########################################
+// ####### Shaders for combining the overlays: ############
 
-const textureCount = 8;
+// the number of textures to combine
+let textureCount;
 
-//* von Shadertoy:
-/*
-Shader Inputs
-uniform vec3      iResolution;           // viewport resolution (in pixels)
-uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)
-uniform samplerXX iChannel0..3;          // input channel. XX = 2D/Cube
-*/
+const vsCombine = `
+    attribute vec2 a_position;
+    attribute vec2 a_texCoord;
 
-//prettier-ignore
-const fsCombine = `#version 300 es
-precision mediump float;
+    uniform vec2 u_resolution;
 
-in vec2 fragCoord;
+    varying vec2 v_texCoord;
 
-out vec4 fragColor;
+    void main() {
+        // convert the rectangle from pixels to 0.0 to 1.0
+        vec2 zeroToOne = a_position / u_resolution;
 
-uniform vec2 u_Resolution;
-uniform sampler2D textures[` + textureCount + `];
+        // convert from 0->1 to 0->2
+        vec2 zeroToTwo = zeroToOne * 2.0;
 
-void main() {
-    /*
-    vec2 uv =  fragCoord.xy / u_Resolution.xy;
-    vec2 res = iChannelResolution[0].xy;
+        // convert from 0->2 to -1->+1 (clipspace)
+        vec2 clipSpace = zeroToTwo - 1.0;
 
-    // load color info from all textures
-    vec4 texel0 = texture(iChannel0, uv);
-    vec4 texel1 = texture(iChannel1, uv);
-    vec4 texel2 = texture(iChannel2, uv);
-    vec4 texel3 = texture(iChannel3, uv);
+        gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
 
-    vec4 texels[4] = vec4[4](texel0, texel1, texel2, texel3);
-   
-    // test for arrays and for loops in glsl
-    vec4 result = vec4(1,1,1,1);
-
-    for(int i=0;i<10;++i)
-    {
-        result += texel0[i];
+        // pass the texCoord to the fragment shader
+        // The GPU will interpolate this value between points.
+        v_texCoord = a_texCoord;
     }
-    
-    const float w = 0.25;
-    //const float w = 1.0 / float(blurredTexels.length());
-    
-    vec4 mixResult;
-    for(int i=0; i < blurredTexels.length(); ++i) 
-    {
-        //= colBlurred0 * w + colBlurred1 * w + colBlurred2 * w + texel3 * w;
-        mixResult += blurredTexels[i] * w;
-    }
-    mixResult += texel3 * 0.5;
-    
-    vec4 test = texel1 * 0.4 + texel2 * 0.2 + texel0*0.4;
-    vec4 dd = mix(test, texel3, 0.2);
-   
-    fragColor = dd;
-    */
+  `;
 
-    fragColor = vec4(0.6, 0.6, 0.6, 1.0);
-}
-`;
+//* hier muss Webgl 1 verwendet werden, sonst gehen keine dynamischen Variablen in der for-Schleife!
+const fsCombine = `
+    precision mediump float;    // mediump should be enough and highp isn't supported on all devices
+
+    // array of textures
+    uniform sampler2D u_textures[NUM_TEXTURES];
+
+    // the texCoords passed in from the vertex shader.
+    varying vec2 v_texCoord;
+
+    void main() {
+        vec4 overlayColor = vec4(0.0);
+
+        for (int i = 0; i < NUM_TEXTURES; ++i)
+        {
+            float weight = 1.0 / float(NUM_TEXTURES);  // jedes Layer erhält im Moment die gleiche Gewichtung!
+            overlayColor += texture2D(u_textures[i], v_texCoord) * weight;
+        }
+
+        // switch to premultiplied alpha to blend correctly
+        overlayColor.rgb *= overlayColor.a;
+
+        gl_FragColor = overlayColor;
+        
+        //if(gl_FragColor.a == 0.0) discard;    // discard pixels with 100% transparency
+    }
+    `;
 
 // ###########################################
 
-//? use this
-let reset: () => void;
+//let reset: () => void;
 
 /**
  * Class to create and combine the textures that are used as an overlay.
@@ -186,8 +179,11 @@ class Overlay {
   }
 
   //TODO die gewichtung sollte pro layer erfolgen und dann als attribute oder direkt als uniform and die shader übergeben werden!
+  //! besser wäre es fast einfach den alpha wert pro textur als gewichtung zu nehmen!
+  // oder einfach unten in combineLayers als 2tes array nur mit floats (alpha werten) übergeben
+
   async initWebgl(data: any[]): Promise<any> {
-    this.mapLayer = data;
+    this.mapLayer = data; //TODO not necessary right now
 
     // Clear the canvas
     this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
@@ -217,7 +213,6 @@ class Overlay {
     }
 
     for (const polyData of this.mapLayer) {
-      //console.log("polyData: ", polyData);
       const vertices = polyData.flatMap((el: { x: any; y: any }) => [el.x, el.y]);
       //console.log("vertices: ", vertices);
 
@@ -233,10 +228,6 @@ class Overlay {
     //this.allCanvases.push(this.overlayCanvas);
 
     await this.saveAsImage();
-
-    //TODO does this work? is this even necessary?
-    //this.clearCanvas();
-    //return this.overlayCanvas;
   }
 
   setupProgram(vertexShaderSource: string, fragmentShaderSource: string): WebGLProgram {
@@ -301,152 +292,18 @@ class Overlay {
 
   // ###### Methods for combining the overlays: ######
 
-  private textureCount = 2;
-
-  /*
- * Shader Inputs von Shadertoy:
- uniform vec3      iResolution;           // viewport resolution (in pixels)
- uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)
- uniform samplerXX iChannel0..3;          // input channel. XX = 2D/Cube
- */
-
-  //prettier-ignore
-  private fs = `
-  precision mediump float;
- 
-  #define NUM_TEXTURES ${this.textureCount}
-
-  varying vec2 fragCoord;
-
-  // the texCoords passed in from the vertex shader.
-  varying vec2 v_texCoord;
- 
-  //out vec4 fragColor;
- 
-  uniform vec2 u_Resolution;
-  uniform sampler2D textures[NUM_TEXTURES];
- 
-  void main() {
-    //vec2 uv =  fragCoord.xy / u_Resolution.xy;
-    vec2 uv =  fragCoord / u_Resolution;
-    //vec2 uv = fragCoord;
-
-     /*
-     
-     vec2 res = iChannelResolution[0].xy;
- 
-     // load color info from all textures
-     vec4 texel0 = texture(iChannel0, uv);
-     vec4 texel1 = texture(iChannel1, uv);
-     vec4 texel2 = texture(iChannel2, uv);
-     vec4 texel3 = texture(iChannel3, uv);
- 
-     vec4 texels[4] = vec4[4](texel0, texel1, texel2, texel3);
-    
-     // test for arrays and for loops in glsl
-     vec4 result = vec4(1,1,1,1);
- 
-     for(int i=0;i<10;++i)
-     {
-         result += texel0[i];
-     }
-     
-     const float w = 0.25;
-     //const float w = 1.0 / float(blurredTexels.length());
-     
-     vec4 mixResult;
-     for(int i=0; i < blurredTexels.length(); ++i) 
-     {
-         //= colBlurred0 * w + colBlurred1 * w + colBlurred2 * w + texel3 * w;
-         mixResult += blurredTexels[i] * w;
-     }
-     mixResult += texel3 * 0.5;
-     
-     vec4 test = texel1 * 0.4 + texel2 * 0.2 + texel0*0.4;
-     vec4 dd = mix(test, texel3, 0.2);
-    
-     fragColor = dd;
-     */
- 
-    //vec4 texel3 = texture(iChannel3, uv);
-    
-    vec4 combinedRes = vec4(0.0);
-    
-    for(int i=0;i<NUM_TEXTURES;++i)
-    {
-        combinedRes += texture2D(textures[i], uv) * 0.3;
-    }
-    //vec4 endRes = mix(combinedRes, texel3, 0.2);
-
-     gl_FragColor = texture2D(textures[0], v_texCoord);
-     //gl_FragColor = combinedRes;
-     //gl_FragColor = vec4(1,0,0,1);
- }
- `;
-
-  private vs1 = `
-    attribute vec2 a_position;
-    attribute vec2 a_texCoord;
-
-    uniform vec2 u_resolution;
-
-    varying vec2 v_texCoord;
-
-    void main() {
-        // convert the rectangle from pixels to 0.0 to 1.0
-        vec2 zeroToOne = a_position / u_resolution;
-
-        // convert from 0->1 to 0->2
-        vec2 zeroToTwo = zeroToOne * 2.0;
-
-        // convert from 0->2 to -1->+1 (clipspace)
-        vec2 clipSpace = zeroToTwo - 1.0;
-
-        gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-
-        // pass the texCoord to the fragment shader
-        // The GPU will interpolate this value between points.
-        v_texCoord = a_texCoord;
-    }
-  `;
-
-  //* hier muss Webgl1 verwendet werden, sonst gehen keine dynamischen Variablen in der for-Schleife!
-  private fs1 = `
-    precision mediump float;    // mediump should be enough and highp isn't supported on all devices
-
-    #define NUM_TEXTURES ${this.textureCount}
-
-    // array of textures
-    uniform sampler2D u_textures[NUM_TEXTURES];
-
-    // the texCoords passed in from the vertex shader.
-    varying vec2 v_texCoord;
-
-    void main() {
-        vec4 overlayColor = vec4(0.0);
-
-        for (int i = 0; i < NUM_TEXTURES; ++i)
-        {
-            float weight = 1.0 / float(NUM_TEXTURES);  // jedes Layer erhält im Moment die gleiche Gewichtung!
-            overlayColor += texture2D(u_textures[i], v_texCoord) * weight;
-        }
-
-        // switch to premultiplied alpha to blend correctly
-        overlayColor.rgb *= overlayColor.a;
-
-        gl_FragColor = overlayColor;
-        
-        //if(gl_FragColor.a == 0.0) discard;    // discard pixels with 100% transparency
-    }
-    `;
-
   //TODO blurring could be done in the first step already, not in this
   combineOverlays(textureLayers: HTMLImageElement[]): HTMLCanvasElement {
-    console.log("in combine overlays at the start");
-    console.log(textureLayers);
+    //console.log(textureLayers);
 
     // set the number of texture to use
-    this.textureCount = textureLayers.length;
+    textureCount = textureLayers.length;
+    //* Add the textureCount to the top of the fragment shader so it can dynamically use the
+    //* correct number of textures. The shader MUST be created (or updated) AFTER the textureCount
+    //* variable has been set as js/ts won't update the string itself when textureCount changes later.
+    const fragmentSource = `#define NUM_TEXTURES ${textureCount}\n` + fsCombine;
+
+    //TODO reusing the canvas or gl ctx from the methods above would be nice but doesn't seem to work :(
 
     // create an in-memory canvas and set width and height to fill the whole map on screen
     const canvas = document.createElement("canvas");
@@ -458,7 +315,7 @@ class Overlay {
     }
 
     // create and link program
-    const program = twgl.createProgramFromSources(gl, [this.vs1, this.fs1]);
+    const program = twgl.createProgramFromSources(gl, [vsCombine, fragmentSource]);
 
     // lookup attributes
     const positionLocation = gl.getAttribLocation(program, "a_position");
@@ -503,23 +360,56 @@ class Overlay {
     gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
 
     // Tell the shader to use texture units 0 to textureCount - 1
-    gl.uniform1iv(textureLoc, Array.from(Array(this.textureCount).keys())); //uniform variable location and texture Index (or array of indices)
+    gl.uniform1iv(textureLoc, Array.from(Array(textureCount).keys())); //uniform variable location and texture Index (or array of indices)
 
     //TODO Blending hier oder doch mit custom layer??
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    //gl.enable(gl.BLEND);
+    //gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     //gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     const vertexCount = 6; // 2 triangles for a rectangle
     gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
-    //TODO cleanup resources and delete canvas afterwards?
-
     return canvas;
+  }
+
+  createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
+    const overlayCanvas = this.combineOverlays(textures);
+    //cleanup and delete webgl resources
+    this.cleanupResources();
+
+    return overlayCanvas;
+  }
+
+  // see https://stackoverflow.com/questions/23598471/how-do-i-clean-up-and-unload-a-webgl-canvas-context-from-gpu-after-use
+  cleanupResources(): void {
+    // desallocate memory and free resources to avoid memory leak issues
+    const numTextureUnits = this.gl.getParameter(this.gl.MAX_TEXTURE_IMAGE_UNITS);
+    for (let unit = 0; unit < numTextureUnits; ++unit) {
+      this.gl.activeTexture(this.gl.TEXTURE0 + unit);
+      this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+      this.gl.bindTexture(this.gl.TEXTURE_CUBE_MAP, null);
+    }
+
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
+    this.gl.bindRenderbuffer(this.gl.RENDERBUFFER, null);
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+
+    // Delete all your resources
+    this.gl.deleteProgram(this.program);
+    this.gl.deleteBuffer(this.positionBuffer);
+    //TODO ein paar fehlen noch hier!
+
+    //this.gl.canvas.width = 1;
+    //this.gl.canvas.height = 1;
+
+    //this.gl.getExtension("WEBGL_lose_context")?.loseContext();
+    //this.gl.getExtension("WEBGL_lose_context")?.restoreContext();
   }
 }
 
-export default async function createOverlay(data: any): Promise<any> {
+export default async function createOverlay(data: any): Promise<void> {
   console.log("Creating overlay now...");
 
   Benchmark.startMeasure("creating overlay");
@@ -528,10 +418,10 @@ export default async function createOverlay(data: any): Promise<any> {
   for (const layer of data) {
     console.log("layer: ", layer);
     Benchmark.startMeasure("init webgl");
-    const canvas = await overlay.initWebgl(layer);
+    await overlay.initWebgl(layer);
     Benchmark.stopMeasure("init webgl");
 
-    //TODO call drawTexture for every layer
+    //TODO drawTexture for every layer instead of everything in initWebgl?
     /*
     for (let index = 0; index < allTextures.length; index++) {
         const texture = allTextures[index];
@@ -540,20 +430,20 @@ export default async function createOverlay(data: any): Promise<any> {
     */
   }
 
+  //TODO for debugging only:
   overlay.allTextures.forEach((image) => {
     //console.log(image.src);
     //addImageOverlay(image);
   });
 
-  const resultCanvas = overlay.combineOverlays(overlay.allTextures);
+  const resultCanvas = overlay.createOverlay(overlay.allTextures);
 
   const img = new Image();
-  img.onload = () => {
+  img.onload = (): void => {
     console.log("in onload: ", img.src);
     addCanvasOverlay(resultCanvas);
   };
   img.src = resultCanvas.toDataURL();
 
   Benchmark.stopMeasure("creating overlay");
-  return overlay;
 }

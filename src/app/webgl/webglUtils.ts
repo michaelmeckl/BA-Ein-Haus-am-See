@@ -82,6 +82,7 @@ export function setRectangle(
   width: number,
   height: number
 ): void {
+  // Set a rectangle the same size as the image at (0, 0).
   const x1 = x;
   const x2 = x + width;
   const y1 = y;
@@ -152,14 +153,20 @@ export function createTexture(
   height = 1
 ): WebGLTexture | null {
   const texture = gl.createTexture();
+  //set texture unit to active;
+  //needed on some drivers, see. https://learnopengl.com/Getting-started/Textures at "Texture Units":
   gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, texture);
 
+  // Set the parameters so we can render any size image:
+  //these properties let you upload textures of any size (defaul would be to repeat, but clamping makes more sense here)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  //these determine how interpolation is made if the image is being scaled up or down
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
 
+  // Upload the image or pixel data into the texture.
   if (data instanceof Uint8Array) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
   } else {
@@ -175,6 +182,7 @@ export function createBuffer(
   data: any
 ): WebGLBuffer | null {
   const buffer = gl.createBuffer();
+  // bind buffer (think of it as ARRAY_BUFFER = buffer)
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
   return buffer;
@@ -300,7 +308,7 @@ function resetDepth(gl: WebGL2RenderingContext): void {
  * Clear the canvas and reset depth.
  */
 export function clearCanvas(gl: WebGL2RenderingContext): void {
-  gl.clearColor(0, 0, 0, 1.0);
+  gl.clearColor(0, 0, 0, 0.0);
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
