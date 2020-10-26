@@ -43,6 +43,7 @@ export function addBufferToFeature(
   units: turfUnits = "meters"
 ): Feature<any> {
   //const newElement = buffer(element as Feature<Polygon, GeoJsonProperties>, 50, "meters");
+  //@ts-expect-error
   return buffer(element, bufferSize, units);
 }
 

@@ -6,7 +6,7 @@ import circle from "@turf/circle";
 import intersect from "@turf/intersect";
 import union from "@turf/union";
 import type { Feature, GeoJsonProperties, LineString, MultiPolygon, Point, Polygon } from "geojson";
-import mapboxgl, { LngLat, LngLatLike } from "mapbox-gl";
+import mapboxgl, { Layer, LngLat, LngLatLike } from "mapbox-gl";
 import WebWorker from "worker-loader!../worker";
 import Benchmark from "../../shared/benchmarking";
 import { map } from "./mapboxConfig";
@@ -159,9 +159,7 @@ export function convertAllFeaturesToPolygons(
   for (let index = 0; index < features.length; index++) {
     const feature = features[index];
     // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
-    Benchmark.startMeasure("adding buffer to feature");
     polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
-    Benchmark.stopMeasure("adding buffer to feature");
 
     /*
     if (feature.geometry.type === "Point") {

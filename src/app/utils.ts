@@ -43,6 +43,11 @@ export function randomInt(range: number): number {
   return Math.floor(Math.random() * range);
 }
 
+export function getOSMTagName(query: string): string {
+  //TODO ~ und | auch parsen!
+  return query.split("=")[1];
+}
+
 function benchmarkTest(): void {
   Benchmark.getAverageTime(Array.from, [Array(10).keys()], "From");
 

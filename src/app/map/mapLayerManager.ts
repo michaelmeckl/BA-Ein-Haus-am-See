@@ -129,6 +129,10 @@ class MapLayerManager {
     }
   }
 
+  hideLayer(layerId: string): void {
+    map.setLayoutProperty(layerId, "visibility", "none");
+  }
+
   /**
    * Delete all layers for the source with the given ID.
    */

@@ -3,7 +3,8 @@
  */
 import { chunk } from "lodash";
 import geojsonCoords from "@mapbox/geojson-coords";
-import mapboxgl, { LngLatLike } from "mapbox-gl";
+import type mapboxgl from "mapbox-gl";
+import type { LngLatLike } from "mapbox-gl";
 import { map } from "./mapboxConfig";
 import { convertToMercatorCoordinates } from "./mapboxUtils";
 
@@ -104,7 +105,6 @@ export function getDataFromMap(filters: Set<string>): number[] {
   console.log(allGeoData);
 
   const allCoordinates: number[] = [].concat(
-    //@ts-expect-error
     ...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))
   );
   //console.log(allCoordinates);

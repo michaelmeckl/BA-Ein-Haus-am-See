@@ -37,6 +37,9 @@ import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { addWebglCircle } from "../webgl/webglCircle";
 import { testCampusExampes } from "../webgl/successfulExamples";
 import createOverlay from "../webgl/overlayCreator";
+import { resolve } from "path";
+import { reject } from "lodash";
+import html2canvas from "html2canvas";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -146,6 +149,7 @@ export default class MapController {
     //TODO !!
     //this.reloadData();
     //this.blurMap();
+    //this.addLumaGlLayer();
   }
 
   onSourceLoaded(): void {
@@ -170,6 +174,51 @@ export default class MapController {
   //TODO should all map click events be handled here? -> probably
   async onMapClick(e: mapboxgl.MapMouseEvent & mapboxgl.EventData): Promise<void> {
     console.log("Click:", e);
+
+    //* bräuchte einen timeout um zu funktionieren -> nicht praktikabel!
+    /*
+    new Promise((resolve, reject) => {
+      Benchmark.startMeasure("hiding all layers");
+      const allLayers = map.getStyle().layers;
+      if (allLayers) {
+        allLayers.forEach((layer) => {
+          mapLayerManager.hideLayer(layer.id);
+        });
+        Benchmark.stopMeasure("hiding all layers");
+        resolve();
+      } else {
+        reject();
+      }
+    }).then(() => {
+      Benchmark.startMeasure("taking snapshot of mapCanvas");
+
+      const mapCanvas = map.getCanvas();
+
+      const img = new Image();
+
+      img.onload = () => {
+        Benchmark.stopMeasure("taking snapshot of mapCanvas");
+        img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
+        img.height = mapCanvas.clientHeight;
+        console.log(img.src);
+      };
+      img.src = mapCanvas.toDataURL();
+    });
+
+    map.addSource("testsource", {
+      type: "geojson",
+      data: "../assets/data.geojson", //TODO use the real data given as param
+    });
+
+    map.addLayer({
+      id: "test-layer",
+      type: "circle",
+      source: "testsource",
+      paint: {
+        "circle-color": "rgba(0, 0, 255, 1.0)",
+      },
+    });
+    */
 
     /*
     getPointsInRadius(map);
@@ -404,10 +453,11 @@ export default class MapController {
     const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
     const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures, 250);
     this.allPolygonFeatures.set(dataName, polyFeatures);
-    //this.showPreprocessedData(allFeatures);
+    //this.calculateMaskAndShowData(allFeatures);
+    this.showPreprocessedData(polyFeatures);
   }
 
-  showPreprocessedData(
+  calculateMaskAndShowData(
     allFeatures: (
       | Feature<Point, GeoJsonProperties>
       | Feature<LineString, GeoJsonProperties>
@@ -429,32 +479,36 @@ export default class MapController {
       const customData = MercatorCoordinates.flatMap((x: any) => [x.x, x.y]);
       this.addWebGlLayer(customData);
     });
+  }
 
+  showPreprocessedData(
+    polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+  ): void {
     mapLayerManager.removeAllLayersForSource("currFeatures");
 
-    /*
-    // show the points
     const layer: Layer = {
-      id: "points",
+      id: "currFeatures-Layer",
       source: "currFeatures",
-      type: "circle",
+      type: "fill",
       paint: {
-        "circle-color": "rgba(255, 0, 0, 1)",
+        "fill-color": "rgba(170, 170, 170, 0.5)",
       },
     };
 
     if (map.getSource("currFeatures")) {
       // the source already exists, only update the data
       console.log(`Source ${"currFeatures"} is already used! Updating it!`);
-      mapLayerManager.updateSource("currFeatures", featureCollection(allFeatures));
+      mapLayerManager.updateSource("currFeatures", featureCollection(polygonFeatures));
     } else {
       // source doesn't exist yet, create a new one
-      mapLayerManager.addNewGeojsonSource("currFeatures", featureCollection(allFeatures), false);
+      mapLayerManager.addNewGeojsonSource(
+        "currFeatures",
+        featureCollection(polygonFeatures),
+        false
+      );
     }
 
     mapLayerManager.addNewLayer(layer, true);
-    //mapLayerManager.addLayers("currFeatures");
-    */
   }
 
   showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
@@ -469,7 +523,7 @@ export default class MapController {
     mapLayerManager.removeAllLayersForSource(sourceName);
 
     this.preprocessGeoData(data, sourceName);
-    //return;
+    return; //TODO
 
     if (map.getSource(sourceName)) {
       // the source already exists, only update the data
@@ -739,15 +793,16 @@ export default class MapController {
         if (coords.length > 1) {
           //? oder will ich hier das das zu einem array "flatten" und nur dieses pushen??
           console.log("Multipolygon: ", coords);
-          //const flattened = [];
+          //const flattened: mapboxgl.Point[] = [];
           //TODO Multipolygone führen aber so zum Beispiel bei der Donau zu vollkommen falschen Renderergebnissen!!
           //TODO vllt doch direkt im shader statt mit turf ?
           for (const coordPart of coords) {
             //@ts-expect-error
             //prettier-ignore
             overlayData[i].push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+            //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
           }
-          //overlayData[i].push(flattened);
+          // overlayData[i].push(flattened);
         } else {
           console.log("Polygon");
           //@ts-expect-error
@@ -761,7 +816,12 @@ export default class MapController {
     console.log("OverlayData: ", overlayData);
     console.log("OverlayAlternative: ", overlayAlternative);
 
-    createOverlay(overlayAlternative);
+    // check that there is data to overlay the map with
+    if (overlayData.length > 0) {
+      createOverlay(overlayData);
+    } else {
+      console.warn("Creating an overlay is not possible because overlayData is empty!");
+    }
 
     // ########################  Overlay Stuff ends #######################
 
