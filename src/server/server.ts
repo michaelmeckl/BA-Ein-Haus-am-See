@@ -6,7 +6,8 @@ import express, { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import { INTERNAL_SERVER_ERROR, NOT_FOUND } from "http-status-codes";
 import path from "path";
-import OsmRouter from "./routes";
+import LoggingRouter from "./loggingRouter";
+import OsmRouter from "./osmRouter";
 
 //TODO handle crashes better than killing the process?
 process.on("uncaughtException", (e) => {
@@ -34,7 +35,7 @@ export default class Server {
     this.app.use(express.static(publicDir));
     this.app.use(express.static(staticDir));
 
-    this.setupRouter();
+    this.setupRoutes();
 
     // error handling must be at the end!
     this.setupErrorHandling();
@@ -61,11 +62,14 @@ export default class Server {
     this.app.use(bodyParser.json());
   }
 
-  setupRouter(): void {
-    const router = new OsmRouter(publicDir);
+  setupRoutes(): void {
+    const osmRouter = new OsmRouter(publicDir);
     // mount the routes with the prefix "osm"
-    //this.app.use("/osm", router);
-    this.app.use(router.instance);
+    //this.app.use("/osm", osmRouter);
+    this.app.use(osmRouter.instance);
+
+    const logRouter = new LoggingRouter(publicDir);
+    this.app.use(logRouter.instance);
   }
 
   setupErrorHandling(): void {

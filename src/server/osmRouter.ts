@@ -40,7 +40,7 @@ export default class OsmRouter {
     this.publicDirPath = publicDir;
 
     this.osmRouter = express.Router();
-    this.initRoutes();
+    this.setupRoutes();
   }
 
   get instance(): Router {
@@ -50,7 +50,7 @@ export default class OsmRouter {
   /**
    * Init the express router and setup routes.
    */
-  initRoutes(): void {
+  setupRoutes(): void {
     this.osmRouter.get("/testCmd", async (req: Request, res: Response, next: NextFunction) => {
       const result = await ServerUtils.executeOSMFilter(this.publicDirPath);
       console.log("Result of operation is:\n", result);
@@ -366,6 +366,7 @@ export default class OsmRouter {
         // add a buffer to all lines and polygons
         // This also replaces all line features with buffered polygon features as turf.buffer() returns
         // Polygons (or Multipolygons).
+        //@ts-expect-error
         polygonFeatures.push(buffer(feature, bufferSize, "meters"));
       } else {
         break;
@@ -412,6 +413,7 @@ export default class OsmRouter {
     for (const feature1 of features) {
       for (const feature2 of features) {
         if (feature1 !== feature2) {
+          //@ts-expect-error
           allIntersections.push(intersect(feature1, feature2));
         }
       }
