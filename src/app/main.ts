@@ -3,9 +3,16 @@ import Benchmark from "../shared/benchmarking";
 import { Config } from "../shared/config";
 import { showMask } from "./map/mapboxUtils";
 import MapController from "./map/mapController";
-import { fetchMaskData, fetchOsmData, testGuide } from "./network/networkUtils";
+import {
+  fetchMaskData,
+  fetchOsmData,
+  fetchOsmDataFromClientVersion,
+  fetchOsmDataFromClientVersionParallel,
+  fetchOsmDataFromClientVersionSequential,
+  testGuide,
+} from "./network/networkUtils";
 import OsmTags from "./osmModel/osmTagCollection";
-import { showSnackbar, SnackbarType } from "./utils";
+import { getOSMTagName, showSnackbar, SnackbarType } from "./utils";
 
 // * const enum instead of enum as this inlines the elements at runtime
 // -> not the enum as a whole is needed at runtime
@@ -70,11 +77,12 @@ function selectData(e: Event, mapController: MapController): void {
   e.stopPropagation();
   e.preventDefault();
 
-  const queryInput = document.querySelector(HtmlElements.QUERY_INPUT_ID) as HTMLInputElement;
   const value = (e.target as HTMLAnchorElement).innerText;
-  const key = OsmTags.getKeyType(value); //TODO: flexibler machen!
-  const query = key + "=" + value;
+  /*
+  const queryInput = document.querySelector(HtmlElements.QUERY_INPUT_ID) as HTMLInputElement;
+  const query = OsmTags.getQuery(value);
   queryInput.value = query;
+  */
 
   const selectionBox = document.querySelector(HtmlElements.SELECTION_BOX_CLASS) as HTMLDivElement;
   const list = document.querySelector(HtmlElements.SELECTION_LIST_ID) as HTMLUListElement;
@@ -83,7 +91,7 @@ function selectData(e: Event, mapController: MapController): void {
 
   // check if that list element already exists to prevent adding it twice
   for (const el of list.getElementsByTagName("li")) {
-    if (el.textContent?.trim() === query) {
+    if (el.textContent?.trim() === value) {
       return;
     }
   }
@@ -95,25 +103,25 @@ function selectData(e: Event, mapController: MapController): void {
   const closeButton = containerElement.firstChild?.childNodes[1] as ChildNode;
 
   // add the selected data to the list element and append the list element
-  listEl.appendChild(document.createTextNode(query));
+  listEl.appendChild(document.createTextNode(value));
   list.appendChild(listEl);
 
-  mapController.addActiveFilter(query.toLowerCase());
+  mapController.addActiveFilter(value);
 
   // remove the list element when its close button is clicked
   closeButton.addEventListener("click", function (this: ChildNode) {
     const listElement = this.parentElement as Node;
     list.removeChild(listElement);
-    mapController.removeActiveFilter(query.toLowerCase());
+    mapController.removeActiveFilter(value);
 
     // remove data from the map as well
     const textContent = listElement.textContent?.trim();
     if (textContent) {
-      mapController.removeData(textContent.toLowerCase());
+      mapController.removeData(textContent);
     }
 
     // eslint-disable-next-line no-magic-numbers
-    showSnackbar(`Successfully removed filter: "${query}"`, SnackbarType.SUCCESS, 2000);
+    showSnackbar(`Successfully removed filter: "${value}"`, SnackbarType.SUCCESS, 2000);
 
     // check if there are other list elements, if not hide selection box
     if (list.children.length === 0) {
@@ -128,15 +136,32 @@ function selectData(e: Event, mapController: MapController): void {
 async function performOsmQuery(mapController: MapController, inputQuery: string): Promise<void> {
   //ganz Regensburg: 12.028,48.966,12.192,49.076
   //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
-  const bounds = mapController.getViewportBoundsString();
+  const bounds = mapController.getViewportBoundsString(); //TODO make it a little bigger ?
 
   // give feedback to the user
   showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
 
-  Benchmark.startMeasure("Fetching data from osm");
-  // request data from osm
-  const data = await fetchOsmData(bounds, inputQuery);
-  console.log(Benchmark.stopMeasure("Fetching data from osm"));
+  for (const tag of mapController.activeFilters) {
+    const query = OsmTags.getQuery(tag);
+
+    Benchmark.startMeasure("Fetching data from osm");
+    // request data from osm
+    const data = await fetchOsmData(bounds, query);
+    console.log(Benchmark.stopMeasure("Fetching data from osm"));
+
+    if (data) {
+      const t0 = performance.now();
+      mapController.showData(data, tag); //set the tag as the sourcename
+      //TODO nur zum Testen:
+      //mapController.addHeatmap(data);
+      const t1 = performance.now();
+      console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
+
+      //showMask(maskData);
+
+      console.log("Finished adding data to map!");
+    }
+  }
 
   //console.log(await Benchmark.getAverageTime(fetchOsmDataFromClientVersionSequential, [bounds, inputQuery], 30));
   //console.log(await Benchmark.getAverageTime(fetchOsmDataFromClientVersionParallel, [bounds, inputQuery], 30));
@@ -153,19 +178,6 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   const maskData = await fetchMaskData(inputQuery);
   Benchmark.stopMeasure("Fetching mask from server");
   */
-
-  if (data) {
-    const t0 = performance.now();
-    mapController.showData(data, inputQuery); //set the query as the sourcename
-    //TODO nur zum Testen:
-    //mapController.addHeatmap(data);
-    const t1 = performance.now();
-    console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
-
-    //showMask(maskData);
-  }
-
-  console.log("Finished adding data to map!");
 }
 
 function setupUI(mapController: MapController): void {

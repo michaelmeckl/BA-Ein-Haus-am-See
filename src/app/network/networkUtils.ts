@@ -62,7 +62,7 @@ export async function getTilequeryResults(query: string): Promise<FeatureCollect
 
 function buildOverpassQuery(bounds: string, userQuery: string): string {
   // shorthand for query instead of 3 separate ones (nwr = node, way, relation)
-  const request = `nwr[${userQuery}];`;
+  //const request = `nwr[${userQuery}];`;
 
   /*TODO: support different types and conjunctions: -> query vllt schon ganz in client bauen?
   * AND:
@@ -86,7 +86,8 @@ function buildOverpassQuery(bounds: string, userQuery: string): string {
   const output3 = "out geom qt;<;out skel qt;";
   */
 
-  const query = `${querySettings}(${request});${output}`;
+  const query = `${querySettings}(${userQuery});${output}`;
+  console.log(query);
   return query;
 }
 
@@ -103,6 +104,7 @@ function buildParallelOverpassQuery(bounds: string): string {
 
   const output = "out geom qt;";
   const query = `${querySettings}(${request}${request2}${request3}${request4}${request5}${request6}${request7});${output}`;
+  console.log(query);
   return query;
 }
 
@@ -212,6 +214,7 @@ export async function fetchOsmDataFromClientVersionSequential(
       });
       console.log(q);
       Benchmark.startMeasure("Request client side");
+      //const url = `https://overpass-api.de/api/interpreter?${overpassQuery}`;
       const url = `http://192.168.99.100:12347/api/interpreter?${overpassQuery}`;
 
       const response = await axios.get(url);
@@ -234,6 +237,7 @@ export async function fetchOsmDataFromClientVersionParallel(
     });
 
     //Benchmark.startMeasure("Request client side");
+    //const url = `https://overpass-api.de/api/interpreter?${overpassQuery}`;
     const url = `http://192.168.99.100:12347/api/interpreter?${overpassQuery}`;
     const response = await axios.get(url);
     console.log(response.data);

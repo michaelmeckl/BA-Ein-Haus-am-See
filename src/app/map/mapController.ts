@@ -63,7 +63,7 @@ export default class MapController {
   //prettier-ignore
   private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
 
-  private activeFilters: Set<string> = new Set();
+  activeFilters: Set<string> = new Set();
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -379,6 +379,7 @@ export default class MapController {
   }
 
   removeData(sourceName: string): void {
+    console.log("Removing source: ", sourceName);
     mapLayerManager.removeSource(sourceName);
   }
 
@@ -454,7 +455,7 @@ export default class MapController {
     const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures, 250);
     this.allPolygonFeatures.set(dataName, polyFeatures);
     //this.calculateMaskAndShowData(allFeatures);
-    this.showPreprocessedData(polyFeatures);
+    this.showPreprocessedData(dataName, polyFeatures);
   }
 
   calculateMaskAndShowData(
@@ -481,31 +482,29 @@ export default class MapController {
     });
   }
 
+  //TODO das funktioniert im moment irgendwie noch nicht richtig mit mehreren hintereinander?
   showPreprocessedData(
+    sourceName: string,
     polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
   ): void {
-    mapLayerManager.removeAllLayersForSource("currFeatures");
+    mapLayerManager.removeAllLayersForSource(sourceName);
 
     const layer: Layer = {
       id: "currFeatures-Layer",
-      source: "currFeatures",
+      source: sourceName,
       type: "fill",
       paint: {
         "fill-color": "rgba(170, 170, 170, 0.5)",
       },
     };
 
-    if (map.getSource("currFeatures")) {
+    if (map.getSource(sourceName)) {
       // the source already exists, only update the data
-      console.log(`Source ${"currFeatures"} is already used! Updating it!`);
-      mapLayerManager.updateSource("currFeatures", featureCollection(polygonFeatures));
+      console.log(`Source ${sourceName} is already used! Updating it!`);
+      mapLayerManager.updateSource(sourceName, featureCollection(polygonFeatures));
     } else {
       // source doesn't exist yet, create a new one
-      mapLayerManager.addNewGeojsonSource(
-        "currFeatures",
-        featureCollection(polygonFeatures),
-        false
-      );
+      mapLayerManager.addNewGeojsonSource(sourceName, featureCollection(polygonFeatures), false);
     }
 
     mapLayerManager.addNewLayer(layer, true);
@@ -522,8 +521,8 @@ export default class MapController {
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(sourceName);
 
-    this.preprocessGeoData(data, sourceName);
-    return; //TODO
+    //this.preprocessGeoData(data, sourceName);
+    //return; //TODO
 
     if (map.getSource(sourceName)) {
       // the source already exists, only update the data
