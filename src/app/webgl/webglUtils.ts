@@ -265,7 +265,9 @@ export function createProgram(
   }
 
   gl.attachShader(program, vertexShader);
+  gl.deleteShader(vertexShader); // cleanup instantly
   gl.attachShader(program, fragmentShader);
+  gl.deleteShader(fragmentShader);
   gl.linkProgram(program);
 
   // check if creating the program was successfull
