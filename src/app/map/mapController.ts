@@ -40,6 +40,7 @@ import createOverlay from "../webgl/overlayCreator";
 import { resolve } from "path";
 import { reject } from "lodash";
 import html2canvas from "html2canvas";
+import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -62,6 +63,8 @@ export default class MapController {
   private currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
   //prettier-ignore
   private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
+
+  private allFilterLayers: FilterLayer[] = [];
 
   activeFilters: Set<string> = new Set();
 
@@ -354,6 +357,16 @@ export default class MapController {
     mapLayerManager.addNewLayer(newLayer, true);
   }
 
+  getFilterLayer(name: string): FilterLayer | null {
+    for (let index = 0; index < this.allFilterLayers.length; index++) {
+      const layer = this.allFilterLayers[index];
+      if (layer.LayerName === name) {
+        return layer;
+      }
+    }
+    return null;
+  }
+
   addVectorData(data: string): void {
     mapLayerManager.addVectorLayer(data);
   }
@@ -453,9 +466,15 @@ export default class MapController {
 
     const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
     const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures, 250);
-    this.allPolygonFeatures.set(dataName, polyFeatures);
+    this.allPolygonFeatures.set(dataName, polyFeatures); //überflüssign wenn mit filterLayers
+
+    const layer = this.getFilterLayer(dataName);
+    if (layer) {
+      layer.Features = polyFeatures;
+    }
+
     //this.calculateMaskAndShowData(allFeatures);
-    this.showPreprocessedData(dataName, polyFeatures);
+    //this.showPreprocessedData(dataName, polyFeatures);
   }
 
   calculateMaskAndShowData(
@@ -510,18 +529,26 @@ export default class MapController {
     mapLayerManager.addNewLayer(layer, true);
   }
 
-  showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
+  //TODO parameter wie distance und relevance müssen vom nutzer eingegeben werden können!
+  showData(
+    data: FeatureCollection<GeometryObject, any>,
+    sourceName: string,
+    distance?: number,
+    relevance?: FilterRelevance,
+    wanted?: boolean
+  ): void {
     console.log("original Data:", data);
     console.log("now adding to map...");
     console.log(sourceName);
 
-    //TODO als sourceName nur das hinter dem = nehmen? (mit regex z.B. const regex = /ab+/;)
-    //const name = sourceName.split("=")[1];
+    //TODO falls das auf den server ausgelagert wird, muss später nur noch die features und points nachträglich gefüllt werden (mit settern am besten!)
+    this.allFilterLayers.push(new FilterLayer(sourceName, distance, relevance, wanted));
 
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(sourceName);
 
-    //this.preprocessGeoData(data, sourceName);
+    //! Data preprocessing could (and probably should) already happen on the server!
+    this.preprocessGeoData(data, sourceName);
     //return; //TODO
 
     if (map.getSource(sourceName)) {
@@ -775,15 +802,17 @@ export default class MapController {
     console.log("currentMapData: ", currentMapData);
     */
 
-    const overlayData: mapboxgl.Point[][][] = [];
-    console.log(this.activeFilters);
+    const overlayData: FilterLayer[] = [];
 
-    //! wenn die polygon features sonst nirgendwo gebraucht werden, könnt man gleich oben wenn sie in die Map
-    //! gespeichert werden, sie zu Punkten umwandeln, dann könnte man vllt die doppelte for-schleife hier vermeiden
+    console.log(this.activeFilters);
+    console.log(this.allFilterLayers);
+
+    //! wenn die polygon features sonst nirgendwo gebraucht werden, könnte man gleich oben wenn sie in die Map
+    //! gespeichert werden, sie zu mapboxgl.Points umwandeln, dann könnte man vllt die doppelte for-schleife hier vermeiden
 
     let i = 0;
-    for (const features of this.allPolygonFeatures.values()) {
-      overlayData[i] = [];
+    for (const [name, features] of this.allPolygonFeatures.entries()) {
+      overlayData[i] = new FilterLayer(name); //TODO oder lieber gleich statt this.allPolygonFeatures?
       for (let index = 0; index < features.length; index++) {
         const feature = features[index];
         const coords = feature.geometry.coordinates;
@@ -798,7 +827,7 @@ export default class MapController {
           for (const coordPart of coords) {
             //@ts-expect-error
             //prettier-ignore
-            overlayData[i].push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+            overlayData[i].Points.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
             //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
           }
           // overlayData[i].push(flattened);
@@ -806,11 +835,59 @@ export default class MapController {
           console.log("Polygon");
           //@ts-expect-error
           //prettier-ignore
-          overlayData[i].push(coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+          const pointData = coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord));
+          overlayData[i].Points.push(pointData);
+
+          //TODO
+          const filterLayer = this.getFilterLayer(name);
+          if (filterLayer) {
+            filterLayer.Points = pointData;
+          }
         }
       }
       i++;
     }
+
+    console.log(this.allFilterLayers);
+
+    /**
+     *[
+     *  { ### Park
+     *    points: [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...,
+     *    radius: 500,
+     *    relevance: "very important",
+     *    name: "Park"  ?? (vllt nicht relevant)
+     *  },
+     *  { ### Restaurant
+     *    points: [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...,
+     *    radius: 2000,
+     *    relevance: "not very important",
+     *  },
+     *  ...
+     * ]
+     */
+
+    /**********
+     * Structure for overlayData looks like this:
+     * [
+     *  [ ### Park
+     *    [
+     *      {x: 49.1287; y: 12.3591}, {x: 49.1211; y: 12.4563}, ... // type: mapboxgl.Point
+     *    ],
+     *    [
+     *      {x: 49.1287; y: 12.3591}, {x: 49.1211; y: 12.4563}, ... // type: mapboxgl.Point
+     *    ],
+     *    [
+     *      {x: 49.1287; y: 12.3591}, {x: 49.1211; y: 12.4563}, ... // type: mapboxgl.Point
+     *    ],
+     *    ...
+     *  ],
+     *  [ ### Restaurant
+     *    [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...
+     *  ],
+     *  ...
+     * ]
+     **********/
 
     console.log("OverlayData: ", overlayData);
     console.log("OverlayAlternative: ", overlayAlternative);

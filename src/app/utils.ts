@@ -44,8 +44,9 @@ export function randomInt(range: number): number {
 }
 
 export function getOSMTagName(query: string): string {
-  //TODO ~ und | auch parsen!
-  return query.split("=")[1];
+  //TODO ~ und | auch parsen und klammern am Ende entfernen!
+  const regex = /[=~]/;
+  return query.split(regex)[1];
 }
 
 function benchmarkTest(): void {

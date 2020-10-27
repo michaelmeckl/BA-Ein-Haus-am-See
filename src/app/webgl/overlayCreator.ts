@@ -498,7 +498,7 @@ export default async function createOverlay(data: any): Promise<void> {
   for (const layer of data) {
     console.log("layer: ", layer);
     Benchmark.startMeasure("init webgl");
-    await overlay.initWebgl(layer);
+    await overlay.initWebgl(layer.Points);
     Benchmark.stopMeasure("init webgl");
 
     //TODO drawTexture for every layer instead of everything in initWebgl?
