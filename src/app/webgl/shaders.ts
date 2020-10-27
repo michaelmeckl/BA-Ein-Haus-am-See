@@ -257,3 +257,140 @@ export function createBlurFragmentSource(): string {
 
   return blurSource;
 }
+
+//* Dilate Fragment Shader:
+// see. http://pieper.github.io/sites/glimp/dilate.html
+export function getDilateFS(): string {
+  return `
+  precision highp float;
+
+  uniform sampler2D sourceTextureSampler;
+  uniform vec2 sourceTextureSize;
+  uniform vec2 sourceTexelSize;
+
+  varying vec2 varyingTextureCoordinate;
+
+  void main(void) {
+    vec4 c = texture2D(sourceTextureSampler, varyingTextureCoordinate);
+    vec4 dc = c;
+
+    vec3 cc;
+    //read out the texels
+    for (int i=-1; i <= 1; ++i)
+    {
+      for (int j=-1; j <= 1; ++j)
+      {
+        
+        // color at pixel in the neighborhood
+        vec2 coord = varyingTextureCoordinate.xy + vec2(float(i), float(j)) * sourceTexelSize.xy;
+        cc = texture2D(sourceTextureSampler, coord).rgb;
+
+        // dilate = max, erode = min
+        dc.rgb = max(cc.rgb, dc.rgb);
+      }
+    }
+
+    gl_FragColor = dc;
+  }
+  `;
+}
+
+//! IMPORTANT: j in the shader below is the distance value!! -> set j to size of the buffer around the polygons!
+//* 2D gaussian blur fs:
+// see. http://pieper.github.io/sites/glimp/gaussian.html
+export function getGaussianBlurFS(): string {
+  return `
+  precision highp float;
+
+  // Gaussian filter.  Based on https://www.shadertoy.com/view/4dfGDH#
+  #define SIGMA 10.0
+  #define MSIZE 15  // Blur strength overall
+  
+  
+  // gaussian distribution (the blur effect decreases fast the more we get away from the center)
+  float normpdf(in float x, in float sigma)
+  {
+    return 0.39894*exp(-0.5*x*x/(sigma*sigma))/sigma;
+  }
+  
+  uniform sampler2D sourceTextureSampler;
+  uniform vec2 sourceTextureSize;
+  uniform vec2 sourceTexelSize;
+  
+  varying vec2 varyingTextureCoordinate;
+  
+  void main(void) {
+    vec4 c = texture2D(sourceTextureSampler, varyingTextureCoordinate);
+    vec4 gc = c;
+    vec4 bc = c;
+
+    
+    //declare stuff
+    const int kSize = (MSIZE-1)/2;  // kernel size
+    float kernel[MSIZE];
+    vec3 gfinal_colour = vec3(0.0);
+
+    float gZ = 0.0;
+
+    //create the 1-D kernel (convolution kernel, looks like [0.0, 0.3, 0.5, 1.0, 0.5, 0.3, 0.0])
+    // in the middle (which is where the current pixel is) the blur has the highest effect and rapidly decreases to the edges
+    for (int j = 0; j <= kSize; ++j) {
+      kernel[kSize+j] = kernel[kSize-j] = normpdf(float(j), SIGMA);
+    }
+
+    // to improve the performance the kernel could also be precomputed:
+    //const float kernel[MSIZE] = float[MSIZE]( 0.031225216, 0.033322271, 0.035206333, 0.036826804, 0.038138565, 0.039104044, 0.039695028, 0.039894000, 0.039695028, 0.039104044, 0.038138565, 0.036826804, 0.035206333, 0.033322271, 0.031225216);
+
+    vec3 cc;
+    float gfactor;
+    //read out the texels
+    for (int i=-kSize; i <= kSize; ++i) // from the most left element of the kernel to the one on the right
+    {
+      for (int j=-kSize; j <= kSize; ++j)
+      {
+        // varyingTextureCoordinate.xy is the current pixel + the distance i,j from this pixel * pixelSize 
+        // (to work with different resolutions, e.g. when zooming in)
+
+        // color at pixel in the neighborhood
+        vec2 coord = varyingTextureCoordinate.xy + vec2(float(i), float(j)) * sourceTexelSize.xy;
+        cc = texture2D(sourceTextureSampler, coord).rgb;
+
+        // compute the gaussian smoothed (multiply both so the blur effect decreases faster, see x*x 
+        // in the gaussian distribution equation above)
+        gfactor = kernel[kSize+j]*kernel[kSize+i];
+
+        // add up all weight factors so we can normalize at the end!
+        gZ += gfactor;
+
+        // the final color is the current texel cc * the blur weight
+        gfinal_colour += gfactor*cc;
+      }
+    }
+
+    // normalize the final rgb color by dividing by the overall weight
+    gc = vec4(gfinal_colour/gZ, 1.0);
+
+    c = gc;
+      
+    gl_FragColor = c;
+  }
+  `;
+}
+
+//* shared vs for the both filters above
+export function getVSForDilateAndGaussBlur(): string {
+  return `
+  precision highp float;
+
+  attribute vec3 coordinate;
+  attribute vec2 textureCoordinate;
+
+  varying vec2 varyingTextureCoordinate;
+
+  void main(void) {
+    gl_Position = vec4(coordinate, 1.);
+
+    varyingTextureCoordinate = textureCoordinate;
+  }
+  `;
+}

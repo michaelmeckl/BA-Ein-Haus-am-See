@@ -5,6 +5,9 @@ import * as twgl from "twgl.js";
 import { addBlurredImage, addCanvasOverlay, addImageOverlay } from "../map/canvasUtils";
 import { map } from "../map/mapboxConfig";
 import { renderAndBlur } from "./blurFilter";
+import { getDilateFS, getGaussianBlurFS, getVSForDilateAndGaussBlur } from "./shaders";
+import { createDilateFilter } from "./dilateFilter";
+import { createGaussianBlurFilter } from "./gaussianBlurFilter";
 
 // ####### Webgl1 Shader ############
 
@@ -72,10 +75,13 @@ void main() {
 const fs2 = `#version 300 es
 precision mediump float;
 
+uniform vec4 u_fragColor;
+
 out vec4 color;
 
 void main() {
-  color = vec4(0.7, 0.7, 0.7, 1.0);
+  //color = vec4(0.7, 0.7, 0.7, 0.8);
+  color = u_fragColor;
 }
 `;
 
@@ -138,7 +144,42 @@ const fsCombine = `
     }
     `;
 
-// ###########################################
+// ############## Blur Fragment Shader: #####################
+
+const blurShader = `
+precision mediump float;
+ 
+// our texture
+uniform sampler2D u_image;
+uniform vec2 u_textureSize;
+uniform float u_kernel[9];
+uniform float u_kernelWeight;
+ 
+// the texCoords passed in from the vertex shader.
+varying vec2 v_texCoord;
+ 
+void main() {
+   vec2 onePixel = vec2(1.0, 1.0) / u_textureSize;
+
+   // sum up all 8 surrounding pixels and the middle
+   vec4 colorSum =
+     texture2D(u_image, v_texCoord + onePixel * vec2(-1, -1)) * u_kernel[0] +
+     texture2D(u_image, v_texCoord + onePixel * vec2( 0, -1)) * u_kernel[1] +
+     texture2D(u_image, v_texCoord + onePixel * vec2( 1, -1)) * u_kernel[2] +
+     texture2D(u_image, v_texCoord + onePixel * vec2(-1,  0)) * u_kernel[3] +
+     texture2D(u_image, v_texCoord + onePixel * vec2( 0,  0)) * u_kernel[4] +
+     texture2D(u_image, v_texCoord + onePixel * vec2( 1,  0)) * u_kernel[5] +
+     texture2D(u_image, v_texCoord + onePixel * vec2(-1,  1)) * u_kernel[6] +
+     texture2D(u_image, v_texCoord + onePixel * vec2( 0,  1)) * u_kernel[7] +
+     texture2D(u_image, v_texCoord + onePixel * vec2( 1,  1)) * u_kernel[8] ;
+ 
+   // Divide the sum by the weight but just use rgb
+   // we'll set alpha to 1.0
+   gl_FragColor = vec4((colorSum / u_kernelWeight).rgb, 1.0);
+}
+`;
+
+//##########################################
 
 //let reset: () => void;
 
@@ -156,11 +197,14 @@ class Overlay {
   private positionLocation!: number;
   private positionBuffer: WebGLBuffer | null = null;
   private resolutionLocation: WebGLUniformLocation | null = null;
+  private colorLocation: WebGLUniformLocation | null = null;
   private vao: WebGLVertexArrayObject | null = null;
 
   allTextures: HTMLImageElement[] = [];
   allCanvases: HTMLCanvasElement[] = [];
 
+  //TODO den canvas etwas größer machen, damit nicht bei jeder kleinen bewegung nachgeladen werden muss??
+  // bräuchte ich dann eine view matrix?
   constructor() {
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     //const canvas = document.createElement("canvas"); // create an in-memory canvas
@@ -189,7 +233,8 @@ class Overlay {
     this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
-    this.program = this.setupProgram(vs2, fs2);
+    // setup webgl program with the given shaders
+    this.program = twgl.createProgramFromSources(this.gl, [vs2, fs2]);
 
     //TODO not really necessary and as i dont use requestAnimationFrame for constantly rendering, probably redundant?
     if (this.gl instanceof WebGL2RenderingContext) {
@@ -202,6 +247,8 @@ class Overlay {
     this.positionLocation = this.gl.getAttribLocation(this.program, "a_position");
 
     this.resolutionLocation = this.gl.getUniformLocation(this.program, "u_resolution");
+
+    this.colorLocation = this.gl.getUniformLocation(this.program, "u_fragColor");
 
     this.positionBuffer = this.gl.createBuffer();
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.positionBuffer);
@@ -218,6 +265,8 @@ class Overlay {
 
       this.drawCanvas(vertices);
 
+      //break; //! for testing!
+
       /*
       console.log("before await saveAsImage");
       await this.saveAsImage();
@@ -230,17 +279,22 @@ class Overlay {
     await this.saveAsImage();
   }
 
-  setupProgram(vertexShaderSource: string, fragmentShaderSource: string): WebGLProgram {
-    // setup webgl program with the given shaders
-    return twgl.createProgramFromSources(this.gl, [vertexShaderSource, fragmentShaderSource]);
-  }
-
   drawCanvas(vertices: any): void {
     //* gl.bufferData will affect whatever buffer is bound to the `ARRAY_BUFFER` bind point.
     //* If we had more than one buffer we'd want to bind that buffer to `ARRAY_BUFFER` first
     this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(vertices), this.gl.STATIC_DRAW);
 
     this.gl.useProgram(this.program);
+
+    const wanted = false;
+    if (wanted) {
+      this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // background is black, fully opaque
+      this.gl.uniform4f(this.colorLocation, 0.7, 0.7, 0.7, 0.8); //wanted polys are light grey
+    } else {
+      this.gl.clearColor(1.0, 1.0, 1.0, 0.0); // background is white, fully transparent
+      this.gl.uniform4f(this.colorLocation, 0.2, 0.2, 0.2, 0.8); // not wanted polys are dark grey
+    }
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
     // set the resolution (needs to be set after useProgram !!)
     this.gl.uniform2f(this.resolutionLocation, this.gl.canvas.width, this.gl.canvas.height);
@@ -252,6 +306,14 @@ class Overlay {
       this.gl.bindVertexArray(this.vao);
     }
 
+    //TODO dont always use two??
+    /**
+     * const primitiveSize = {
+            [gl.LINES]: 2,
+            [gl.TRIANGLES]: 3,
+            [gl.LINE_STRIP]: 1
+        }[drawMode];
+     */
     const vertexCount = vertices.length / 2;
     this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, vertexCount);
   }
@@ -271,6 +333,7 @@ class Overlay {
         this.allTextures.push(img);
 
         //TODO dont use this !!
+        /*
         // perf-results: 101,6 ; 101,2 ; 82,6 ; 62,7 ; 45,9 (ms) -> avg: 78,8 ms (vllt lieber median?)
         Benchmark.startMeasure("blur Image with Webgl");
         const canvas = renderAndBlur(img);
@@ -281,7 +344,8 @@ class Overlay {
           resolve();
         } else {
           reject();
-        }
+        }*/
+        resolve();
       };
       img.onerror = (): void => reject();
 
@@ -309,6 +373,8 @@ class Overlay {
     const canvas = document.createElement("canvas");
     canvas.width = map.getCanvas().clientWidth;
     canvas.height = map.getCanvas().clientHeight;
+    //TODO etwas davon aktivieren?
+    //const gl = canvas.getContext("webgl2", {stencil: true, antialias: true, premultipliedAlpha: false, alpha: false});
     const gl = canvas.getContext("webgl2");
     if (!gl) {
       throw new Error("Couldn't get a webgl context for combining the overlays!");
@@ -333,6 +399,7 @@ class Overlay {
     //* this works only because all images have the same size!
     webglUtils.setRectangle(gl, 0, 0, textureLayers[0].width, textureLayers[0].height);
 
+    // texture coordinates are always in the space between 0.0 and 1.0
     const texcoordBuffer = webglUtils.createBuffer(
       gl,
       new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0])
@@ -351,6 +418,8 @@ class Overlay {
 
     gl.useProgram(program);
 
+    //gl.disable(gl.DEPTH_TEST);
+
     // Turn on the position attribute
     webglUtils.bindAttribute(gl, positionBuffer, positionLocation);
     // Turn on the texcoord attribute
@@ -363,18 +432,24 @@ class Overlay {
     gl.uniform1iv(textureLoc, Array.from(Array(textureCount).keys())); //uniform variable location and texture Index (or array of indices)
 
     //TODO Blending hier oder doch mit custom layer??
-    //gl.enable(gl.BLEND);
-    //gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    //TODO verschiedene Blend Functions Testen!!
+    // see https://stackoverflow.com/questions/39341564/webgl-how-to-correctly-blend-alpha-channel-png/
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for pre-multiplied alpha
+    //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for un-premultiplied alpha
     //gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     const vertexCount = 6; // 2 triangles for a rectangle
     gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
+    gl.disable(gl.BLEND);
+
     return canvas;
   }
 
   createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
-    const overlayCanvas = this.combineOverlays(textures);
+    //const overlayCanvas = this.combineOverlays(textures);
+    const overlayCanvas = createGaussianBlurFilter(textures);
     //cleanup and delete webgl resources
     this.cleanupResources();
 
@@ -407,6 +482,10 @@ class Overlay {
     //this.gl.getExtension("WEBGL_lose_context")?.loseContext();
     //this.gl.getExtension("WEBGL_lose_context")?.restoreContext();
   }
+
+  deleteImages(): void {
+    this.allTextures.length = 0;
+  }
 }
 
 export default async function createOverlay(data: any): Promise<void> {
@@ -415,6 +494,7 @@ export default async function createOverlay(data: any): Promise<void> {
   Benchmark.startMeasure("creating overlay");
   const overlay = new Overlay();
 
+  //TODO layer sollte ein object sein mit den properties coord array, radius und relevance
   for (const layer of data) {
     console.log("layer: ", layer);
     Benchmark.startMeasure("init webgl");
@@ -442,6 +522,9 @@ export default async function createOverlay(data: any): Promise<void> {
   img.onload = (): void => {
     console.log("in onload: ", img.src);
     addCanvasOverlay(resultCanvas);
+
+    //delete all created images in the overlay class
+    overlay.deleteImages();
   };
   img.src = resultCanvas.toDataURL();
 
