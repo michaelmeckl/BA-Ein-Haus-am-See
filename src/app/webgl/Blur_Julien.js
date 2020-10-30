@@ -25,7 +25,7 @@ _getDrawnViewportCanvas = function (ftColl, zoom, requiredTilesInfo) {
 
     // Eine logische (oder arithmetische) Verschiebung um n (Bitpositionen) nach links ist äquivalent 
     // zu einer Multiplikation mit 2^{n}
-    var z2 = (1 << zoom);
+    var z2 = (1 << zoom); //2^{zoom}
 
     var features = (ftColl.features) ? ftColl.features : ftColl;
     // if (!features)  console.log(ftColl);

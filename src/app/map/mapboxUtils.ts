@@ -44,11 +44,15 @@ function getResolutions() {
   return resolutions;
 }
 
-// see https://stackoverflow.com/questions/37599561/drawing-a-circle-with-the-radius-in-miles-meters-with-mapbox-gl-js
-export function getMeterRatioForZoomLevel(meters: number, zoom: number): number {
-  // see https://docs.mapbox.com/help/glossary/zoom-level/
-  const metersPerPixel = 78271.484 / 2 ** zoom;
-  return meters / metersPerPixel /*/ Math.cos((latitude * Math.PI) / 180)*/;
+// formula based on https://wiki.openstreetmap.org/wiki/Zoom_levels
+export function metersInPixel(meters: number, latitude: number, zoomLevel: number): number {
+  const earthCircumference = 40075016.686;
+  const latitudeRadians = latitude * (Math.PI / 180);
+  // zoomlevel + 9 instead of +8 because mapbox uses 512*512 tiles, see https://docs.mapbox.com/help/glossary/zoom-level/
+  const metersPerPixel =
+    (earthCircumference * Math.cos(latitudeRadians)) / Math.pow(2, zoomLevel + 9);
+
+  return meters / metersPerPixel;
 }
 
 export function getRadiusAndCenterOfViewport(): any {
@@ -274,6 +278,8 @@ export function showMask(mask: any): void {
     mapLayerManager.addNewGeojsonSource("maske", mask, false);
   }
 
+  const currentLat = map.getCenter().lat;
+
   map.addLayer({
     id: "mask-layer",
     source: "maske",
@@ -297,8 +303,8 @@ export function showMask(mask: any): void {
         // this makes the line-width in meters stay relative to the current zoom level:
         "interpolate",
         ["exponential", 2], ["zoom"],
-        10, /*["*", 10, ["^", 2, -16]],*/ getMeterRatioForZoomLevel(20, 10),
-        24, /*["*", 150, ["^", 2, 8]]*/ getMeterRatioForZoomLevel(100, 24),
+        10, /*["*", 10, ["^", 2, -16]],*/ metersInPixel(20, currentLat, 10),
+        24, /*["*", 150, ["^", 2, 8]]*/ metersInPixel(100, currentLat, 24),
       ],
       //prettier-ignore
       "line-blur": ["interpolate", ["linear"], ["zoom"],

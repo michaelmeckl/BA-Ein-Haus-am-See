@@ -41,6 +41,7 @@ import { resolve } from "path";
 import { reject } from "lodash";
 import html2canvas from "html2canvas";
 import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
+import createCanvasOverlay from "./canvasRenderer";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -803,6 +804,7 @@ export default class MapController {
     */
 
     const overlayData: FilterLayer[] = [];
+    //const overlayData: mapboxgl.Point[][][] = [];
 
     console.log(this.activeFilters);
     console.log(this.allFilterLayers);
@@ -838,7 +840,7 @@ export default class MapController {
           const pointData = coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord));
           overlayData[i].Points.push(pointData);
 
-          //TODO
+          //TODO das statt dem overlay data dann verwenden
           const filterLayer = this.getFilterLayer(name);
           if (filterLayer) {
             filterLayer.Points = pointData;
@@ -847,8 +849,6 @@ export default class MapController {
       }
       i++;
     }
-
-    console.log(this.allFilterLayers);
 
     /**
      *[
@@ -892,9 +892,12 @@ export default class MapController {
     console.log("OverlayData: ", overlayData);
     console.log("OverlayAlternative: ", overlayAlternative);
 
+    //TODO
+    createCanvasOverlay(overlayData);
+
     // check that there is data to overlay the map with
     if (overlayData.length > 0) {
-      createOverlay(overlayData);
+      //createOverlay(overlayData);
     } else {
       console.warn("Creating an overlay is not possible because overlayData is empty!");
     }

@@ -91,23 +91,8 @@ export function blurCanvas(canvas: HTMLCanvasElement, blurAmount: number) {
   }
 }
 
-export function clearCanvasRect(ctx: CanvasRenderingContext2D, width: number, height: number) {
+export function clearCanvas(ctx: CanvasRenderingContext2D, width: number, height: number) {
   ctx.clearRect(0, 0, width, height);
-}
-
-// vgl. https://stackoverflow.com/questions/13422917/get-elements-from-canvas
-export function drawImageToHiddenCanvas(ctx: CanvasRenderingContext2D) {
-  // make a hidden canvas:
-  var hiddenCanvas = document.createElement("canvas");
-  var hCtx = hiddenCanvas.getContext("2d");
-  // First you round the corners permanently by making a clipping region:
-  ctx.roundedRect(etc);
-  ctx.clip();
-  //then a user draws something onto HIDDEN canvas, like an image
-  // This image never gets its corners cut
-  hCtx.drawImage(myImage, 0, 0);
-  // Then you draw the hidden canvas onto your normal one:
-  ctx.drawImage(hiddenCanvas, 0, 0);
 }
 
 export function addCanvasOverlay(canvas: HTMLCanvasElement): void {
