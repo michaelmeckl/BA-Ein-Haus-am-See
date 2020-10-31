@@ -1,25 +1,23 @@
 /* eslint-env browser */
+import { filter } from "lodash";
 import Benchmark from "../shared/benchmarking";
 import { Config } from "../shared/config";
-import { showMask } from "./map/mapboxUtils";
 import MapController from "./map/mapController";
-import {
-  fetchMaskData,
-  fetchOsmData,
-  fetchOsmDataFromClientVersion,
-  fetchOsmDataFromClientVersionParallel,
-  fetchOsmDataFromClientVersionSequential,
-  testGuide,
-} from "./network/networkUtils";
+import { loadLocations } from "./map/locationsPanel";
+import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
+import FilterManager from "./mapData/filterManager";
+import { fetchOsmData } from "./network/networkUtils";
 import OsmTags from "./osmModel/osmTagCollection";
-import { getOSMTagName, showSnackbar, SnackbarType } from "./utils";
+import { showSnackbar, SnackbarType } from "./utils";
 
 // * const enum instead of enum as this inlines the elements at runtime
-// -> not the enum as a whole is needed at runtime
+//TODO alle html element accessor names hier auslagern:
 const enum HtmlElements {
   LIST_TEMPLATE_ID = "#li-template",
+  FILTER_LIST_TEMPLATE_ID = "#filter-li-template",
   // heading buttons
   SHOW_LOCATIONS_BUTTON_ID = "#showLocations",
+  SHOW_FILTER_BUTTON_ID = "#showFilters",
   SHOW_CUSTOM_DATA_ID = "#showCustomData",
   // api controls
   QUERY_INPUT_ID = "#query-input",
@@ -29,13 +27,38 @@ const enum HtmlElements {
   DROPDOWN_CONTENT_CLASS = ".dropdown-content",
   // sidebar
   CLOSE_SIDEBAR_BUTTON_CLASS = ".closeSidebar",
+  FILTER_SIDEBAR = "#filter-sidebar",
+  LOCATIONS_SIDEBAR = "#loc-sidebar",
   // container elements
-  SIDEBAR = "sidebar",
-  MAP_CONTAINER = "mapContainer",
-  MAP = "map",
+  SIDEBAR = ".sidebar",
+  MAP_CONTAINER = "#mapContainer",
+  MAP = "#map",
 }
 
+const enum SidebarType {
+  FilterSidebar,
+  LocationsSidebar,
+}
+
+let mapController: MapController;
+
 const LIST_TEMPLATE = document.querySelector(HtmlElements.LIST_TEMPLATE_ID)?.innerHTML.trim();
+const FILTER_LIST_TEMPLATE = document
+  .querySelector(HtmlElements.FILTER_LIST_TEMPLATE_ID)
+  ?.innerHTML.trim();
+
+const list = document.querySelector("#active-filters") as HTMLUListElement;
+const noFilterText = document.querySelector(".no-filter") as HTMLParagraphElement;
+const modal = document.querySelector("#filterModal") as HTMLDivElement;
+
+const sidebarContainer = document.querySelector(HtmlElements.SIDEBAR) as HTMLDivElement;
+const filterSidebar = document.querySelector(HtmlElements.FILTER_SIDEBAR) as HTMLDivElement;
+const locationsSidebar = document.querySelector(HtmlElements.LOCATIONS_SIDEBAR) as HTMLDivElement;
+
+const mapConatiner = document.querySelector(HtmlElements.MAP_CONTAINER) as HTMLDivElement;
+const mapElement = document.querySelector(HtmlElements.MAP) as HTMLDivElement;
+
+//TODO die buttons unten könnten auch noch hier rauf
 
 /*
 async function testVectorTileAPI(c: MapController): Promise<void> {
@@ -52,28 +75,225 @@ async function testVectorTileAPI(c: MapController): Promise<void> {
 }
 */
 
-/* Set the width of the side navigation to 250px */
-function openSidebar(): void {
-  //TODO alternativ auch mit map.easeTo({padding: {left: 400, top: 100}}) gut machbar!
-  (document.getElementById(HtmlElements.SIDEBAR) as HTMLDivElement).style.width = "250px";
-  (document.getElementById(HtmlElements.MAP_CONTAINER) as HTMLDivElement).style.marginLeft =
-    "250px";
-  (document.getElementById(HtmlElements.MAP) as HTMLDivElement).style.width = "calc(100% - 250px)";
+//* as onFilterRemoved is bound to a click listener the event (this) MUST be the last argument!
+function onFilterRemoved(filterName: string, ev: Event): void {
+  const listElement = (ev.target as HTMLButtonElement).parentElement as Node; // cast to node to remove it with removeChild()
+  list.removeChild(listElement);
+  FilterManager.removeFilter(filterName);
+
+  // remove data from the map as well
+  const textContent = listElement.firstChild?.textContent?.trim(); //TODO oder einfach filtername nehmen hier??
+  if (textContent) {
+    mapController.removeData(textContent);
+  }
+
+  // eslint-disable-next-line no-magic-numbers
+  showSnackbar(`Filter ${filterName} wurde entfernt.`, SnackbarType.SUCCESS, 1500);
+
+  // check if there are other list elements, if not show the no filter text
+  if (list.children.length === 0) {
+    noFilterText?.classList.remove(Config.CSS_HIDDEN);
+  }
 }
 
-/* Set the width of the side navigation to 0 */
+function addNewFilter(
+  filterName: string,
+  distance: string,
+  distanceUnit: string,
+  importance: string,
+  filterWanted: string
+): void {
+  if (list.children.length === 0) {
+    // the list is empty so this is the first filter -> hide the no filter text
+    noFilterText?.classList.add(Config.CSS_HIDDEN);
+  }
+
+  // check if that list element already exists to prevent adding it twice
+  for (const el of list.getElementsByTagName("li")) {
+    if (el.firstChild?.textContent?.trim() === filterName) {
+      return;
+    }
+  }
+
+  const containerElement = document.createElement("div");
+  containerElement.innerHTML = FILTER_LIST_TEMPLATE as string;
+  const listEl = containerElement.firstChild as ChildNode;
+
+  const title = `<h3>${filterName}</h3>`;
+  // insert the h3 before the button
+  containerElement.firstElementChild?.insertAdjacentHTML("afterbegin", title);
+
+  // get the remove button for the list element
+  //const removeButton = containerElement.firstChild?.childNodes[1] as ChildNode;
+  const removeButton = containerElement.querySelector("#remove-filter-button");
+
+  // add the selected data to the list element and append the list element
+  listEl.appendChild(
+    document.createTextNode(
+      `${distance} ${distanceUnit}, Relevanz: ${importance}, Erwünscht: ${filterWanted}`
+    )
+  );
+  list.appendChild(listEl);
+
+  const distanceInMeters = distanceUnit === "m" ? parseInt(distance) : parseInt(distance) * 1000;
+  const wanted = filterWanted === "true";
+
+  let relevance;
+  //TODO sehr unflexibel!
+  switch (importance) {
+    case "optional":
+      relevance = FilterRelevance.notVeryImportant;
+      break;
+    case "sehr wichtig":
+      relevance = FilterRelevance.veryImportant;
+      break;
+    case "wichtig":
+    default:
+      relevance = FilterRelevance.important;
+  }
+  //if (importance in FilterRelevance) relevance = FilterRelevance[importance]; //not working!
+  const newFilter = new FilterLayer(filterName, distanceInMeters, relevance, wanted);
+  FilterManager.addFilter(newFilter);
+
+  showSnackbar("Filter wurde erfolgreich hinzugefügt!", SnackbarType.SUCCESS, 1500);
+
+  // remove the list element when its close button is clicked
+  //@ts-expect-error: not actually a ts-error but this with implicit any is fine for me in this case
+  removeButton?.addEventListener("click", onFilterRemoved.bind(this, filterName));
+}
+
+function resetModalContent(): void {
+  const modalForm = document.querySelector("#modal-form") as HTMLFormElement;
+  modalForm.reset();
+}
+
+function showFilterDetailModal(filterName: string | null): void {
+  //show the modal
+  modal.style.display = "block";
+
+  // set the title to the current filter
+  const modalTitle = document.querySelector(".modal-header") as HTMLElement;
+  modalTitle.textContent = filterName;
+}
+
+function onCancelBtnClick(): void {
+  modal.style.display = "none";
+  resetModalContent();
+}
+
+function onAddFilterBtnClick(): void {
+  // get all relevant input information
+  const filterName = document.querySelector(".modal-header") as HTMLElement;
+  const distance = document.querySelector(".distance-input") as HTMLInputElement;
+  const distanceUnit = document.querySelector("#distance-unit-select") as HTMLSelectElement;
+  const importance = document.querySelector("#importance-select") as HTMLSelectElement;
+  const filterWanted = document.querySelector(
+    "input[name = 'polarity']:checked"
+  ) as HTMLInputElement;
+
+  console.log(filterName.textContent);
+  console.log(distance.value);
+  console.log(distanceUnit.value);
+  console.log(importance.value);
+  console.log(filterWanted.value);
+
+  addNewFilter(
+    filterName.textContent || "",
+    distance.value,
+    distanceUnit.value,
+    importance.value,
+    filterWanted.value
+  );
+
+  //close the modal
+  modal.style.display = "none";
+  //reset all fields in the modal
+  resetModalContent();
+}
+
+function setupModalButtons(): void {
+  const cancelBtn = document.querySelector("#cancel-button");
+  const addFilterBtn = document.querySelector("#add-filter-button");
+
+  //handle click on cancel button
+  cancelBtn?.addEventListener("click", onCancelBtnClick);
+  //handle click on add filter button
+  addFilterBtn?.addEventListener("click", onAddFilterBtnClick);
+}
+
+/* show the sidebar and calculalet the width of the map */
+//prettier-ignore
+function openSidebar(sidebarType: SidebarType): void {
+
+  //TODO toggle sidebar (also bei klick wieder zu)?
+
+  // switch visibility of sidebars
+  if(sidebarType === SidebarType.FilterSidebar) {
+    filterSidebar.classList.remove(Config.CSS_HIDDEN);
+    locationsSidebar.classList.add(Config.CSS_HIDDEN);
+  } else {
+    filterSidebar.classList.add(Config.CSS_HIDDEN);
+    locationsSidebar.classList.remove(Config.CSS_HIDDEN);
+  }
+  
+  //TODO width = 30% für mehr responsitivität
+  const sidebarWidth = "350px";
+  sidebarContainer.style.width = sidebarWidth;
+  mapConatiner.style.marginLeft = sidebarWidth;
+  mapElement.style.width = `calc(100% - ${sidebarWidth})`;
+}
+
+/* Set the width of the sidebar to 0 */
 function closeSidebar(): void {
-  (document.getElementById(HtmlElements.SIDEBAR) as HTMLDivElement).style.width = "0";
-  (document.getElementById(HtmlElements.MAP_CONTAINER) as HTMLDivElement).style.marginLeft = "0";
-  (document.getElementById(HtmlElements.MAP) as HTMLDivElement).style.width = "100%";
+  sidebarContainer.style.width = "0";
+  mapConatiner.style.marginLeft = "0";
+  mapElement.style.width = "100%";
 }
 
-async function showLocations(): Promise<void> {
-  //console.log("NOT IMPLEMENTED:\nFetching data from osm ...");
-  openSidebar();
+function setupFilterSelection(): void {
+  const filterNodes = document.querySelectorAll(".filter-entries > a");
+
+  filterNodes.forEach((filter) => {
+    filter.addEventListener("click", () => {
+      showFilterDetailModal(filter.textContent);
+    });
+  });
 }
 
-function selectData(e: Event, mapController: MapController): void {
+function setupSidebarFilterCategories(): void {
+  const filterCategories = document.getElementsByClassName("filter-categories");
+
+  for (let i = 0; i < filterCategories.length; i++) {
+    filterCategories[i].addEventListener("click", (event) => {
+      const clickedButton = event.currentTarget as HTMLElement;
+      // toggle the active class
+      clickedButton.classList.toggle("active-filter-category");
+
+      // toggle the dropdown arrow
+      const dropdownIcon = clickedButton.firstElementChild;
+      dropdownIcon?.classList.toggle("caret-down");
+      dropdownIcon?.classList.toggle("caret-up");
+
+      // show or hide the dropdown content
+      const dropdownContent = clickedButton.nextElementSibling as HTMLElement;
+      if (dropdownContent.style.display === "block") {
+        dropdownContent.style.display = "none";
+      } else {
+        dropdownContent.style.display = "block";
+      }
+    });
+  }
+}
+
+function showFilterPanel(): void {
+  openSidebar(SidebarType.FilterSidebar);
+}
+
+function showLocationsPanel(): void {
+  openSidebar(SidebarType.LocationsSidebar);
+}
+
+function selectData(e: Event): void {
   e.stopPropagation();
   e.preventDefault();
 
@@ -106,13 +326,13 @@ function selectData(e: Event, mapController: MapController): void {
   listEl.appendChild(document.createTextNode(value));
   list.appendChild(listEl);
 
-  mapController.addActiveFilter(value);
+  FilterManager.addFilter(new FilterLayer(value, 250, FilterRelevance.important, true));
 
   // remove the list element when its close button is clicked
   closeButton.addEventListener("click", function (this: ChildNode) {
     const listElement = this.parentElement as Node;
     list.removeChild(listElement);
-    mapController.removeActiveFilter(value);
+    FilterManager.removeFilter(value);
 
     // remove data from the map as well
     const textContent = listElement.textContent?.trim();
@@ -133,7 +353,7 @@ function selectData(e: Event, mapController: MapController): void {
   selectionBox.classList.remove(Config.CSS_HIDDEN);
 }
 
-async function performOsmQuery(mapController: MapController, inputQuery: string): Promise<void> {
+async function performOsmQuery(inputQuery: string): Promise<void> {
   //ganz Regensburg: 12.028,48.966,12.192,49.076
   //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
   const bounds = mapController.getViewportBoundsString(); //TODO make it a little bigger ?
@@ -141,7 +361,7 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   // give feedback to the user
   showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
 
-  for (const tag of mapController.activeFilters) {
+  for (const tag of FilterManager.activeFilters) {
     const query = OsmTags.getQuery(tag);
 
     Benchmark.startMeasure("Fetching data from osm");
@@ -180,10 +400,15 @@ async function performOsmQuery(mapController: MapController, inputQuery: string)
   */
 }
 
-function setupUI(mapController: MapController): void {
+function setupUI(): void {
   const showLocationsButtton = document.querySelector(HtmlElements.SHOW_LOCATIONS_BUTTON_ID);
   if (showLocationsButtton) {
-    showLocationsButtton.addEventListener("click", showLocations);
+    showLocationsButtton.addEventListener("click", showLocationsPanel);
+  }
+
+  const showFilterButtton = document.querySelector(HtmlElements.SHOW_FILTER_BUTTON_ID);
+  if (showFilterButtton) {
+    showFilterButtton.addEventListener("click", showFilterPanel);
   }
 
   //TODO
@@ -219,7 +444,7 @@ function setupUI(mapController: MapController): void {
   const dropdownList = document.querySelector(HtmlElements.DROPDOWN_CONTENT_CLASS);
   if (dropdownList) {
     dropdownList.addEventListener("click", function (ev) {
-      selectData(ev, mapController);
+      selectData(ev);
     });
   }
 
@@ -231,30 +456,48 @@ function setupUI(mapController: MapController): void {
     );
   }
 
+  //TODO statt aus dem input field sollte aus der filter-li oder direkt aus dem filteManager ausgelesen werden!!
+  // -> wird oben eh schon gemacht, der übergabeparameter ist prinzipiell überflüssig
   const queryInput = document.querySelector(HtmlElements.QUERY_INPUT_ID) as HTMLInputElement;
   const queryButton = document.querySelector(HtmlElements.QUERY_BUTTON_ID);
   if (queryButton && queryInput) {
     queryButton.addEventListener("click", () => {
-      performOsmQuery(mapController, queryInput.value.toLowerCase());
+      performOsmQuery(queryInput.value.toLowerCase());
     });
   }
+
+  //setup filter side panel
+
+  setupSidebarFilterCategories();
+  setupFilterSelection();
+  setupModalButtons();
+  // When the user clicks anywhere outside of the modal, close it
+  window.onclick = function (event: Event): void {
+    if (event.target === modal) {
+      modal.style.display = "none";
+      //reset all fields in the modal
+      resetModalContent();
+    }
+  };
+
+  //setup house side panel
+  //TODO
+  loadLocations();
 }
 
 function init(): void {
   console.time("load map");
 
-  const mapController = new MapController();
-  mapController
-    .init()
-    .then(() => {
-      // map loaded sucessfully
-      console.timeEnd("load map");
-      setupUI(mapController);
-    })
-    .catch((error) => {
+  mapController = new MapController();
+  mapController.init().then(() => {
+    // map loaded sucessfully
+    console.timeEnd("load map");
+    setupUI();
+  });
+  /*.catch((error) => {
       // an error occured while loading the map, the application cannot be used
       throw new Error(error);
-    });
+    });*/
 }
 
 init();

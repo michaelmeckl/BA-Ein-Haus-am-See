@@ -26,7 +26,7 @@ import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import mapLayerManager from "./mapLayerManager";
-import { loadSidebar } from "./mapTutorialStoreTest";
+import { loadLocations } from "./locationsPanel";
 import { PerformanceMeasurer } from "./performanceMeasurer";
 import { featureCollection, point } from "@turf/helpers";
 import circle from "@turf/circle";
@@ -42,6 +42,7 @@ import { reject } from "lodash";
 import html2canvas from "html2canvas";
 import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
 import createCanvasOverlay from "./canvasRenderer";
+import FilterManager from "../mapData/filterManager";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -50,24 +51,11 @@ import createCanvasOverlay from "./canvasRenderer";
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
  */
 export default class MapController {
-  //private mapData = new Map<string, number[]>(); // type as key, array of all points as value
-  //TODO oder so:
-  //private mapData = new Map<string, Map<string, number[]>>(); // sourcename as key, value: map from above
-  //TODO oder so:
-  private mapData = new Map<string, number[] | number[][]>(); // sourcename as key, array of all points as value or array of
-  // array for polygon and linestring?? (basically do i want to flatten it??)
-
-  //private currentData?: string;
-
   private currentPoints = new Set<Feature<Point, GeoJsonProperties>>();
   private currentWays = new Set<Feature<LineString, GeoJsonProperties>>();
   private currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
   //prettier-ignore
   private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
-
-  private allFilterLayers: FilterLayer[] = [];
-
-  activeFilters: Set<string> = new Set();
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -91,16 +79,12 @@ export default class MapController {
 
     // disable map rotation using right click + drag
     map.dragRotate.disable();
-
     // disable map rotation using touch rotation gesture
     map.touchZoomRotate.disableRotation();
 
     // start measuring the frame rate
     const performanceMeasurer = new PerformanceMeasurer();
     performanceMeasurer.startMeasuring();
-
-    //TODO
-    loadSidebar();
 
     //map.showTileBoundaries = true;
 
@@ -175,61 +159,8 @@ export default class MapController {
     //console.log("A dataloading event occurred.");
   }
 
-  //TODO should all map click events be handled here? -> probably
   async onMapClick(e: mapboxgl.MapMouseEvent & mapboxgl.EventData): Promise<void> {
     console.log("Click:", e);
-
-    //* bräuchte einen timeout um zu funktionieren -> nicht praktikabel!
-    /*
-    new Promise((resolve, reject) => {
-      Benchmark.startMeasure("hiding all layers");
-      const allLayers = map.getStyle().layers;
-      if (allLayers) {
-        allLayers.forEach((layer) => {
-          mapLayerManager.hideLayer(layer.id);
-        });
-        Benchmark.stopMeasure("hiding all layers");
-        resolve();
-      } else {
-        reject();
-      }
-    }).then(() => {
-      Benchmark.startMeasure("taking snapshot of mapCanvas");
-
-      const mapCanvas = map.getCanvas();
-
-      const img = new Image();
-
-      img.onload = () => {
-        Benchmark.stopMeasure("taking snapshot of mapCanvas");
-        img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
-        img.height = mapCanvas.clientHeight;
-        console.log(img.src);
-      };
-      img.src = mapCanvas.toDataURL();
-    });
-
-    map.addSource("testsource", {
-      type: "geojson",
-      data: "../assets/data.geojson", //TODO use the real data given as param
-    });
-
-    map.addLayer({
-      id: "test-layer",
-      type: "circle",
-      source: "testsource",
-      paint: {
-        "circle-color": "rgba(0, 0, 255, 1.0)",
-      },
-    });
-    */
-
-    /*
-    getPointsInRadius(map);
-
-    //!not working rigth now
-    //sortDistances(e.lngLat);
-    */
 
     //addWebglCircle(map);
 
@@ -256,18 +187,9 @@ export default class MapController {
     map.addControl(Geocoder.geocoderControl, "bottom-left");
   }
 
-  addActiveFilter(filter: string): void {
-    this.activeFilters.add(filter);
-  }
-
-  //TODO remove map data in here? so everything is in one place?
-  removeActiveFilter(filter: string): void {
-    this.activeFilters.delete(filter);
-  }
-
   reloadData(): void {
     //TODO load data new on every move, works but needs another source than overpass api mirror
-    this.activeFilters.forEach(async (param) => {
+    FilterManager.activeFilters.forEach(async (param) => {
       Benchmark.startMeasure("Fetching data on moveend");
       const data = await fetchOsmData(this.getViewportBoundsString(), param);
       console.log(Benchmark.stopMeasure("Fetching data on moveend"));
@@ -346,6 +268,7 @@ export default class MapController {
     //@ts-expect-error
     const viewportCirclePolygon = circle([center.lng, center.lat], radius, { units: "meters" });
 
+    //@ts-expect-error
     mapLayerManager.addNewGeojsonSource("viewportCircle", viewportCirclePolygon);
     const newLayer: Layer = {
       id: "viewportCircleLayer",
@@ -356,16 +279,6 @@ export default class MapController {
       },
     };
     mapLayerManager.addNewLayer(newLayer, true);
-  }
-
-  getFilterLayer(name: string): FilterLayer | null {
-    for (let index = 0; index < this.allFilterLayers.length; index++) {
-      const layer = this.allFilterLayers[index];
-      if (layer.LayerName === name) {
-        return layer;
-      }
-    }
-    return null;
   }
 
   addVectorData(data: string): void {
@@ -469,7 +382,7 @@ export default class MapController {
     const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures, 250);
     this.allPolygonFeatures.set(dataName, polyFeatures); //überflüssign wenn mit filterLayers
 
-    const layer = this.getFilterLayer(dataName);
+    const layer = FilterManager.getFilterLayer(dataName);
     if (layer) {
       layer.Features = polyFeatures;
     }
@@ -543,7 +456,7 @@ export default class MapController {
     console.log(sourceName);
 
     //TODO falls das auf den server ausgelagert wird, muss später nur noch die features und points nachträglich gefüllt werden (mit settern am besten!)
-    this.allFilterLayers.push(new FilterLayer(sourceName, distance, relevance, wanted));
+    FilterManager.addFilter(new FilterLayer(sourceName, distance, relevance, wanted));
 
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(sourceName);
@@ -618,7 +531,7 @@ export default class MapController {
 
     console.log("adding webgl data...");
 
-    const mapData = getDataFromMap(this.activeFilters);
+    const mapData = getDataFromMap(FilterManager.activeFilters);
     const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
     map.addLayer(customLayer, "waterway-label");
 
@@ -806,8 +719,8 @@ export default class MapController {
     const overlayData: FilterLayer[] = [];
     //const overlayData: mapboxgl.Point[][][] = [];
 
-    console.log(this.activeFilters);
-    console.log(this.allFilterLayers);
+    console.log(FilterManager.activeFilters);
+    console.log(FilterManager.allFilterLayers);
 
     //! wenn die polygon features sonst nirgendwo gebraucht werden, könnte man gleich oben wenn sie in die Map
     //! gespeichert werden, sie zu mapboxgl.Points umwandeln, dann könnte man vllt die doppelte for-schleife hier vermeiden
@@ -841,7 +754,7 @@ export default class MapController {
           overlayData[i].Points.push(pointData);
 
           //TODO das statt dem overlay data dann verwenden
-          const filterLayer = this.getFilterLayer(name);
+          const filterLayer = FilterManager.getFilterLayer(name);
           if (filterLayer) {
             filterLayer.Points = pointData;
           }

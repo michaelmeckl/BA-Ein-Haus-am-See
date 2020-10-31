@@ -138,11 +138,6 @@ class TagCollection {
   und highway	motorway_link
   vllt auch noch highway=trunk für die ebene nach autobahn ()
    * 
-   * * apartments / houses:
-   building=apartment
-   addr:flats
-   vllt landuse=residential mit name=* oder so???
-   * 
    * * Wasser:
    waterway=river und waterway=stream (vllt auch noch waterway=canal?)
    Seen: natural=water+water=lake
@@ -202,6 +197,9 @@ class TagCollection {
   }
 
   //TODO fetch everything that is marked as a building or apartment
+  /* * apartments / houses:
+    vllt landuse=residential mit name=* oder addr:flats ???
+   */
   getAllHousesQuery(): string {
     /*
     waysWithAllHousesTags = new ArrayList<Integer>();
@@ -214,7 +212,8 @@ class TagCollection {
 
     waysWithAllHousesTags.add(waysWithTagYes, ...);
     */
-    return "";
+
+    return 'nwr["building"~"^apartments|dormitory|terrace|house$"];';
   }
 }
 

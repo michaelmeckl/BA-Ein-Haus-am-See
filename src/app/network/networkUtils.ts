@@ -174,11 +174,14 @@ export async function fetchOsmData(
     });
     //const url = "/osmRequestPbfVersion?" + params; //TODO osmtogeojson has to be commented out to work with this
     const url = "/osmRequestCacheVersion?" + params;
+    console.log(url);
 
     Benchmark.startMeasure("Request client side");
 
     const response = await axios.get(url);
     console.log(Benchmark.stopMeasure("Request client side"));
+
+    console.log(response);
 
     Benchmark.startMeasure("o2geo client");
     const geoJson = osmtogeojson(response.data);
