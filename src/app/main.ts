@@ -481,8 +481,8 @@ function setupUI(): void {
   };
 
   //setup house side panel
-  //TODO
-  loadLocations();
+  //TODO not possible performance-wise at the moment
+  //loadLocations();
 }
 
 function init(): void {
