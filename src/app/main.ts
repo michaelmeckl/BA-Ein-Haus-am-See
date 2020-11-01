@@ -9,6 +9,7 @@ import FilterManager from "./mapData/filterManager";
 import { fetchOsmData } from "./network/networkUtils";
 import OsmTags from "./osmModel/osmTagCollection";
 import { showSnackbar, SnackbarType } from "./utils";
+import filterManager from "./mapData/filterManager";
 
 // * const enum instead of enum as this inlines the elements at runtime
 //TODO alle html element accessor names hier auslagern:
@@ -115,26 +116,6 @@ function addNewFilter(
     }
   }
 
-  const containerElement = document.createElement("div");
-  containerElement.innerHTML = FILTER_LIST_TEMPLATE as string;
-  const listEl = containerElement.firstChild as ChildNode;
-
-  const title = `<h3>${filterName}</h3>`;
-  // insert the h3 before the button
-  containerElement.firstElementChild?.insertAdjacentHTML("afterbegin", title);
-
-  // get the remove button for the list element
-  //const removeButton = containerElement.firstChild?.childNodes[1] as ChildNode;
-  const removeButton = containerElement.querySelector("#remove-filter-button");
-
-  // add the selected data to the list element and append the list element
-  listEl.appendChild(
-    document.createTextNode(
-      `${distance} ${distanceUnit}, Relevanz: ${importance}, Erwünscht: ${filterWanted}`
-    )
-  );
-  list.appendChild(listEl);
-
   const distanceInMeters = distanceUnit === "m" ? parseInt(distance) : parseInt(distance) * 1000;
   const wanted = filterWanted === "true";
 
@@ -154,6 +135,28 @@ function addNewFilter(
   //if (importance in FilterRelevance) relevance = FilterRelevance[importance]; //not working!
   const newFilter = new FilterLayer(filterName, distanceInMeters, relevance, wanted);
   FilterManager.addFilter(newFilter);
+
+  const containerElement = document.createElement("div");
+  containerElement.innerHTML = FILTER_LIST_TEMPLATE as string;
+  const listEl = containerElement.firstChild as ChildNode;
+
+  const title = `<h4>${filterName}</h4>`;
+  // insert the h3 before the button
+  containerElement.firstElementChild?.insertAdjacentHTML("afterbegin", title);
+
+  // get the remove button for the list element
+  //const removeButton = containerElement.firstChild?.childNodes[1] as ChildNode;
+  const removeButton = containerElement.querySelector("#remove-filter-button");
+
+  // add the selected data to the list element and append the list element
+  listEl.appendChild(
+    document.createTextNode(
+      `Entfernung: ${distance} ${distanceUnit}, Relevanz: ${importance}, ${
+        wanted ? "erwünscht" : "nicht erwünscht"
+      }`
+    )
+  );
+  list.appendChild(listEl);
 
   showSnackbar("Filter wurde erfolgreich hinzugefügt!", SnackbarType.SUCCESS, 1500);
 
@@ -191,11 +194,13 @@ function onAddFilterBtnClick(): void {
     "input[name = 'polarity']:checked"
   ) as HTMLInputElement;
 
+  /*
   console.log(filterName.textContent);
   console.log(distance.value);
   console.log(distanceUnit.value);
   console.log(importance.value);
   console.log(filterWanted.value);
+  */
 
   addNewFilter(
     filterName.textContent || "",
@@ -361,8 +366,9 @@ async function performOsmQuery(inputQuery: string): Promise<void> {
   // give feedback to the user
   showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
 
+  console.log("Performing osm query for active filters: ", FilterManager.activeFilters);
   for (const tag of FilterManager.activeFilters) {
-    const query = OsmTags.getQuery(tag);
+    const query = OsmTags.getQueryForCategory(tag);
 
     Benchmark.startMeasure("Fetching data from osm");
     // request data from osm
@@ -403,7 +409,19 @@ async function performOsmQuery(inputQuery: string): Promise<void> {
 function setupUI(): void {
   const showLocationsButtton = document.querySelector(HtmlElements.SHOW_LOCATIONS_BUTTON_ID);
   if (showLocationsButtton) {
-    showLocationsButtton.addEventListener("click", showLocationsPanel);
+    showLocationsButtton.addEventListener("click", () => {
+      // check if there are active filters, if not show snackbar warning
+      if (filterManager.activeFilters.size > 0) {
+        showLocationsPanel();
+      } else {
+        // eslint-disable-next-line no-magic-numbers
+        showSnackbar(
+          "Um Orte anzuzeigen, muss mindestens ein Filter aktiviert sein!",
+          SnackbarType.WARNING,
+          2000
+        );
+      }
+    });
   }
 
   const showFilterButtton = document.querySelector(HtmlElements.SHOW_FILTER_BUTTON_ID);
@@ -417,10 +435,10 @@ function setupUI(): void {
     blurButtton.addEventListener("click", mapController.blurMap.bind(mapController));
   }
 
-  //TODO
-  const deckButtton = document.querySelector("#deckglButton");
-  if (deckButtton) {
-    deckButtton.addEventListener("click", mapController.addDeckLayer.bind(mapController));
+  //TODO nur die "raw" polygone und points anzeigen (mit mapbox layer)
+  const showMapDataButtton = document.querySelector("#deckglButton");
+  if (showMapDataButtton) {
+    //showMapDataButtton.addEventListener("click", mapController.addDeckLayer.bind(mapController));
   }
 
   //TODO
@@ -436,6 +454,7 @@ function setupUI(): void {
   );
   */
 
+  //FIXME funktioniert im locations Panel nicht!!!
   const closeSidebarButtton = document.querySelector(HtmlElements.CLOSE_SIDEBAR_BUTTON_CLASS);
   if (closeSidebarButtton) {
     closeSidebarButtton.addEventListener("click", closeSidebar);
@@ -457,7 +476,7 @@ function setupUI(): void {
   }
 
   //TODO statt aus dem input field sollte aus der filter-li oder direkt aus dem filteManager ausgelesen werden!!
-  // -> wird oben eh schon gemacht, der übergabeparameter ist prinzipiell überflüssig
+  //* -> wird oben eh schon gemacht, der übergabeparameter ist prinzipiell überflüssig
   const queryInput = document.querySelector(HtmlElements.QUERY_INPUT_ID) as HTMLInputElement;
   const queryButton = document.querySelector(HtmlElements.QUERY_BUTTON_ID);
   if (queryButton && queryInput) {

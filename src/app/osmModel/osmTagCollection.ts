@@ -1,91 +1,21 @@
 /* eslint-disable quotes */
-import type OsmTag from "./osmTag";
-
-//TODO: anderes format? z.B. as a Map? or a Set?
-const allTags = {
-  SHOPPING: {
-    supermarket: ["supermarket"],
-    bakery: ["bakery"],
-    butcher: ["butcher"],
-    mall: ["mall"],
-    kiosk: ["kiosk"],
-  },
-
-  NATURE: {
-    park: ["park", "recreation_ground", "village_green"],
-    wood: ["wood", "forrest"],
-    water: [
-      "river",
-      "riverbank",
-      "fairway",
-      "water",
-      "coastline",
-      "bay",
-      "stream",
-      "canal",
-      "drain",
-      "ditch",
-    ],
-  },
-
-  TRAFFIC: {
-    bus: ["bus_stop", "bus_station"],
-    train: ["train_station"],
-    motorway: ["motorway"],
-    subway: ["subway_entrance"],
-    tram: ["tram_stop"],
-  },
-
-  EDUCATION: {
-    kindergarten: ["kindergarten"],
-    school: ["school"],
-    university: ["university"],
-  },
-
-  SPORTS: {
-    swimming: ["swimming_pool", "water_park"],
-    fitness: ["gym", "sports_centre"],
-    tennis: ["tennis"],
-    soccer: ["soccer"],
-    boxing: ["boxing"],
-    dancing: ["dance"],
-  },
-
-  GASTRONOMY: {
-    restaurant: ["restaurant"],
-    cafe: ["cafe"],
-    pub: ["pub"],
-  },
-
-  MEDICINE: {
-    doctor: ["doctors"],
-    hospital: ["hospital"],
-    pharmacy: ["pharmacy"],
-  },
-
-  CHILDREN: {
-    playground: ["playground"],
-    livingstreet: ["living_street"],
-  },
-} as const; // as const makes this object immutable; see https://www.sitepoint.com/compile-time-immutability-in-typescript/#deeplyfreezingliteralexpressionswithconstassertions;
 
 class TagCollection {
-  constructor() {
+  /*
+  createTag(osmName: string) {
     const tag: OsmTag = {
-      key: "shop",
+      key: osmName,
       values: ["supermarket", ""],
       selected: false,
       distance: 15,
       wanted: false,
     };
-  }
+    return tag;
+  }*/
 
-  getTag(tag: string): string {
-    throw Error("not implemented");
-  }
-
-  getQuery(displayName: string): string {
-    switch (displayName) {
+  //* die case namen könnten noch extrahiert werden, z.B. in ein enum oder einen type für mehr type-safety
+  getQueryForCategory(categoryName: string): string {
+    switch (categoryName) {
       case "Bar":
         return 'nwr["amenity"~"^pub|bar|biergarten$"]; nwr["biergarten"="yes"];';
 
@@ -95,122 +25,61 @@ class TagCollection {
       case "Cafe":
         return 'nwr["amenity"="cafe"];';
 
-      case "University":
-        //return 'nwr["building"="university"];'; // to get the buildings
-        return 'nwr["amenity"="university"];'; // to get the whole campus area
+      case "Universität / OTH":
+        //return 'nwr["building"="university"];'; // to get the buildings itself
+        return 'nwr["amenity"~"^university|college$"];'; // to get the whole area
 
-      case "Supermarket":
+      case "Schule":
+        return 'nwr["amenity"="school"];';
+
+      case "Supermarkt":
         return 'nwr["shop"="supermarket"];';
 
-      case "Bus stop":
-        return 'nwr["public_transport"="stop_position"]["bus"="yes"];';
+      case "Einkaufszentrum":
+        return 'nwr["shop"~"^department_store|mall$"];';
 
-      case "Highway":
-        return 'nwr["highway"~"^motorway|trunk|motorway_link$"];';
+      case "Parkplatz":
+        return 'nwr["amenity"="parking"];';
 
-      case "Railway station":
+      case "Bushaltestelle":
+        return 'nwr["public_transport"="stop_position"]["bus"="yes"]; nwr["highway"="bus_stop"];';
+
+      case "Bahnhof":
         return 'nwr["public_transport"="stop_position"]["railway"="stop"];';
 
+      case "Autobahn":
+        //return 'nwr["highway"~"^motorway|trunk|motorway_link$"];';  // Autobahn und größere Straßen / trunks
+        return 'nwr["highway"~"^motorway|motorway_link$"];';
+
       case "Park":
-        return 'nwr["leisure"~"^park|nature_reserve$"];';
+        return 'nwr["leisure"~"^park|nature_reserve|village_green|recreation_ground$"];';
 
-      case "River":
-        return 'nwr["waterway"~"^river|stream$"];'; //TODO vllt water=* oder waterway=* um alles zu bekommen??
+      // landuse=meadow für Wiesen auch verwenden ?
 
-      //TODO die osm tags und modelle nochmal genauer anschauen!
-      //* für Seen: natural=water+water=lake,
-      //* vgl. https://wiki.openstreetmap.org/wiki/Waterways
+      case "Wald":
+        return 'nwr["landuse"="forest"]; nwr["natural"="wood"];';
+
+      case "Fluss":
+        //return 'nwr["waterway"~"^river|stream|canal$"];'; // um zusätzlich noch kleine Bäche und Kanäle zu bekommen
+        return 'nwr["waterway"="river"];';
+
+      //* für Seen: natural=water & water=lake
 
       default:
-        throw new Error("Unknown input value! Key couldn't be found!");
+        throw new Error("Unknown input value for osm tag! No suitable key was found!");
     }
   }
 
-  //TODO
-  /**
-   * *amenity:
-   *  für Bar: 
-  nwr["amenity"~"^pub|bar|biergarten$"]({{bbox}});
-  nwr["biergarten"="yes"]({{bbox}});
-   * 
-   * Autobahn / große Straße:
-  highway=motorway
-  und highway	motorway_link
-  vllt auch noch highway=trunk für die ebene nach autobahn ()
-   * 
-   * * Wasser:
-   waterway=river und waterway=stream (vllt auch noch waterway=canal?)
-   Seen: natural=water+water=lake
-   *
-   * * Education:
-   amenity=college
-   amenity=university
-   amenity=school
-   amenity=kindergarten
-   * * Öffentliche Verkehrsmittel:
-   * Bushaltestelle: 
-   nwr["public_transport"="stop_position"]["bus"="yes"]({{bbox}});
-   * Busbahnhof
-   amenity=bus_station
-   oder: public_transport=station
-   * Bahnhofhaltestelle:
-    nwr["public_transport"="stop_position"]["railway"="stop"]({{bbox}});
-   *
-   * * Parkplätze:
-   amenity=parking
-   und für Straßenrand: parking:lane=*
-   * * im Grünen:
-   leisure=park
-   leisure=nature_reserve
-   
-    * Andere:
-   landuse=forest
-   landuse=meadow ???
-   */
-
-  getKeyType(val: string): string {
-    switch (val) {
-      case "Bar": // oder club, ...
-      case "Restaurant":
-      case "Cafe":
-        return "amenity";
-
-      case "University":
-        return "amenity"; // could be amenity too if we want the whole campus
-
-      case "Supermarket":
-        return "shop";
-
-      case "Park": // oder leisure	nature_reserve
-        return "leisure";
-
-      case "River":
-        return "waterway"; //TODO vllt water=* oder waterway=* um alles zu bekommen??
-
-      //TODO die osm tags und modelle nochmal genauer anschauen!
-      //* für Seen: natural=water+water=lake,
-      //* vgl. https://wiki.openstreetmap.org/wiki/Waterways
-
-      default:
-        throw new Error("Unknown input value! Key couldn't be found!");
-    }
-  }
-
-  //TODO fetch everything that is marked as a building or apartment
+  //TODO: fetch everything that is marked as a building or apartment
   /* * apartments / houses:
     vllt landuse=residential mit name=* oder addr:flats ???
    */
   getAllHousesQuery(): string {
-    /*
-    waysWithAllHousesTags = new ArrayList<Integer>();
-
-    waysWithTagYes = mI.getAllHouses("building", "yes");
+    /*waysWithTagYes = mI.getAllHouses("building", "yes");
     waysWithTagApartment = mI.getAllHouses("building", "apartments");
     waysWithTagHouse = mI.getAllHouses("building", "house");
     waysWithTagTerrace = mI.getAllHouses("building", "terrace");
     waysWithHouseNumbers = mI.getAllHouses("addr:housenumber", ".*");
-
-    waysWithAllHousesTags.add(waysWithTagYes, ...);
     */
 
     return 'nwr["building"~"^apartments|dormitory|terrace|house$"];';

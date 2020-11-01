@@ -444,8 +444,6 @@ body {
     font-size: 0.9em;
     list-style: none;
     padding: 0 5px 10px 5px;
-    font-size: 0.9em;
-    list-style: none;
 }
 
 #active-filters li {
@@ -460,6 +458,10 @@ body {
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+}
+
+#active-filters h4 {
+    margin: 4px 0;
 }
 
 #active-filters li:hover {
@@ -800,7 +802,7 @@ body {
     overflow: hidden;
     border-width: 0;
     outline: none;
-    border-radius: 2px;
+    border-radius: 4px;
     background-color: #14bd5a;
     color: whitesmoke;
 }
@@ -818,7 +820,7 @@ body {
     overflow: hidden;
     border-width: 0;
     outline: none;
-    border-radius: 2px;
+    border-radius: 4px;
     background-color: #e8e8e8;
     color: black;
 }

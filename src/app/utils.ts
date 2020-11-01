@@ -1,10 +1,11 @@
 import Benchmark from "../shared/benchmarking";
 
-const SNACKBAR_DEFAULT_DURATION = 3000; // 3 seconds
+const SNACKBAR_DEFAULT_DURATION = 2000; // 2 seconds
 
 export const enum SnackbarType {
   SUCCESS = "#14bd5a",
   ERROR = "#b61919",
+  WARNING = "#f5a81b",
   INFO = "cornflowerblue",
   DEFAULT = "darkviolet",
 }
