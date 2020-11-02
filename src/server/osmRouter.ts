@@ -30,6 +30,11 @@ import intersect from "@turf/intersect";
 import mask from "@turf/mask";
 //import pg from "pg";  //postgres
 
+/*
+//@ts-expect-error
+import osmium from "osmium";
+*/
+
 const readFile = Util.promisify(fs.readFile);
 
 export default class OsmRouter {
@@ -41,6 +46,8 @@ export default class OsmRouter {
 
     this.osmRouter = express.Router();
     this.setupRoutes();
+
+    //this.testNodeOsmium();
   }
 
   get instance(): Router {
@@ -421,4 +428,50 @@ export default class OsmRouter {
 
     return allIntersections;
   }
+
+  //! geht nur in linux
+  /*
+  testNodeOsmium(): void {
+    console.time("read with osmium");
+
+    const path = this.publicDirPath + "/assets/oberpfalz-latest.osm.pbf";
+    const file = new osmium.File(path);
+    const reader = new osmium.Reader(file, { node: true, way: true, relation: true });
+
+    const handler = new osmium.Handler();
+    //prettier-ignore
+    handler.options({ "tagged_nodes_only": true });
+
+    let count = 0;
+    handler.on("node", (node: any) => {
+      if (node.tags("park") || node.tags("amenity")) {
+        console.log(node.tags());
+        count++;
+      }
+    });
+    handler.on("way", (way: any) => {
+      if (way.tags("park") || way.tags("amenity")) {
+        count++;
+      }
+    });
+    handler.on("relation", (relation: any) => {
+      if (relation.tags("park") || relation.tags("amenity")) {
+        count++;
+      }
+    });
+
+    // wird irgendwie nie aufgerufen
+    // handler.on("done", function () {
+    //   console.log("Found " + count + " parks and amenities!");
+
+    //   console.timeEnd("read with osmium");
+    // });
+
+    osmium.apply(reader, handler);
+
+    console.log("Found " + count + " parks and amenities!");
+
+    console.timeEnd("read with osmium");
+  }
+  */
 }

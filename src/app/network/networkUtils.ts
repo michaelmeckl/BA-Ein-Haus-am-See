@@ -13,16 +13,34 @@ import osmtogeojson from "osmtogeojson";
 import Benchmark from "../../shared/benchmarking";
 import geobuf from "geobuf";
 import Pbf from "pbf";
+import { point } from "@turf/helpers";
+import { featureCollection } from "@turf/helpers";
 
 // attach the retry interceptor to the global axios instance, so all requests are retried if they fail
 const interceptorId = rax.attach();
 
+function parseOsmScoutResponse(response: any): FeatureCollection<GeometryObject, any> {
+  const allLocations = [];
+
+  for (const element of response) {
+    allLocations.push(
+      point([element.lng, element.lat], {
+        distance: element.distance,
+        title: element.title,
+        type: element.type,
+      })
+    );
+  }
+  //@ts-expect-error
+  return featureCollection(allLocations);
+}
+
 //TODO mögliches Perf-Problem: man kann immer nur einen poitype gleichzeitig suchen, d.h. es müssen mehrere
 //TODO  hintereinander ausgeführt werden; keine Parallelisierung wie bei Overpass API möglich!
-export async function testGuide(): Promise<any> {
+export async function testGuide(poiType: string): Promise<any> {
   try {
     Benchmark.startMeasure("Request client side");
-    const url = `http://127.0.0.1:8553/v1/guide?radius=${50000}&limit=${500}&poitype=${"bar"}&lng=${12.1}&lat=${49.008}`;
+    const url = `http://192.168.178.45:8553/v1/guide?radius=${100000}&limit=${100000}&poitype=${poiType}&lng=${12.136}&lat=${49.402}`;
     //* diese query funktioniert: (limit ist nötig, sonst ist default 50)
     // http://localhost:8553/v1/guide?radius=20000&limit=200&poitype=bar&lng=12.1&lat=49.008
 
@@ -41,7 +59,7 @@ export async function testGuide(): Promise<any> {
     Benchmark.startMeasure("o2geo client");
     //TODO das ergebnis von guide ist kein json, das mit osmtogeojson in geojson umgewandelt werden könnte
     // -> muss also zunächst noch geparst werden (wir vermutlich etwas länger dauern als omstogeojson, da nicht einfach nur json -> geojson)
-    const geoJson = osmtogeojson(response.data.results);
+    const geoJson = parseOsmScoutResponse(response.data.results);
     Benchmark.stopMeasure("o2geo client");
 
     return geoJson;
