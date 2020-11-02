@@ -52,7 +52,8 @@ class TagCollection {
         return 'nwr["highway"~"^motorway|motorway_link$"];';
 
       case "Park":
-        return 'nwr["leisure"~"^park|nature_reserve|village_green|recreation_ground$"];';
+        //return 'nwr["leisure"~"^park|nature_reserve|village_green|recreation_ground$"];';
+        return 'nwr["leisure"~"^park|nature_reserve$"];';
 
       // landuse=meadow für Wiesen auch verwenden ?
 
@@ -74,6 +75,7 @@ class TagCollection {
   /* * apartments / houses:
     vllt landuse=residential mit name=* oder addr:flats ???
    */
+  //TODO run this query only at a certain zoom level (e.g. > 14) to improve performance??
   getAllHousesQuery(): string {
     /*waysWithTagYes = mI.getAllHouses("building", "yes");
     waysWithTagApartment = mI.getAllHouses("building", "apartments");

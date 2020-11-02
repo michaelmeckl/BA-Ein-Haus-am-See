@@ -43,6 +43,7 @@ import html2canvas from "html2canvas";
 import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
 import createCanvasOverlay from "./canvasRenderer";
 import FilterManager from "../mapData/filterManager";
+import { addBufferToFeature } from "./turfUtils";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -234,12 +235,30 @@ export default class MapController {
    * southern-most latitude, western-most longitude, northern-most latitude, eastern-most longitude.
    * @return string representation of the bounds in the above order
    */
-  getViewportBoundsString(): string {
+  getViewportBoundsString(additionalDistance?: number): string {
     const currBounds = map.getBounds();
-    const southLat = currBounds.getSouth();
-    const westLng = currBounds.getWest();
-    const northLat = currBounds.getNorth();
-    const eastLng = currBounds.getEast();
+    let southLat = currBounds.getSouth();
+    let westLng = currBounds.getWest();
+    let northLat = currBounds.getNorth();
+    let eastLng = currBounds.getEast();
+
+    console.log(currBounds);
+
+    if (additionalDistance) {
+      const bufferedBBox = bbox(
+        addBufferToFeature(
+          //@ts-expect-error
+          bbpolygon([westLng, southLat, eastLng, northLat]),
+          additionalDistance
+        )
+      );
+      console.log(bufferedBBox);
+
+      southLat = bufferedBBox[1];
+      westLng = bufferedBBox[0];
+      northLat = bufferedBBox[3];
+      eastLng = bufferedBBox[2];
+    }
 
     return `${southLat},${westLng},${northLat},${eastLng}`;
   }
@@ -779,28 +798,6 @@ export default class MapController {
      *  ...
      * ]
      */
-
-    /**********
-     * Structure for overlayData looks like this:
-     * [
-     *  [ ### Park
-     *    [
-     *      {x: 49.1287; y: 12.3591}, {x: 49.1211; y: 12.4563}, ... // type: mapboxgl.Point
-     *    ],
-     *    [
-     *      {x: 49.1287; y: 12.3591}, {x: 49.1211; y: 12.4563}, ... // type: mapboxgl.Point
-     *    ],
-     *    [
-     *      {x: 49.1287; y: 12.3591}, {x: 49.1211; y: 12.4563}, ... // type: mapboxgl.Point
-     *    ],
-     *    ...
-     *  ],
-     *  [ ### Restaurant
-     *    [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...
-     *  ],
-     *  ...
-     * ]
-     **********/
 
     console.log("OverlayData: ", overlayData);
     console.log("OverlayAlternative: ", overlayAlternative);

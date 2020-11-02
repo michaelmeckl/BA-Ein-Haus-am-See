@@ -5,6 +5,7 @@ import { map } from "./mapboxConfig";
 import Benchmark from "../../shared/benchmarking";
 import mapLayerManager from "./mapLayerManager";
 import type { CanvasSource, Point } from "mapbox-gl";
+import { getViewportBounds } from "./mapboxUtils";
 
 function drawCircle(context: CanvasRenderingContext2D, point: Point, radius = 20): void {
   context.beginPath();
@@ -103,13 +104,7 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement): void {
   }
   */
 
-  const bounds = map.getBounds();
-  const viewportBounds = [
-    bounds.getNorthWest().toArray(),
-    bounds.getNorthEast().toArray(),
-    bounds.getSouthEast().toArray(),
-    bounds.getSouthWest().toArray(),
-  ];
+  const viewportBounds = getViewportBounds();
 
   mapLayerManager.removeAllLayersForSource("canvasSource");
 
@@ -120,7 +115,7 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement): void {
   map.addSource("canvasSource", {
     type: "canvas",
     canvas: canvas,
-    animate: false, // TODO turn off for better performance if not needed!
+    animate: false,
     coordinates: viewportBounds,
   });
 
@@ -129,7 +124,9 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement): void {
     source: "canvasSource",
     type: "raster",
     paint: {
-      "raster-opacity": 0.85,
+      "raster-opacity": 0.8,
+      //TODO opacity auf 0.5 ändern? -> dann hätte das ganze Overlay (egal wie dunkel es ist)
+      //TODO immer 0.5 alpha und man könnte die karte noch sehen
     },
   });
 }
@@ -137,15 +134,7 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement): void {
 export function addBlurredImage(img: HTMLImageElement, canvas: HTMLCanvasElement): void {
   Benchmark.startMeasure("addingImageOverlay");
   img.src = canvas.toDataURL();
-
-  const bounds = map.getBounds();
-  const viewportBounds = [
-    bounds.getNorthWest().toArray(),
-    bounds.getNorthEast().toArray(),
-    bounds.getSouthEast().toArray(),
-    bounds.getSouthWest().toArray(),
-  ];
-  //console.log("ViewportBounds: ", viewportBounds);
+  const viewportBounds = getViewportBounds();
 
   img.onload = () => {
     map.addSource("canvasSource", {

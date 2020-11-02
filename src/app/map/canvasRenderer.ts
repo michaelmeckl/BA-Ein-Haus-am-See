@@ -2,7 +2,12 @@ import { map } from "./mapboxConfig";
 import Benchmark from "../../shared/benchmarking";
 import { addCanvasOverlay } from "./canvasUtils";
 import * as webglUtils from "../webgl/webglUtils";
+import { metersInPixel } from "./mapboxUtils";
 import * as twgl from "twgl.js";
+//import FastGaussBlur from "../vendors/fast-gauss-blur";
+import "../vendors/fast-gauss-blur.js";
+import "../vendors/StackBlur";
+import { createGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
 
 // the number of textures to combine
 let textureCount;
@@ -64,7 +69,11 @@ const fsCombine = `
         // switch to premultiplied alpha to blend transparent images correctly
         overlayColor.rgb *= overlayColor.a;
 
+        
         gl_FragColor = overlayColor;
+
+
+        //if(gl_FragColor.r > 0.5 || gl_FragColor.g > 0.5 || gl_FragColor.b > 0.5) discard;
         
         //if(gl_FragColor.a == 0.0) discard;    // discard pixels with 100% transparency
     }
@@ -87,6 +96,9 @@ class CanvasRenderer {
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     canvas.width = map.getCanvas().clientWidth;
     canvas.height = map.getCanvas().clientHeight;
+    console.log("Width:", canvas.width);
+    console.log("Height:", canvas.height);
+
     this.overlayCanvas = canvas;
 
     const context = canvas.getContext("2d" /*, { alpha: false }*/); //TODO use {alpha: false} to make background dark!
@@ -123,59 +135,173 @@ class CanvasRenderer {
     // clear the canvas
     ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
 
-    for (const polygons of this.mapLayer) {
-      const vertices = polygons.flatMap((el: { x: any; y: any }) => [el.x, el.y]);
+    //macht keinen unterschied ob schwarz oder transparent
+    /*
+    ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0";
+    ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+    */
+
+    const radius = 250;
+    console.log("Meter in pixel: ", metersInPixel(radius, map.getCenter().lat, map.getZoom()));
+
+    // apply a "feather"/blur - effect to everything that is drawn on the canvas
+    //ctx.filter = "blur(12px)";
+
+    const promises: any[] = [];
+
+    Benchmark.startMeasure("render and blur all polygons of one layer");
+    for (const polygon of this.mapLayer) {
+      console.log("polygon", polygon);
+      const vertices = polygon.flatMap((el: { x: any; y: any }) => [el.x, el.y]);
       //console.log("vertices: ", vertices);
       if (vertices.length % 2 !== 0) {
-        console.warn("Not even number of vertices for ", polygons);
+        console.warn("Not even number of vertices for ", polygon);
       }
-
-      //! Test this blur / feather effect
-      //ctx.globalCompositeOperation = "destination-out";
-
-      //ctx.filter = "blur(12px)"; // "feather"
-
-      //ctx.globalCompositeOperation = "destination-over";
 
       ctx.beginPath();
       ctx.moveTo(vertices[0], vertices[1]); //TODO für multipolygone bräuchte man in der schleife noch ein moveTo (oder eine 2te schleife) ?
-      //? nur bis -1 ??
-      for (let index = 2; index < vertices.length; index += 2) {
+
+      for (let index = 2; index < vertices.length - 1; index += 2) {
         //console.log("vertices-idx: ", index);
         ctx.lineTo(vertices[index], vertices[index + 1]);
       }
       ctx.closePath();
 
-      ctx.fillStyle = "rgba(180, 180, 180, 1.0)";
-      ctx.fill();
-      //ctx.stroke();
-      //ctx.globalCompositeOperation = "destination-atop";
-
-      //TODO gehört zum feather effect oben:
-      // reset comp. mode and filter
-      //ctx.globalCompositeOperation = "destination-out";
-      //ctx.filter = "none";
-
-      //TODO klappts damit ???
+      //* Beispiel für mehrere STrokes übereinander (und nur die stroke geblurred)
       /*
-      ctx.strokeStyle = "#ffff00";
-      ctx.lineWidth = 5;
+      ctx.filter = "blur(15px)";
+
+      ctx.strokeStyle = "#aaaaaa";
+      ctx.lineWidth = 40;
       ctx.stroke();
 
       ctx.save();
 
-      ctx.fillStyle = "rgba(201, 11, 201, 0.8)";
-      ctx.fill();
-      //ctx.fill("evenodd");
+      ctx.globalCompositeOperation = "destination-over";
+
+      ctx.scale(2, 2);
+      ctx.strokeStyle = "#bbbbbb";
+      ctx.lineWidth = 60;
+      ctx.stroke();
+
       ctx.restore();
+
+      ctx.save();
+
+      ctx.globalCompositeOperation = "destination-over";
+
+      ctx.scale(2, 2);
+      ctx.strokeStyle = "#cccccc";
+      ctx.lineWidth = 80;
+      ctx.stroke();
+
+      ctx.restore();
+
+      ctx.filter = "none";
       */
+      // fill with light grey
+      ctx.fillStyle = "rgba(180, 180, 180, 1.0)";
+      //ctx.fillStyle = "white";
+      ctx.fill();
+      //TODO ? ctx.fill("evenodd");
+
+      //ctx.stroke();
+
+      promises.push(this.blurPolygon());
+
+      //break;
     }
+
+    console.log("before blur Polygon");
+    const allBlurredPolys = await Promise.all(promises);
+    console.log("after blur Polygon");
+
+    Benchmark.stopMeasure("render and blur all polygons of one layer");
+
+    //this.blurPolygon();
 
     await this.saveAsImage();
   }
 
+  updateOverlay(): void {
+    //TODO bei jeder Bewegung aufrufen und das oben neu machen
+  }
+
+  blurPolygon(): Promise<void> {
+    //TODO
+    //this.fastGaußBlur();
+
+    let img = new Image();
+
+    return new Promise((resolve, reject) => {
+      img.onload = (): void => {
+        //use clientWidth and Height so the image fits the current screen size
+        img.width = this.overlayCanvas.clientWidth;
+        img.height = this.overlayCanvas.clientHeight;
+
+        //TODO:
+        //if(shouldShowAreas) { do blur ]
+        Benchmark.startMeasure("blur Image with Webgl");
+        const overlayCanvas = createGaussianBlurFilter([img]);
+        //const canvas = renderAndBlur(img);
+        Benchmark.stopMeasure("blur Image with Webgl");
+
+        this.ctx.drawImage(overlayCanvas, 0, 0);
+
+        //this.ctx.drawImage(img, 0, 0);
+
+        img.onload = null;
+        //@ts-expect-error
+        img = null;
+        resolve();
+      };
+      img.onerror = (): void => reject();
+
+      //* setting the source should ALWAYS be done after setting the event listener!
+      img.src = this.overlayCanvas.toDataURL();
+    });
+  }
+
+  fastGaußBlur(): void {
+    const imgData = this.ctx.getImageData(
+      0,
+      0,
+      this.overlayCanvas.width,
+      this.overlayCanvas.height
+    );
+
+    const redChannel = [];
+
+    for (let i = 0; i < imgData.data.length; i += 4) {
+      redChannel.push(imgData.data[i]);
+    }
+
+    const blurredRedChannel: any[] = [];
+
+    const size = 25;
+    console.time("fastgaussblur");
+    //@ts-expect-error
+    FastGaussBlur.apply(
+      redChannel,
+      blurredRedChannel,
+      this.overlayCanvas.width,
+      this.overlayCanvas.height,
+      size
+    );
+    console.timeEnd("fastgaussblur");
+
+    for (let i = 0; i < imgData.data.length; i += 4) {
+      const colorValue = blurredRedChannel[i / 4];
+      imgData.data[i] = colorValue;
+      imgData.data[i + 1] = colorValue;
+      imgData.data[i + 2] = colorValue;
+    }
+
+    this.ctx.putImageData(imgData, 0, 0);
+  }
+
   saveAsImage(): Promise<void> {
-    const img = new Image();
+    let img = new Image();
 
     return new Promise((resolve, reject) => {
       img.onload = (): void => {
@@ -187,19 +313,28 @@ class CanvasRenderer {
 
         this.allTextures.push(img);
 
-        //TODO dont use this !!
-        /*
-        // perf-results: 101,6 ; 101,2 ; 82,6 ; 62,7 ; 45,9 (ms) -> avg: 78,8 ms (vllt lieber median?)
+        //TODO:
+        //if(shouldShowAreas) { do blur ]
         Benchmark.startMeasure("blur Image with Webgl");
-        const canvas = renderAndBlur(img);
+        //const overlayCanvas = createGaussianBlurFilter([img]);
+        //const canvas = renderAndBlur(img);
         Benchmark.stopMeasure("blur Image with Webgl");
 
+        //this.ctx.drawImage(overlayCanvas, 0, 0);
+
+        //this.ctx.drawImage(img, 0, 0);
+        /*
         if (canvas) {
           this.allCanvases.push(canvas);
           resolve();
         } else {
           reject();
-        }*/
+        }
+        */
+
+        img.onload = null;
+        //@ts-expect-error
+        img = null;
         resolve();
       };
       img.onerror = (): void => reject();
@@ -291,6 +426,15 @@ class CanvasRenderer {
     //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for un-premultiplied alpha
     //gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
+    /**
+     * * BlendModes:
+      //Blend SrcAlpha OneMinusSrcAlpha // Normal
+			//Blend One One // Additive
+			//Blend One OneMinusDstColor // Soft Additive
+			//Blend DstColor Zero // Multiplicative
+			//Blend DstColor SrcColor // 2x Multiplicative
+     */
+
     const vertexCount = 6; // 2 triangles for a rectangle
     gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
@@ -302,7 +446,7 @@ class CanvasRenderer {
   }
 
   createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
-    const overlayCanvas = this.combineOverlays(textures);
+    this.combineOverlays(textures);
     //cleanup and delete webgl resources
     //TODO this.cleanupResources();
 
@@ -343,7 +487,7 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
 
   const img = new Image();
   img.onload = (): void => {
-    console.log("in onload: ", img.src);
+    //console.log("in onload: ", img.src);
     addCanvasOverlay(resultCanvas);
 
     //delete all created images in the overlay class
@@ -352,4 +496,6 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
   img.src = resultCanvas.toDataURL();
 
   Benchmark.stopMeasure("creating canvas overlay");
+
+  console.log("vbv");
 }

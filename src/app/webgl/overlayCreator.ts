@@ -80,7 +80,7 @@ uniform vec4 u_fragColor;
 out vec4 color;
 
 void main() {
-  //color = vec4(0.7, 0.7, 0.7, 0.8);
+  //color = vec4(0.6, 0.6, 0.6, 0.8);
   color = u_fragColor;
 }
 `;
@@ -135,7 +135,7 @@ const fsCombine = `
             overlayColor += texture2D(u_textures[i], v_texCoord) * weight;
         }
 
-        // switch to premultiplied alpha to blend correctly
+        // switch to premultiplied alpha to blend transparent images correctly
         overlayColor.rgb *= overlayColor.a;
 
         gl_FragColor = overlayColor;
@@ -286,18 +286,25 @@ class Overlay {
 
     this.gl.useProgram(this.program);
 
-    const wanted = false;
+    //! this does apply the wanted effect but only for the last polygon (the others are cleared here!!)
+    // -> but the wanted prop is set per layer so is there any other way ??
+    /*
+    const wanted = true;
     if (wanted) {
       this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // background is black, fully opaque
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       this.gl.uniform4f(this.colorLocation, 0.7, 0.7, 0.7, 0.8); //wanted polys are light grey
     } else {
       this.gl.clearColor(1.0, 1.0, 1.0, 0.0); // background is white, fully transparent
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       this.gl.uniform4f(this.colorLocation, 0.2, 0.2, 0.2, 0.8); // not wanted polys are dark grey
     }
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    */
 
     // set the resolution (needs to be set after useProgram !!)
     this.gl.uniform2f(this.resolutionLocation, this.gl.canvas.width, this.gl.canvas.height);
+
+    this.gl.uniform4f(this.colorLocation, 0.6, 0.6, 0.6, 0.8);
 
     //this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.positionBuffer);
 
@@ -332,20 +339,21 @@ class Overlay {
 
         this.allTextures.push(img);
 
-        //TODO dont use this !!
-        /*
+        //! blur is too late here!! needs to be in the render for each polygon!!
+
         // perf-results: 101,6 ; 101,2 ; 82,6 ; 62,7 ; 45,9 (ms) -> avg: 78,8 ms (vllt lieber median?)
         Benchmark.startMeasure("blur Image with Webgl");
-        const canvas = renderAndBlur(img);
+        const overlayCanvas = createGaussianBlurFilter([img]);
+        //const canvas = renderAndBlur(img);
         Benchmark.stopMeasure("blur Image with Webgl");
 
-        if (canvas) {
-          this.allCanvases.push(canvas);
+        if (overlayCanvas) {
+          this.allCanvases.push(overlayCanvas);
           resolve();
         } else {
           reject();
-        }*/
-        resolve();
+        }
+        //resolve();
       };
       img.onerror = (): void => reject();
 
@@ -439,6 +447,15 @@ class Overlay {
     //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for un-premultiplied alpha
     //gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
+    /**
+     * * BlendModes:
+      //Blend SrcAlpha OneMinusSrcAlpha // Normal
+			//Blend One One // Additive
+			//Blend One OneMinusDstColor // Soft Additive
+			//Blend DstColor Zero // Multiplicative
+			//Blend DstColor SrcColor // 2x Multiplicative
+     */
+
     const vertexCount = 6; // 2 triangles for a rectangle
     gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
@@ -448,8 +465,8 @@ class Overlay {
   }
 
   createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
-    //const overlayCanvas = this.combineOverlays(textures);
-    const overlayCanvas = createGaussianBlurFilter(textures);
+    const overlayCanvas = this.combineOverlays(textures);
+    //const overlayCanvas = createGaussianBlurFilter(textures); //TODO
     //cleanup and delete webgl resources
     this.cleanupResources();
 
@@ -484,6 +501,7 @@ class Overlay {
   }
 
   deleteImages(): void {
+    // clear array by setting its length to 0
     this.allTextures.length = 0;
   }
 }
@@ -510,12 +528,28 @@ export default async function createOverlay(data: any): Promise<void> {
     */
   }
 
+  console.log("Current number of saved textures in overlayCreator: ", overlay.allTextures.length);
   //TODO for debugging only:
   overlay.allTextures.forEach((image) => {
     //console.log(image.src);
     //addImageOverlay(image);
   });
 
+  const test: any[] = [];
+  overlay.allCanvases.forEach((c) => {
+    //console.log(image.src);
+    //addImageOverlay(image);
+    const img = new Image();
+    img.onload = (): void => {
+      console.log("Canvas:", img.src);
+    };
+    img.src = c.toDataURL();
+    test.push(img);
+  });
+
+  console.log(test);
+
+  //const resultCanvas = overlay.createOverlay(test);
   const resultCanvas = overlay.createOverlay(overlay.allTextures);
 
   const img = new Image();

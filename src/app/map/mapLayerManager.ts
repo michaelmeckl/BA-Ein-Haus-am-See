@@ -133,6 +133,12 @@ class MapLayerManager {
     map.setLayoutProperty(layerId, "visibility", "none");
   }
 
+  removeLayerFromMap(layerId: string): void {
+    map.removeLayer(layerId);
+    // filter the elements with the given layerid out
+    this.activeLayers = this.activeLayers.filter((el) => el.id !== layerId);
+  }
+
   /**
    * Delete all layers for the source with the given ID.
    */

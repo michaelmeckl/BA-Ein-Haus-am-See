@@ -55,6 +55,17 @@ export function metersInPixel(meters: number, latitude: number, zoomLevel: numbe
   return meters / metersPerPixel;
 }
 
+export function getViewportBounds(): number[][] {
+  const bounds = map.getBounds();
+  const viewportBounds = [
+    bounds.getNorthWest().toArray(),
+    bounds.getNorthEast().toArray(),
+    bounds.getSouthEast().toArray(),
+    bounds.getSouthWest().toArray(),
+  ];
+  return viewportBounds;
+}
+
 export function getRadiusAndCenterOfViewport(): any {
   const centerPoint = map.getCenter();
   const northEastPoint = map.getBounds().getNorthEast();
@@ -146,6 +157,7 @@ export function findAllFeaturesInCircle(allFeatures: any) {
  * Util - Function that returns the current viewport extent as a polygon.
  */
 //TODO vllt etwas mehr als den viewport gleich nehmen?
+//* not used right now
 export function getViewportAsPolygon(): Feature<Polygon, GeoJsonProperties> {
   const bounds = map.getBounds();
   const viewportBounds = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
@@ -419,6 +431,14 @@ export async function showDifferenceBetweenViewportAndFeature(
  * Util-Function to convert LngLat coordinates to pixel coordinates on the screen.
  */
 export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
+  //TODO make the map bounds a little bit bigger for projecting so we can get points that would be outside the current screen (negative pixels)
+  //TODO but not like this:
+  /*
+  map.setZoom(map.getZoom() - 1);
+  const c = map.project(coord);
+  map.setZoom(map.getZoom() + 1);
+  return c;
+  */
   return map.project(coord);
 }
 

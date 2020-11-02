@@ -303,8 +303,8 @@ export function getGaussianBlurFS(): string {
   precision highp float;
 
   // Gaussian filter.  Based on https://www.shadertoy.com/view/4dfGDH#
-  #define SIGMA 10.0
-  #define MSIZE 25  // Blur strength overall
+  #define SIGMA 5.0
+  #define MSIZE 15  // Blur strength overall
   
   
   // gaussian distribution (the blur effect decreases fast the more we get away from the center)

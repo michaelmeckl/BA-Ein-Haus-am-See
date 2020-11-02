@@ -6,10 +6,11 @@ import MapController from "./map/mapController";
 import { loadLocations } from "./map/locationsPanel";
 import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
 import FilterManager from "./mapData/filterManager";
-import { fetchOsmData } from "./network/networkUtils";
+import { fetchOsmData, fetchOsmDataFromClientVersion } from "./network/networkUtils";
 import OsmTags from "./osmModel/osmTagCollection";
 import { showSnackbar, SnackbarType } from "./utils";
 import filterManager from "./mapData/filterManager";
+import mapLayerManager from "./map/mapLayerManager";
 
 // * const enum instead of enum as this inlines the elements at runtime
 //TODO alle html element accessor names hier auslagern:
@@ -359,9 +360,8 @@ function selectData(e: Event): void {
 }
 
 async function performOsmQuery(inputQuery: string): Promise<void> {
-  //ganz Regensburg: 12.028,48.966,12.192,49.076
-  //kleinerer Teil: 12.06075,48.98390,12.14537,49.03052
-  const bounds = mapController.getViewportBoundsString(); //TODO make it a little bigger ?
+  //TODO change accordingly before deploying!!
+  const bounds = mapController.getViewportBoundsString(500); //load data in viewport and 500 meter around
 
   // give feedback to the user
   showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
@@ -372,7 +372,7 @@ async function performOsmQuery(inputQuery: string): Promise<void> {
 
     Benchmark.startMeasure("Fetching data from osm");
     // request data from osm
-    const data = await fetchOsmData(bounds, query);
+    const data = await fetchOsmDataFromClientVersion(bounds, query);
     console.log(Benchmark.stopMeasure("Fetching data from osm"));
 
     if (data) {
@@ -395,7 +395,7 @@ async function performOsmQuery(inputQuery: string): Promise<void> {
 
   //TODO
   /*
-  const data = await testGuide();
+  const data = await testGuide("restaurant");
   console.log(data);
   */
 
@@ -432,7 +432,12 @@ function setupUI(): void {
   //TODO
   const blurButtton = document.querySelector("#blurButton");
   if (blurButtton) {
-    blurButtton.addEventListener("click", mapController.blurMap.bind(mapController));
+    //blurButtton.addEventListener("click", mapController.blurMap.bind(mapController));
+    blurButtton.addEventListener("click", () => {
+      //TODO reset map state hier!
+      mapLayerManager.removeSource("canvasSource");
+      //mapLayerManager.removeLayerFromMap("overlay");
+    });
   }
 
   //TODO nur die "raw" polygone und points anzeigen (mit mapbox layer)
