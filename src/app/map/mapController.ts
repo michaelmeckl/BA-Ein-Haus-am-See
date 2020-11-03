@@ -399,7 +399,7 @@ export default class MapController {
 
     const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
     const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures, 250);
-    this.allPolygonFeatures.set(dataName, polyFeatures); //überflüssign wenn mit filterLayers
+    this.allPolygonFeatures.set(dataName, polyFeatures); //TODO überflüssign wenn mit filterLayers
 
     const layer = FilterManager.getFilterLayer(dataName);
     if (layer) {
@@ -740,6 +740,7 @@ export default class MapController {
 
     console.log(FilterManager.activeFilters);
     console.log(FilterManager.allFilterLayers);
+    console.log(FilterManager);
 
     //! wenn die polygon features sonst nirgendwo gebraucht werden, könnte man gleich oben wenn sie in die Map
     //! gespeichert werden, sie zu mapboxgl.Points umwandeln, dann könnte man vllt die doppelte for-schleife hier vermeiden

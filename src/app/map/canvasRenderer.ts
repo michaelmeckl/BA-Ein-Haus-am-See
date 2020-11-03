@@ -1,13 +1,15 @@
 import { map } from "./mapboxConfig";
 import Benchmark from "../../shared/benchmarking";
-import { addCanvasOverlay } from "./canvasUtils";
+import { addCanvasOverlay, makeAlphaMask } from "./canvasUtils";
 import * as webglUtils from "../webgl/webglUtils";
 import { metersInPixel } from "./mapboxUtils";
 import * as twgl from "twgl.js";
 //import FastGaussBlur from "../vendors/fast-gauss-blur";
 import "../vendors/fast-gauss-blur.js";
 import "../vendors/StackBlur";
-import { createGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
+import { applyGaussianBlur, createGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
+import type { FilterLayer } from "../mapData/filterLayer";
+import * as StackBlur from "stackblur-canvas"; //TODO test me
 
 // the number of textures to combine
 let textureCount;
@@ -61,8 +63,9 @@ const fsCombine = `
             }
         }*/ 
 
+        float weight = 1.0 / float(NUM_TEXTURES);  // jedes Layer erhält im Moment die gleiche Gewichtung!
+            
         for (int i = 0; i < NUM_TEXTURES; ++i) {
-            float weight = 1.0 / float(NUM_TEXTURES);  // jedes Layer erhält im Moment die gleiche Gewichtung!
             overlayColor += texture2D(u_textures[i], v_texCoord) * weight;
         }
 
@@ -124,8 +127,8 @@ class CanvasRenderer {
     // reset scale: this.ctx.scale(-newWidth, -newHeight);
   }
 
-  async renderPolygons(data: any[]): Promise<any> {
-    this.mapLayer = data; // im moment unnötig!
+  async renderPolygons(mapLayer: FilterLayer): Promise<any> {
+    this.mapLayer = mapLayer; // TODO im moment unnötig aber vermtl nötig um ständiz zu updaten!
     //console.log("this.mapLayer: ", this.mapLayer);
 
     //* if holes must be rendered both both polygons (outside and hole) have to be in opposite clockwise order
@@ -135,22 +138,35 @@ class CanvasRenderer {
     // clear the canvas
     ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
 
-    //macht keinen unterschied ob schwarz oder transparent
-    /*
-    ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0";
+    //fill black
+    ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
     ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-    */
 
-    const radius = 250;
-    console.log("Meter in pixel: ", metersInPixel(radius, map.getCenter().lat, map.getZoom()));
+    //macht keinen unterschied ob schwarz oder transparent
 
+    console.log(
+      "Meter in pixel: ",
+      metersInPixel(mapLayer.Distance, map.getCenter().lat, map.getZoom())
+    );
+
+    //ctx.globalCompositeOperation = "source-over";
     // apply a "feather"/blur - effect to everything that is drawn on the canvas
-    //ctx.filter = "blur(12px)";
 
-    const promises: any[] = [];
+    //    ctx.filter = "blur(12px)";
+
+    //ctx.globalAlpha = 0.5;
+
+    //const promises: any[] = [];
 
     Benchmark.startMeasure("render and blur all polygons of one layer");
-    for (const polygon of this.mapLayer) {
+    console.log("before render and blur all polygons of one layer");
+
+    console.log(1.0 / this.mapLayer.Points.length);
+
+    //createGaussianBlurFilter();
+
+    //const promises = this.mapLayer.Points.map(async (polygon: { x: any; y: any }[]) => {
+    for (const polygon of this.mapLayer.Points) {
       console.log("polygon", polygon);
       const vertices = polygon.flatMap((el: { x: any; y: any }) => [el.x, el.y]);
       //console.log("vertices: ", vertices);
@@ -199,37 +215,63 @@ class CanvasRenderer {
 
       ctx.filter = "none";
       */
+
+      //TODO entweder hier den alpha wert pro layer ändern für gewichtung oder später als zusätzliches array an opengl übergeben pro textur
+      // TODO hier macht keinen sinn oder? dann würden sich die ja nur aufaddieren!
+
       // fill with light grey
-      ctx.fillStyle = "rgba(180, 180, 180, 1.0)";
+      ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
       //ctx.fillStyle = "white";
-      ctx.fill();
-      //TODO ? ctx.fill("evenodd");
+      //ctx.fill();
+      ctx.fill("evenodd");
 
       //ctx.stroke();
 
-      promises.push(this.blurPolygon());
+      //promises.push(this.blurPolygon());
+      //await this.blurPolygon();
+      // await this.anotherBlur();
+      //await this.fastGaußBlur();
 
       //break;
     }
+    console.log("after render and blur all polygons of one layer");
 
-    console.log("before blur Polygon");
-    const allBlurredPolys = await Promise.all(promises);
-    console.log("after blur Polygon");
+    //const allBlurredPolys = await Promise.all(promises);
 
     Benchmark.stopMeasure("render and blur all polygons of one layer");
 
-    //this.blurPolygon();
+    //ctx.globalCompositeOperation = "destination-over";
+    //ctx.filter = "none";
+
+    //await this.blurPolygon();
+    //await this.fastGaußBlur();
+
+    /*
+    StackBlur.canvasRGBA(
+      this.overlayCanvas,
+      0,
+      0,
+      this.overlayCanvas.width,
+      this.overlayCanvas.height,
+      12
+    );
+    */
 
     await this.saveAsImage();
   }
 
-  updateOverlay(): void {
+  updateOverlay(newData: any): void {
     //TODO bei jeder Bewegung aufrufen und das oben neu machen
   }
 
   blurPolygon(): Promise<void> {
     //TODO
-    //this.fastGaußBlur();
+    /*
+    return new Promise((resolve, reject) => {
+      this.fastGaußBlur();
+      resolve();
+    });
+    */
 
     let img = new Image();
 
@@ -242,12 +284,13 @@ class CanvasRenderer {
         //TODO:
         //if(shouldShowAreas) { do blur ]
         Benchmark.startMeasure("blur Image with Webgl");
-        const overlayCanvas = createGaussianBlurFilter([img]);
+        const overlayCanvas = applyGaussianBlur([img]);
         //const canvas = renderAndBlur(img);
         Benchmark.stopMeasure("blur Image with Webgl");
 
         this.ctx.drawImage(overlayCanvas, 0, 0);
 
+        //* draw original image over the blurred one to create an outline effect?
         //this.ctx.drawImage(img, 0, 0);
 
         img.onload = null;
@@ -262,6 +305,7 @@ class CanvasRenderer {
     });
   }
 
+  //! Julien hat den auf den ganzen Canvas angewandt so weit ich weiß, nicht pro kreis, polygon etc.
   fastGaußBlur(): void {
     const imgData = this.ctx.getImageData(
       0,
@@ -322,7 +366,9 @@ class CanvasRenderer {
 
         //this.ctx.drawImage(overlayCanvas, 0, 0);
 
+        //* draw original image over the blurred one to create an outline effect?
         //this.ctx.drawImage(img, 0, 0);
+
         /*
         if (canvas) {
           this.allCanvases.push(canvas);
@@ -401,7 +447,7 @@ class CanvasRenderer {
 
     // ##### drawing code: #####
 
-    webglUtils.setupCanvasForDrawing(gl, [0, 0, 0, 0.85]);
+    webglUtils.setupCanvasForDrawing(gl, [0.0, 0.0, 0.0, 0.0]);
 
     gl.useProgram(program);
 
@@ -466,6 +512,7 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
   Benchmark.startMeasure("creating canvas overlay");
   const renderer = new CanvasRenderer();
 
+  /*
   Benchmark.startMeasure("render all Polygons");
   for (const layer of data) {
     console.log("layer: ", layer);
@@ -474,7 +521,14 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
     await renderer.renderPolygons(layer.Points);
     Benchmark.stopMeasure("render layer");
   }
-  Benchmark.stopMeasure("render all Polygons");
+  Benchmark.stopMeasure("render all Polygons");*/
+
+  console.log("before");
+  Benchmark.startMeasure("render all Polygons");
+  const allRenderProcesses = data.map((layer: FilterLayer) => renderer.renderPolygons(layer));
+  await Promise.all(allRenderProcesses);
+  Benchmark.startMeasure("render all Polygons");
+  console.log("after");
 
   console.log("Current number of saved textures in canvasRenderer: ", renderer.allTextures.length);
   //TODO for debugging only:
@@ -496,6 +550,4 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
   img.src = resultCanvas.toDataURL();
 
   Benchmark.stopMeasure("creating canvas overlay");
-
-  console.log("vbv");
 }

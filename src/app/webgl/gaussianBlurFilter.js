@@ -12,7 +12,14 @@ let glProgram;
 let renderImageCoordinatesBuffer;
 let renderImageTexureCoordinatesBuffer;
 
-function initialSetup(gl) {
+let gl;
+
+export function createGaussianBlurFilter() {
+    gl = renderCanvas.getContext("webgl2");
+    if (!gl) {
+        throw new Error("Couldn't get a webgl context for combining the overlays!");
+    }
+
     gl.clearColor(0.0, 0.0, 0.0, 1.0); // black, fully opaque
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL); // Near things obscure far things
@@ -52,6 +59,7 @@ function setupSourceTexture(gl, sourceTextureImage) {
     const sourceTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    //gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); //* premultiply is necessary for blurring?
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceTextureImage);
 
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -83,19 +91,12 @@ function render(gl, sourceTexture) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-export function createGaussianBlurFilter(textures) {
-    const gl = renderCanvas.getContext("webgl2");
-    if (!gl) {
-        throw new Error("Couldn't get a webgl context for combining the overlays!");
-    }
-
+export function applyGaussianBlur(textures) {
     // all textures have the same size:
     sourceTextureSize[0] = textures[0].width;
     sourceTextureSize[1] = textures[0].height;
     renderCanvas.height = textures[0].height;
     renderCanvas.width = textures[0].width;
-
-    initialSetup(gl);
 
     // setup textures
     const textureArr = [];

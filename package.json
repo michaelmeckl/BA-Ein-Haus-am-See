@@ -80,6 +80,7 @@
     "pbf2json": "^6.6.0",
     "query-string": "^6.13.1",
     "retry-axios": "^2.2.1",
+    "stackblur-canvas": "^2.4.0",
     "tslib": "^2.0.0",
     "twgl.js": "^4.16.0",
     "xmldom": "^0.3.0"

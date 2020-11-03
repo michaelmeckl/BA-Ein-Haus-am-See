@@ -367,7 +367,8 @@ async function performOsmQuery(inputQuery: string): Promise<void> {
   showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
 
   console.log("Performing osm query for active filters: ", FilterManager.activeFilters);
-  for (const tag of FilterManager.activeFilters) {
+  Benchmark.startMeasure("Performing osm query for active filters");
+  const allQueries = Array.from(FilterManager.activeFilters).map(async (tag) => {
     const query = OsmTags.getQueryForCategory(tag);
 
     Benchmark.startMeasure("Fetching data from osm");
@@ -387,7 +388,19 @@ async function performOsmQuery(inputQuery: string): Promise<void> {
 
       console.log("Finished adding data to map!");
     }
-  }
+  });
+  await Promise.all(allQueries);
+  /*
+  const allResults = await Promise.allSettled(allQueries);
+  console.log("All Results", allResults);
+  allResults.forEach((res) => {
+    if (res.status === "rejected") {
+      showSnackbar("Nicht alle Daten konnten erfolgreich geladen werden", SnackbarType.ERROR, 1500);
+      return;
+    }
+  });
+  */
+  Benchmark.stopMeasure("Performing osm query for active filters");
 
   //console.log(await Benchmark.getAverageTime(fetchOsmDataFromClientVersionSequential, [bounds, inputQuery], 30));
   //console.log(await Benchmark.getAverageTime(fetchOsmDataFromClientVersionParallel, [bounds, inputQuery], 30));
