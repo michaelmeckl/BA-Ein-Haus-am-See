@@ -18,7 +18,7 @@ import { fetchMaskData, fetchOsmData } from "../network/networkUtils";
 import { renderAndBlur } from "../webgl/blurFilter";
 import LumaLayer from "../webgl/lumaLayer";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { addBlurredImage, addCanvasOverlay } from "./canvasUtils";
+import { addBlurredImage, addCanvasOverlay, readImageFromCanvas } from "./canvasUtils";
 import ClusterManager from "./clusterManager";
 import CustomScatterplotLayer, { createMapboxLayer, getDeckGlLayer } from "./deckLayer";
 import { getAllRenderedFeatures, getAllSourceFeatures, getDataFromMap } from "./featureUtils";
@@ -48,6 +48,8 @@ import { addBufferToFeature } from "./turfUtils";
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
 
+//export let originalMapImage: HTMLImageElement | undefined;
+
 /**
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
  */
@@ -66,12 +68,9 @@ export default class MapController {
   init(): Promise<void> {
     return new Promise((resolve, reject) => {
       map.on("load", () => {
-        // setup the initial map state
-        this.setupMapState();
-
         resolve();
       });
-      map.on("error", () => reject());
+      map.on("error", (err) => reject(err));
     });
   }
 
@@ -524,7 +523,7 @@ export default class MapController {
       if (canvas) {
         // perf-results:  7,8; 12,5; 10,9; 7,3; 6,8  (ms) -> avg: 9,06 ms
         Benchmark.startMeasure("addingCanvasOverlay");
-        addCanvasOverlay(canvas);
+        addCanvasOverlay(canvas, 1.0);
         Benchmark.stopMeasure("addingCanvasOverlay");
 
         // perf-results:  178; 187; 160; 93; 111 (ms) -> avg: 145,8 ms
@@ -803,12 +802,10 @@ export default class MapController {
     console.log("OverlayData: ", overlayData);
     console.log("OverlayAlternative: ", overlayAlternative);
 
-    //TODO
-    createCanvasOverlay(overlayData);
-
     // check that there is data to overlay the map with
     if (overlayData.length > 0) {
       //createOverlay(overlayData);
+      createCanvasOverlay(overlayData);
     } else {
       console.warn("Creating an overlay is not possible because overlayData is empty!");
     }

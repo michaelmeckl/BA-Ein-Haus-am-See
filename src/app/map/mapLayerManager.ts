@@ -44,6 +44,12 @@ class MapLayerManager {
   private activeLayers: (Layer | CustomLayerInterface)[] = [];
   //private activeLayers: string[] = [];
 
+  //TODO visibleLayers auch noch separat speichern?
+
+  get currentActiveLayers(): (Layer | CustomLayerInterface)[] {
+    return this.activeLayers;
+  }
+
   // Add a geojson source, see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson
   addNewGeojsonSource(
     sourceName: string,

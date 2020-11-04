@@ -1,15 +1,15 @@
 import { map } from "./mapboxConfig";
 import Benchmark from "../../shared/benchmarking";
-import { addCanvasOverlay, makeAlphaMask } from "./canvasUtils";
+import { addCanvasOverlay, invertCanvas, makeAlphaMask } from "./canvasUtils";
 import * as webglUtils from "../webgl/webglUtils";
 import { metersInPixel } from "./mapboxUtils";
 import * as twgl from "twgl.js";
 //import FastGaussBlur from "../vendors/fast-gauss-blur";
-import "../vendors/fast-gauss-blur.js";
+
 import "../vendors/StackBlur";
 import { applyGaussianBlur, createGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
 import type { FilterLayer } from "../mapData/filterLayer";
-import * as StackBlur from "stackblur-canvas"; //TODO test me
+import mapLayerManager from "./mapLayerManager";
 
 // the number of textures to combine
 let textureCount;
@@ -46,38 +46,28 @@ const fsCombine = `
 
     // array of textures
     uniform sampler2D u_textures[NUM_TEXTURES];
+    uniform float u_weights[NUM_TEXTURES];
 
     // the texCoords passed in from the vertex shader.
     varying vec2 v_texCoord;
 
     void main() {
         vec4 overlayColor = vec4(0.0);
+        float weight;
 
-        /*
-        if (NUM_TEXTURES < 2) {
-            overlayColor += texture2D(u_textures[0], v_texCoord);
-        } else {
-            for (int i = 0; i < NUM_TEXTURES; ++i) {
-                float weight = 1.0 / float(NUM_TEXTURES);  // jedes Layer erhält im Moment die gleiche Gewichtung!
-                overlayColor += texture2D(u_textures[i], v_texCoord) * weight;
-            }
-        }*/ 
-
-        float weight = 1.0 / float(NUM_TEXTURES);  // jedes Layer erhält im Moment die gleiche Gewichtung!
-            
         for (int i = 0; i < NUM_TEXTURES; ++i) {
+            weight = u_weights[i];
             overlayColor += texture2D(u_textures[i], v_texCoord) * weight;
         }
+
+        //float invertedAlpha = 1.0 - overlayColor.g;
 
         // switch to premultiplied alpha to blend transparent images correctly
         overlayColor.rgb *= overlayColor.a;
 
-        
-        gl_FragColor = overlayColor;
-
+        gl_FragColor = vec4(overlayColor.rgb, overlayColor.a);
 
         //if(gl_FragColor.r > 0.5 || gl_FragColor.g > 0.5 || gl_FragColor.b > 0.5) discard;
-        
         //if(gl_FragColor.a == 0.0) discard;    // discard pixels with 100% transparency
     }
     `;
@@ -93,14 +83,17 @@ class CanvasRenderer {
 
   allTextures: HTMLImageElement[] = [];
 
+  //TODO diese variablen hier müssten gecleared werden immer am Ende oder Anfang!
+  private weights: number[] = [];
+
   constructor() {
     // create an in-memory canvas and set width and height to fill the whole map on screen
-    //const canvas = document.createElement("canvas");  //! das funktioniert bei 2D api nicht !!?!?!!?!!?!!
+    //const canvas = document.createElement("canvas");  //* das funktioniert bei 2D api nicht!
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     canvas.width = map.getCanvas().clientWidth;
     canvas.height = map.getCanvas().clientHeight;
-    console.log("Width:", canvas.width);
-    console.log("Height:", canvas.height);
+    //console.log("Width:", canvas.width);
+    //console.log("Height:", canvas.height);
 
     this.overlayCanvas = canvas;
 
@@ -113,9 +106,7 @@ class CanvasRenderer {
   }
 
   //TODO only clear a specific part (not the whole canvas)
-  clearCanvasPart(px: number, py: number, width: number, height: number): void {
-    this.ctx.clearRect(px, py, width, height);
-  }
+  //! save coordinates of the old overlay and if no zoom update only the rest ??? ->  is this better?
 
   //TODO test
   rescaleCanvas(newWidth: number, newHeight: number): void {
@@ -142,7 +133,7 @@ class CanvasRenderer {
     ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
     ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
 
-    //macht keinen unterschied ob schwarz oder transparent
+    this.weights.push(mapLayer.Relevance);
 
     console.log(
       "Meter in pixel: ",
@@ -152,7 +143,7 @@ class CanvasRenderer {
     //ctx.globalCompositeOperation = "source-over";
     // apply a "feather"/blur - effect to everything that is drawn on the canvas
 
-    //    ctx.filter = "blur(12px)";
+    //ctx.filter = "blur(25px)";
 
     //ctx.globalAlpha = 0.5;
 
@@ -161,13 +152,11 @@ class CanvasRenderer {
     Benchmark.startMeasure("render and blur all polygons of one layer");
     console.log("before render and blur all polygons of one layer");
 
-    console.log(1.0 / this.mapLayer.Points.length);
-
-    //createGaussianBlurFilter();
+    createGaussianBlurFilter();
 
     //const promises = this.mapLayer.Points.map(async (polygon: { x: any; y: any }[]) => {
     for (const polygon of this.mapLayer.Points) {
-      console.log("polygon", polygon);
+      //console.log("polygon", polygon);
       const vertices = polygon.flatMap((el: { x: any; y: any }) => [el.x, el.y]);
       //console.log("vertices: ", vertices);
       if (vertices.length % 2 !== 0) {
@@ -219,16 +208,14 @@ class CanvasRenderer {
       //TODO entweder hier den alpha wert pro layer ändern für gewichtung oder später als zusätzliches array an opengl übergeben pro textur
       // TODO hier macht keinen sinn oder? dann würden sich die ja nur aufaddieren!
 
-      // fill with light grey
+      // draw polygons white
       ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
-      //ctx.fillStyle = "white";
-      //ctx.fill();
       ctx.fill("evenodd");
 
       //ctx.stroke();
 
       //promises.push(this.blurPolygon());
-      //await this.blurPolygon();
+      await this.blurPolygon();
       // await this.anotherBlur();
       //await this.fastGaußBlur();
 
@@ -242,20 +229,6 @@ class CanvasRenderer {
 
     //ctx.globalCompositeOperation = "destination-over";
     //ctx.filter = "none";
-
-    //await this.blurPolygon();
-    //await this.fastGaußBlur();
-
-    /*
-    StackBlur.canvasRGBA(
-      this.overlayCanvas,
-      0,
-      0,
-      this.overlayCanvas.width,
-      this.overlayCanvas.height,
-      12
-    );
-    */
 
     await this.saveAsImage();
   }
@@ -303,45 +276,6 @@ class CanvasRenderer {
       //* setting the source should ALWAYS be done after setting the event listener!
       img.src = this.overlayCanvas.toDataURL();
     });
-  }
-
-  //! Julien hat den auf den ganzen Canvas angewandt so weit ich weiß, nicht pro kreis, polygon etc.
-  fastGaußBlur(): void {
-    const imgData = this.ctx.getImageData(
-      0,
-      0,
-      this.overlayCanvas.width,
-      this.overlayCanvas.height
-    );
-
-    const redChannel = [];
-
-    for (let i = 0; i < imgData.data.length; i += 4) {
-      redChannel.push(imgData.data[i]);
-    }
-
-    const blurredRedChannel: any[] = [];
-
-    const size = 25;
-    console.time("fastgaussblur");
-    //@ts-expect-error
-    FastGaussBlur.apply(
-      redChannel,
-      blurredRedChannel,
-      this.overlayCanvas.width,
-      this.overlayCanvas.height,
-      size
-    );
-    console.timeEnd("fastgaussblur");
-
-    for (let i = 0; i < imgData.data.length; i += 4) {
-      const colorValue = blurredRedChannel[i / 4];
-      imgData.data[i] = colorValue;
-      imgData.data[i + 1] = colorValue;
-      imgData.data[i + 2] = colorValue;
-    }
-
-    this.ctx.putImageData(imgData, 0, 0);
   }
 
   saveAsImage(): Promise<void> {
@@ -422,7 +356,7 @@ class CanvasRenderer {
 
     // lookup uniforms
     const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
-
+    const weightsLoc = gl.getUniformLocation(program, "u_weights[0]");
     // lookup the location for the textures
     const textureLoc = gl.getUniformLocation(program, "u_textures[0]");
 
@@ -460,6 +394,12 @@ class CanvasRenderer {
 
     // set the resolution
     gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
+    // set the weights
+    const ws: number[] = [];
+    textureLayers.forEach(() => {
+      ws.push(1 / textureLayers.length);
+    });
+    gl.uniform1fv(weightsLoc, ws);
 
     // Tell the shader to use texture units 0 to textureCount - 1
     gl.uniform1iv(textureLoc, Array.from(Array(textureCount).keys())); //uniform variable location and texture Index (or array of indices)
@@ -497,12 +437,54 @@ class CanvasRenderer {
     //TODO this.cleanupResources();
 
     return this.overlayCanvas;
-    //return overlayCanvas;
   }
 
   deleteImages(): void {
     // clear array by setting its length to 0
     this.allTextures.length = 0;
+  }
+
+  //TODO oder das custom layer hierfür nehmen??
+  blendOnMap(): void {
+    //console.log("onload map canvas: ", originalMapImage?.src);
+
+    /*
+    const activeLayers = mapLayerManager.currentActiveLayers;
+    console.log("active Layers: ", activeLayers);
+
+    //TODO klappt so auch nicht so wirklich und ist wahrscheinlich auch nicht gut für performance und ux
+    activeLayers.forEach((layer) => {
+      mapLayerManager.hideLayer(layer.id);
+    });
+    */
+
+    const mapCanvas = map.getCanvas();
+
+    //* clears to black but flickers for a moment
+    /*
+    const mapContext = mapCanvas.getContext("webgl");
+    if (!mapContext) {
+      console.error("No context from map available!");
+      return;
+    }
+
+    mapContext.viewport(0, 0, mapContext.drawingBufferWidth, mapContext.drawingBufferHeight);
+    mapContext.clearColor(0.0, 0.0, 0.0, 1.0);
+    mapContext.clear(mapContext.COLOR_BUFFER_BIT);
+    */
+
+    const image = new Image();
+    image.onload = () => {
+      image.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
+      image.height = mapCanvas.clientHeight;
+
+      //makeAlphaMask(this.overlayCanvas);
+
+      //TODO damit sich die nicht verändert, sollte ich die am anfang global speichern?
+      //! bringt nichts weil das ja nur der start kartenausschnitt dann immer ist, ich beweg mich ja!!
+      // console.log("map canvas without custom layers: ", image.src);
+    };
+    image.src = mapCanvas.toDataURL();
   }
 }
 
@@ -512,17 +494,6 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
   Benchmark.startMeasure("creating canvas overlay");
   const renderer = new CanvasRenderer();
 
-  /*
-  Benchmark.startMeasure("render all Polygons");
-  for (const layer of data) {
-    console.log("layer: ", layer);
-
-    Benchmark.startMeasure("render layer");
-    await renderer.renderPolygons(layer.Points);
-    Benchmark.stopMeasure("render layer");
-  }
-  Benchmark.stopMeasure("render all Polygons");*/
-
   console.log("before");
   Benchmark.startMeasure("render all Polygons");
   const allRenderProcesses = data.map((layer: FilterLayer) => renderer.renderPolygons(layer));
@@ -531,23 +502,25 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
   console.log("after");
 
   console.log("Current number of saved textures in canvasRenderer: ", renderer.allTextures.length);
-  //TODO for debugging only:
-  renderer.allTextures.forEach((image: any) => {
-    //console.log(image.src);
-    //addImageOverlay(image);
-  });
 
   const resultCanvas = renderer.createOverlay(renderer.allTextures);
+
+  Benchmark.stopMeasure("creating canvas overlay");
+
+  //invertCanvas(resultCanvas);
+
+  makeAlphaMask(resultCanvas);
+  //renderer.blendOnMap();
 
   const img = new Image();
   img.onload = (): void => {
     //console.log("in onload: ", img.src);
-    addCanvasOverlay(resultCanvas);
-
-    //delete all created images in the overlay class
-    renderer.deleteImages();
+    //addCanvasOverlay(resultCanvas, 1.0);
   };
   img.src = resultCanvas.toDataURL();
 
-  Benchmark.stopMeasure("creating canvas overlay");
+  //delete all created images in the overlay class
+  renderer.deleteImages();
+
+  console.log("test aljflafjljal fskj");
 }

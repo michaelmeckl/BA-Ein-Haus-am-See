@@ -99,6 +99,24 @@ export function setRectangle(
   );
 }
 
+export function getWebGLRenderingContext(): WebGLRenderingContext | null {
+  const canvas = document.querySelector("canvas");
+  if (!canvas) {
+    return null;
+  }
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+  const gl = canvas.getContext("webgl");
+  if (!gl) {
+    console.error("Failed to get WebGL context." + "Your browser or device may not support WebGL.");
+    return null;
+  }
+  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  return gl;
+}
+
 export function drawWebglElements(gl: WebGL2RenderingContext, bufferInfo: twgl.BufferInfo): void {
   //* this uses either drawArrays or drawElements automatically based on the supplied buffer info
   return twgl.drawBufferInfo(gl, bufferInfo);

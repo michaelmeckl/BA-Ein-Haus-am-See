@@ -7,7 +7,7 @@ import { map } from "../map/mapboxConfig";
 import { renderAndBlur } from "./blurFilter";
 import { getDilateFS, getGaussianBlurFS, getVSForDilateAndGaussBlur } from "./shaders";
 import { createDilateFilter } from "./dilateFilter";
-import { createGaussianBlurFilter } from "./gaussianBlurFilter";
+import { applyGaussianBlur, createGaussianBlurFilter } from "./gaussianBlurFilter";
 
 // ####### Webgl1 Shader ############
 
@@ -219,6 +219,8 @@ class Overlay {
 
     this.gl = glContext;
 
+    createGaussianBlurFilter();
+
     //reset = Reset(this.gl);
   }
 
@@ -230,7 +232,7 @@ class Overlay {
     this.mapLayer = data; //TODO not necessary right now
 
     // Clear the canvas
-    this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 
     // setup webgl program with the given shaders
@@ -304,7 +306,7 @@ class Overlay {
     // set the resolution (needs to be set after useProgram !!)
     this.gl.uniform2f(this.resolutionLocation, this.gl.canvas.width, this.gl.canvas.height);
 
-    this.gl.uniform4f(this.colorLocation, 0.6, 0.6, 0.6, 0.8);
+    this.gl.uniform4f(this.colorLocation, 0.6, 0.6, 0.6, 1.0);
 
     //this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.positionBuffer);
 
@@ -343,7 +345,7 @@ class Overlay {
 
         // perf-results: 101,6 ; 101,2 ; 82,6 ; 62,7 ; 45,9 (ms) -> avg: 78,8 ms (vllt lieber median?)
         Benchmark.startMeasure("blur Image with Webgl");
-        const overlayCanvas = createGaussianBlurFilter([img]);
+        const overlayCanvas = applyGaussianBlur([img]);
         //const canvas = renderAndBlur(img);
         Benchmark.stopMeasure("blur Image with Webgl");
 
@@ -555,7 +557,7 @@ export default async function createOverlay(data: any): Promise<void> {
   const img = new Image();
   img.onload = (): void => {
     console.log("in onload: ", img.src);
-    addCanvasOverlay(resultCanvas);
+    addCanvasOverlay(resultCanvas, 0.85);
 
     //delete all created images in the overlay class
     overlay.deleteImages();

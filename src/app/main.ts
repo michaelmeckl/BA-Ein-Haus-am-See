@@ -526,15 +526,21 @@ function init(): void {
   console.time("load map");
 
   mapController = new MapController();
-  mapController.init().then(() => {
-    // map loaded sucessfully
-    console.timeEnd("load map");
-    setupUI();
-  });
-  /*.catch((error) => {
+  mapController
+    .init()
+    .then(() => {
+      // map loaded sucessfully
+      console.timeEnd("load map");
+
+      // setup the initial map state
+      mapController.setupMapState();
+
+      setupUI();
+    })
+    .catch((error) => {
       // an error occured while loading the map, the application cannot be used
       throw new Error(error);
-    });*/
+    });
 }
 
 init();

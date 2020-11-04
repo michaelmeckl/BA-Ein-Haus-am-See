@@ -295,16 +295,54 @@ export function getDilateFS(): string {
   `;
 }
 
+export function newGaussianBlurShader(): string {
+  return `
+  precision mediump float;
+
+  uniform sampler2D sourceTextureSampler;
+  uniform vec2 sourceTextureSize;
+  uniform vec2 sourceTexelSize;
+  
+  varying vec2 varyingTextureCoordinate;
+
+  const int samples = 35,
+          LOD = 2,         // gaussian done on MIPmap at scale LOD
+          sLOD = 1 << LOD; // tile size = 2^LOD
+  const float sigma = float(samples) * .25;
+
+  float gaussian(vec2 i) {
+      return exp( -.5* dot(i/=sigma,i) ) / ( 6.28 * sigma*sigma );
+  }
+
+  vec4 blur(sampler2D sp, vec2 U, vec2 scale) {
+      vec4 O = vec4(0);  
+      int s = samples/sLOD;
+      
+      for ( int i = 0; i < s*s; i++ ) {
+          vec2 d = vec2(i%s, i/s)*float(sLOD) - float(samples)/2.;
+          O += gaussian(d) * textureLod( sp, U + scale * d , float(LOD) );
+      }
+      
+      return O / O.a;
+  }
+
+  void main(void) {
+  void mainImage(out vec4 O, vec2 fragCoord) {
+      gl_FragColor = blur( sourceTextureSampler, fragCoord/iResolution.xy, 1./sourceTextureSize.xy );
+  }
+  `;
+}
+
 //! IMPORTANT: j in the shader below is the distance value!! -> set j to size of the buffer around the polygons!
 //* 2D gaussian blur fs:
 // see. http://pieper.github.io/sites/glimp/gaussian.html
 export function getGaussianBlurFS(): string {
   return `
-  precision highp float;
+  precision mediump float;
 
   // Gaussian filter.  Based on https://www.shadertoy.com/view/4dfGDH#
-  #define SIGMA 5.0
-  #define MSIZE 15  // Blur strength overall
+  #define SIGMA 10.0
+  #define MSIZE 25  // Blur strength overall
   
   
   // gaussian distribution (the blur effect decreases fast the more we get away from the center)
@@ -388,7 +426,7 @@ export function getVSForDilateAndGaussBlur(): string {
   varying vec2 varyingTextureCoordinate;
 
   void main(void) {
-    gl_Position = vec4(coordinate, 1.);
+    gl_Position = vec4(coordinate, 1.0);
 
     varyingTextureCoordinate = textureCoordinate;
   }
