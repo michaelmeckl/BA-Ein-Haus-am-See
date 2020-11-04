@@ -1,11 +1,10 @@
 import { map } from "./mapboxConfig";
 import Benchmark from "../../shared/benchmarking";
-import { addCanvasOverlay, invertCanvas, makeAlphaMask } from "./canvasUtils";
+import { addCanvasOverlay, cloneCanvas, invertCanvas, makeAlphaMask } from "./canvasUtils";
 import * as webglUtils from "../webgl/webglUtils";
 import { metersInPixel } from "./mapboxUtils";
 import * as twgl from "twgl.js";
-//import FastGaussBlur from "../vendors/fast-gauss-blur";
-
+import "../vendors/fast-gauss-blur";
 import "../vendors/StackBlur";
 import { applyGaussianBlur, createGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
 import type { FilterLayer } from "../mapData/filterLayer";
@@ -40,7 +39,7 @@ const vsCombine = `
     }
   `;
 
-//* hier muss Webgl 1 verwendet werden, sonst gehen keine dynamischen Variablen in der for-Schleife!
+//* this shader has to be written in webgl 1 because webgl 2 doesn't allow dynamic access in a for loop!
 const fsCombine = `
     precision mediump float;    // mediump should be enough and highp isn't supported on all devices
 
@@ -72,8 +71,8 @@ const fsCombine = `
     }
     `;
 
-//* to improve performance everything that doesn't change can be rendered to an offscreen canvas and on next
-//* render simply blitted onto the main canvas with c.getContext('2d').drawImage(offScreenCanvas, 0, 0);
+//! to improve performance everything that doesn't change can be rendered to an offscreen canvas and on next
+//! render simply blitted onto the main canvas with c.getContext('2d').drawImage(offScreenCanvas, 0, 0);
 
 class CanvasRenderer {
   private overlayCanvas: HTMLCanvasElement;
@@ -88,7 +87,7 @@ class CanvasRenderer {
 
   constructor() {
     // create an in-memory canvas and set width and height to fill the whole map on screen
-    //const canvas = document.createElement("canvas");  //* das funktioniert bei 2D api nicht!
+    //const canvas = document.createElement("canvas");  //* doesn't work for some reason
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     canvas.width = map.getCanvas().clientWidth;
     canvas.height = map.getCanvas().clientHeight;
@@ -143,7 +142,7 @@ class CanvasRenderer {
     //ctx.globalCompositeOperation = "source-over";
     // apply a "feather"/blur - effect to everything that is drawn on the canvas
 
-    //ctx.filter = "blur(25px)";
+    //ctx.filter = "blur(32px)";
 
     //ctx.globalAlpha = 0.5;
 
@@ -152,6 +151,7 @@ class CanvasRenderer {
     Benchmark.startMeasure("render and blur all polygons of one layer");
     console.log("before render and blur all polygons of one layer");
 
+    //TODO kann das auch in konstruktor?
     createGaussianBlurFilter();
 
     //const promises = this.mapLayer.Points.map(async (polygon: { x: any; y: any }[]) => {
@@ -215,7 +215,7 @@ class CanvasRenderer {
       //ctx.stroke();
 
       //promises.push(this.blurPolygon());
-      await this.blurPolygon();
+      //await this.blurPolygon();
       // await this.anotherBlur();
       //await this.fastGaußBlur();
 
@@ -230,7 +230,50 @@ class CanvasRenderer {
     //ctx.globalCompositeOperation = "destination-over";
     //ctx.filter = "none";
 
+    //TODO muss das awaited werden oder ist hier parallelisieren möglich?
+    await this.blurPolygon();
+    //this.fastGaußBlur();
+
     await this.saveAsImage();
+  }
+
+  //! Julien hat den auf den ganzen Canvas angewandt so weit ich weiß, nicht pro kreis, polygon etc.
+  fastGaußBlur(): void {
+    const imgData = this.ctx.getImageData(
+      0,
+      0,
+      this.overlayCanvas.width,
+      this.overlayCanvas.height
+    );
+
+    const redChannel = [];
+
+    for (let i = 0; i < imgData.data.length; i += 4) {
+      redChannel.push(imgData.data[i]);
+    }
+
+    const blurredRedChannel: any[] = [];
+
+    const size = 25;
+    console.time("fastgaussblur");
+    //@ts-expect-error
+    FastGaussBlur.apply(
+      redChannel,
+      blurredRedChannel,
+      this.overlayCanvas.width,
+      this.overlayCanvas.height,
+      size
+    );
+    console.timeEnd("fastgaussblur");
+
+    for (let i = 0; i < imgData.data.length; i += 4) {
+      const colorValue = blurredRedChannel[i / 4];
+      imgData.data[i] = colorValue;
+      imgData.data[i + 1] = colorValue;
+      imgData.data[i + 2] = colorValue;
+    }
+
+    this.ctx.putImageData(imgData, 0, 0);
   }
 
   updateOverlay(newData: any): void {
@@ -254,6 +297,8 @@ class CanvasRenderer {
         img.width = this.overlayCanvas.clientWidth;
         img.height = this.overlayCanvas.clientHeight;
 
+        //const oldCanvas = cloneCanvas(this.overlayCanvas);
+
         //TODO:
         //if(shouldShowAreas) { do blur ]
         Benchmark.startMeasure("blur Image with Webgl");
@@ -263,8 +308,12 @@ class CanvasRenderer {
 
         this.ctx.drawImage(overlayCanvas, 0, 0);
 
-        //* draw original image over the blurred one to create an outline effect?
-        //this.ctx.drawImage(img, 0, 0);
+        /*
+        this.ctx.globalCompositeOperation = "destination-over";
+        //* draw original image over the blurred one to create an outline effect
+        this.ctx.drawImage(oldCanvas, 0, 0);
+        this.ctx.globalCompositeOperation = "source-over";
+        */
 
         img.onload = null;
         //@ts-expect-error
@@ -522,5 +571,6 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
   //delete all created images in the overlay class
   renderer.deleteImages();
 
-  console.log("test aljflafjljal fskj");
+  console.log("finished blurring and overlay");
+  console.log("8");
 }

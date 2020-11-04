@@ -1,4 +1,4 @@
-import { vertexShaderCanvas, fragmentShaderCanvas } from "./shaders";
+import { vertexShaderCanvas, blurFragmentShaderCanvas } from "./shaders";
 import {
   computeKernelWeight,
   createProgram,
@@ -82,7 +82,11 @@ export function renderAndBlur(image: HTMLImageElement): HTMLCanvasElement | null
 
   // init shader program
   const vertexShader = createShader(glContext, glContext.VERTEX_SHADER, vertexShaderCanvas());
-  const fragmentShader = createShader(glContext, glContext.FRAGMENT_SHADER, fragmentShaderCanvas());
+  const fragmentShader = createShader(
+    glContext,
+    glContext.FRAGMENT_SHADER,
+    blurFragmentShaderCanvas()
+  );
   const program = createProgram(glContext, vertexShader, fragmentShader);
 
   // lookup attributes

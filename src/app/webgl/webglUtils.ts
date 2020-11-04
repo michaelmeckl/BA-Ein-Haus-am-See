@@ -6,9 +6,8 @@ type shaderType =
   | WebGL2RenderingContext["VERTEX_SHADER"]
   | WebGL2RenderingContext["FRAGMENT_SHADER"];
 
-export function getBlurFilterKernel(name = "gaussianBlur"): number[] {
-  // prettier-ignore
-  const kernels = {
+// prettier-ignore
+const blurKernels = {
     // Define several convolution kernels
     gaussianBlur: [
       0.045, 0.122, 0.045,
@@ -37,18 +36,19 @@ export function getBlurFilterKernel(name = "gaussianBlur"): number[] {
     ],
   };
 
+export function getBlurFilterKernel(name = "gaussianBlur"): number[] {
   switch (name) {
     case "gaussianBlur2":
-      return kernels.gaussianBlur2;
+      return blurKernels.gaussianBlur2;
     case "gaussianBlur3":
-      return kernels.gaussianBlur3;
+      return blurKernels.gaussianBlur3;
     case "boxBlur":
-      return kernels.boxBlur;
+      return blurKernels.boxBlur;
     case "triangleBlur":
-      return kernels.triangleBlur;
+      return blurKernels.triangleBlur;
     case "gaussianBlur":
     default:
-      return kernels.gaussianBlur;
+      return blurKernels.gaussianBlur;
   }
 }
 
@@ -108,7 +108,7 @@ export function getWebGLRenderingContext(): WebGLRenderingContext | null {
   canvas.height = canvas.clientHeight;
   const gl = canvas.getContext("webgl");
   if (!gl) {
-    console.error("Failed to get WebGL context." + "Your browser or device may not support WebGL.");
+    console.error("Failed to get WebGL context. Your browser or device may not support WebGL.");
     return null;
   }
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);

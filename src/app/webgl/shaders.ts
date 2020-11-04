@@ -1,6 +1,5 @@
-//TODO: alle shader in webgl2 schreiben (bzw. in opengl es 300)
 /**
- * * in WebGL 2:
+ * * in WebGL 2: (see https://webgl2fundamentals.org/webgl/lessons/webgl1-to-webgl2.html for more information)
  * * varying becomes out in fragment shader and in in vertexShader
  * * attribute is replaced by in
  * * gl_Fragcolor is not set anymore, instead use out for color in fragment shader
@@ -64,67 +63,6 @@ export function defaultLumaShaders(): any {
   return { vertexSource, fragmentSource };
 }
 
-// TODO ist von shadertoy -> umschreiben
-// see https://www.shadertoy.com/view/MdyBzG
-export function applyKawaseBlurFilter() {
-  const source = `
-    void mainImage( out vec4 fragColor, in vec2 fragCoord )
-    {
-        vec2 uv = fragCoord / iResolution.xy;
-        vec2 res = iChannelResolution[0].xy;
-      
-        float i = 5.5;
-        
-        vec3 col = texture( iChannel0, uv + vec2( i, i ) / res ).rgb;
-        col += texture( iChannel0, uv + vec2( i, -i ) / res ).rgb;
-        col += texture( iChannel0, uv + vec2( -i, i ) / res ).rgb;
-        col += texture( iChannel0, uv + vec2( -i, -i ) / res ).rgb;
-        col /= 4.0;
-    
-        fragColor = vec4( col, 1.0 );
-    }`;
-
-  return source;
-}
-
-/**
-   * * This multiplies two canvases:
-   * call this like:
-     function updateTextureFromCanvas(tex, canvas, textureUnit) {
-        gl.activeTexture(gl.TEXTURE0 + textureUnit);
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-      }
-  
-      var tex1 = setupTexture(canvas1, 0, program, "u_canvas1");
-      var tex2 = setupTexture(canvas2, 1, program, "u_canvas2");
-   */
-export function multiplyCanvasFragmentShader() {
-  return `
-    precision mediump float;
-  
-    // our 2 canvases
-    uniform sampler2D u_canvas1;
-    uniform sampler2D u_canvas2;
-  
-    // the texCoords passed in from the vertex shader.
-    // note: we're only using 1 set of texCoords which means
-    //   we're assuming the canvases are the same size.
-    varying vec2 v_texCoord;
-  
-    void main() {
-        // Look up a pixel from first canvas
-        vec4 color1 = texture2D(u_canvas1, v_texCoord);
-  
-        // Look up a pixel from second canvas
-        vec4 color2 = texture2D(u_canvas2, v_texCoord);
-  
-        // return the 2 colors multiplied
-        gl_FragColor = color1 * color2;
-    }
-    `;
-}
-
 export function vertexShaderCanvas(): string {
   return `
       // an attribute will receive data from a buffer
@@ -155,8 +93,25 @@ export function vertexShaderCanvas(): string {
     `;
 }
 
+export function gaussianVertexShaderCanvas(): string {
+  return `
+  precision mediump float;
+
+  attribute vec3 coordinate;
+  attribute vec2 textureCoordinate;
+
+  varying vec2 v_texCoord;
+
+  void main(void) {
+    gl_Position = vec4(coordinate, 1.0);
+
+    v_texCoord = textureCoordinate;
+  }
+  `;
+}
+
 //blur für canvas
-export function fragmentShaderCanvas(): string {
+export function blurFragmentShaderCanvas(): string {
   return `
       precision mediump float;
    
@@ -186,79 +141,11 @@ export function fragmentShaderCanvas(): string {
             texture2D(u_image, v_texCoord + onePixel * vec2( 1,  1)) * u_kernel[8] ;
   
         gl_FragColor = vec4((colorSum / u_kernelWeight).rgb, 1);
-        //gl_FragColor = vec4(1,0,0,1);
       }
     `;
 }
 
-//TODO Blur - Filter
-export function createBlurFragmentSource(): string {
-  const blurSource = `
-      precision highp float;
-      uniform sampler2D u_texture;
-      uniform vec2 delta;
-      varying vec2 v_tpos;
-      float random(vec3 scale, float seed) {
-          /* use the fragment position for a different seed per-pixel */
-          return fract(sin(dot(gl_FragCoord.xyz + seed, scale)) * 43758.5453 + seed);
-      }
-      void main() {
-          vec4 color = vec4(0.0);
-          float total = 0.0;
-          
-          /* randomize the lookup values to hide the fixed number of samples */
-          float offset = random(vec3(12.9898, 78.233, 151.7182), 0.0);
-          
-          for (float t = -30.0; t <= 30.0; t++) {
-              float percent = (t + offset - 0.5) / 30.0;
-              float weight = 1.0 - abs(percent);
-              vec4 sample = texture2D(u_texture, v_tpos + delta * percent);
-              
-              /* switch to pre-multiplied alpha to correctly blur transparent images */
-              sample.rgb *= sample.a;
-              
-              color += sample * weight;
-              total += weight;
-          }
-          
-          gl_FragColor = color / total;
-          
-          /* switch back from pre-multiplied alpha */
-          gl_FragColor.rgb /= gl_FragColor.a + 0.00001;
-      }`;
-
-  const fragmentSourceAlternativ = `
-      uniform sampler2D texUnit;
-      uniform float[9] conMatrix;
-      uniform float conWeight;
-      uniform vec2 conPixel;
-  
-      void main(void)
-      {
-          vec4 color = vec4(0.0);
-          vec2 texCoord = gl_TexCoord[0].st;
-          vec2 offset = conPixel * 1.5;
-          vec2 start = texCoord - offset;
-          vec2 current = start;
-  
-          for (int i = 0; i < 9; i++)
-          {
-              color += texture2D( texUnit, current ) * conMatrix[i]; 
-  
-              current.x += conPixel.x;
-              if (i == 2 || i == 5) {
-                  current.x = start.x;
-                  current.y += conPixel.y; 
-              }
-          }
-  
-          gl_FragColor = color * conWeight;
-      }`;
-
-  return blurSource;
-}
-
-//* Dilate Fragment Shader:
+//* Dilate Fragment Shader: (only for reference, not used)
 // see. http://pieper.github.io/sites/glimp/dilate.html
 export function getDilateFS(): string {
   return `
@@ -295,40 +182,62 @@ export function getDilateFS(): string {
   `;
 }
 
-export function newGaussianBlurShader(): string {
-  return `
+export function gaussianBlurVertexShader(): string {
+  return `#version 300 es
+
+  precision mediump float;
+
+  in vec3 coordinate;
+  in vec2 textureCoordinate;
+
+  out vec2 texCoord;
+
+  void main(void) {
+    gl_Position = vec4(coordinate, 1.0);
+
+    texCoord = textureCoordinate;
+  }
+  `;
+}
+
+//* needs webgl 2 or the textureLOD extension for webgl 1 (https://developer.mozilla.org/en-US/docs/Web/API/EXT_shader_texture_lod)
+// see https://www.shadertoy.com/view/ltScRG
+export function gaussianBlurFragmentShader(): string {
+  return `#version 300 es
+
   precision mediump float;
 
   uniform sampler2D sourceTextureSampler;
-  uniform vec2 sourceTextureSize;
-  uniform vec2 sourceTexelSize;
+  uniform vec2 textureResolution;
+  uniform vec2 canvasResolution;
   
-  varying vec2 varyingTextureCoordinate;
+  in vec2 texCoord;
+
+  out vec4 fragColor;
 
   const int samples = 35,
           LOD = 2,         // gaussian done on MIPmap at scale LOD
           sLOD = 1 << LOD; // tile size = 2^LOD
-  const float sigma = float(samples) * .25;
+  const float sigma = float(samples) * 0.25;
 
   float gaussian(vec2 i) {
-      return exp( -.5* dot(i/=sigma,i) ) / ( 6.28 * sigma*sigma );
+      return exp( -0.5* dot(i/=sigma,i) ) / ( 6.28 * sigma*sigma );
   }
 
-  vec4 blur(sampler2D sp, vec2 U, vec2 scale) {
-      vec4 O = vec4(0);  
+  vec4 blur(sampler2D samplerTexture, vec2 uvCoord, vec2 scale) {
+      vec4 outputColor = vec4(0.0);  
       int s = samples/sLOD;
       
       for ( int i = 0; i < s*s; i++ ) {
-          vec2 d = vec2(i%s, i/s)*float(sLOD) - float(samples)/2.;
-          O += gaussian(d) * textureLod( sp, U + scale * d , float(LOD) );
+          vec2 d = vec2(i%s, i/s)*float(sLOD) - float(samples)/2.0;
+          outputColor += gaussian(d) * textureLod( samplerTexture, uvCoord + scale * d , float(LOD) );
       }
       
-      return O / O.a;
+      return outputColor ;
   }
 
   void main(void) {
-  void mainImage(out vec4 O, vec2 fragCoord) {
-      gl_FragColor = blur( sourceTextureSampler, fragCoord/iResolution.xy, 1./sourceTextureSize.xy );
+      fragColor = blur(sourceTextureSampler, texCoord.xy/canvasResolution.xy, 1.0/textureResolution.xy );
   }
   `;
 }
@@ -342,7 +251,7 @@ export function getGaussianBlurFS(): string {
 
   // Gaussian filter.  Based on https://www.shadertoy.com/view/4dfGDH#
   #define SIGMA 10.0
-  #define MSIZE 25  // Blur strength overall
+  #define MSIZE 30  // Blur strength overall
   
   
   // gaussian distribution (the blur effect decreases fast the more we get away from the center)

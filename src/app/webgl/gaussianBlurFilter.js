@@ -2,10 +2,23 @@ import * as twgl from "twgl.js";
 import {
     getGaussianBlurFS,
     getVSForDilateAndGaussBlur,
+    gaussianBlurFragmentShader,
+    gaussianBlurVertexShader,
+    gaussianVertexShaderCanvas,
+    blurFragmentShaderCanvas,
 } from "./shaders";
+import {
+    computeKernelWeight,
+    getBlurFilterKernel,
+} from "./webglUtils";
 
 const renderCanvas = document.createElement("canvas");
 const sourceTextureSize = [0, 0];
+
+/*
+const blurKernel = getBlurFilterKernel("gaussianBlur");
+const kernelWeight = computeKernelWeight(blurKernel);
+*/
 
 let glProgram;
 
@@ -40,6 +53,18 @@ export function createGaussianBlurFilter() {
         getVSForDilateAndGaussBlur(),
         getGaussianBlurFS(),
     ]);
+    /*
+    glProgram = twgl.createProgramFromSources(gl, [
+        gaussianBlurVertexShader(),
+        gaussianBlurFragmentShader(),
+    ]);
+    */
+    /*
+    glProgram = twgl.createProgramFromSources(gl, [
+        gaussianVertexShaderCanvas(),
+        blurFragmentShaderCanvas(),
+    ]);
+    */
 
     // the coordinate attribute
     gl.bindBuffer(gl.ARRAY_BUFFER, renderImageCoordinatesBuffer);
@@ -59,7 +84,7 @@ function setupSourceTexture(gl, sourceTextureImage) {
     const sourceTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    //gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); //* premultiply is necessary for blurring?
+    //gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); //* premultiply?
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceTextureImage);
 
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -79,15 +104,26 @@ function render(gl, sourceTexture) {
 
     // set up the sourceTextureSize
     gl.uniform2f(gl.getUniformLocation(glProgram, "sourceTextureSize"), sourceTextureSize[0], sourceTextureSize[1]);
-
     // set up the sourceTexelSize
     gl.uniform2f(gl.getUniformLocation(glProgram, "sourceTexelSize"), 1.0 / sourceTextureSize[0], 1.0 / sourceTextureSize[1]);
+
+    //gl.uniform2f(gl.getUniformLocation(glProgram, "canvasResolution"), renderCanvas.width, renderCanvas.height);
+
+    /*
+    const kernelLocation = gl.getUniformLocation(glProgram, "u_kernel[0]");
+    const kernelWeightLocation = gl.getUniformLocation(glProgram, "u_kernelWeight");
+    // set the kernel and it's weight
+    gl.uniform1fv(kernelLocation, blurKernel);
+    gl.uniform1f(kernelWeightLocation, kernelWeight);
+    */
 
     // the sourceTexture
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
     gl.uniform1i(gl.getUniformLocation(glProgram, "sourceTextureSampler"), 0);
 
+    //const count = 6; // 6 means two triangles
+    //gl.drawArrays(gl.TRIANGLES, 0, count);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
@@ -95,8 +131,9 @@ export function applyGaussianBlur(textures) {
     // all textures have the same size:
     sourceTextureSize[0] = textures[0].width;
     sourceTextureSize[1] = textures[0].height;
-    renderCanvas.height = textures[0].height;
+
     renderCanvas.width = textures[0].width;
+    renderCanvas.height = textures[0].height;
 
     // setup textures
     const textureArr = [];
