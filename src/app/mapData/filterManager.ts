@@ -6,10 +6,11 @@ class FilterManager {
   activeFilters: Set<string> = new Set();
 
   constructor() {
-    //! remove later
+    /*
     console.warn(
       "DEVELOPMENT: You should only see this warning once at the beginning. If this shows up more than once there's a problem!"
     );
+    */
   }
 
   addFilter(filterLayer: FilterLayer): void {

@@ -28,7 +28,7 @@ import mapLayerManager from "../mapData/mapLayerManager";
 import { fetchOsmDataFromServer } from "../network/networkUtils";
 import { showSnackbar, SnackbarType } from "../utils";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { createCanvasOverlay, updateOverlay } from "./canvasRenderer";
+import { createOverlay } from "./canvasRenderer";
 import { getDataFromMap } from "./featureUtils";
 import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -41,7 +41,7 @@ import OsmTagCollection from "../mapData/osmTagCollection";
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
 
 const zoomTreshold = 2; // 2 zoom levels difference
-const moveTreshold = 1500; // map center difference in meters
+const moveTreshold = 1200; // map center difference in meters
 
 /**
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
@@ -58,7 +58,7 @@ export default class MapController {
 
   //TODO
   private showingOverlay = false;
-  showOverlayAutomatically = false;
+  showOverlayAutomatically = true;
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -107,9 +107,9 @@ export default class MapController {
   }
 
   onMapDragEnd(): void {
-    //TODO overlay needs to be updated all the time unfortunately :(
+    //* overlay needs to be updated all the time unfortunately :(
     if (this.showingOverlay) {
-      //updateOverlay();
+      createOverlay(FilterManager.allFilterLayers);
       return;
     }
 
@@ -132,7 +132,7 @@ export default class MapController {
     const newZoom = map.getZoom();
 
     if (this.showingOverlay) {
-      //updateOverlay();
+      createOverlay(FilterManager.allFilterLayers);
       //this.currentZoom = newZoom;
       return;
     }
@@ -237,8 +237,12 @@ export default class MapController {
     */
     Benchmark.stopMeasure("Performing osm query for active filters");
 
-    if (this.showOverlayAutomatically) {
-      //TODO updateOverlay();
+    console.log("before showOverlayAutomatically...");
+
+    if (this.showOverlayAutomatically && FilterManager.allFilterLayers.length > 0) {
+      console.log("updating overlay...\n", FilterManager.allFilterLayers);
+      this.showingOverlay = true;
+      createOverlay(FilterManager.allFilterLayers);
     }
 
     //TODO wohin damit?
@@ -566,7 +570,7 @@ export default class MapController {
 
     // check that there is data to overlay the map with
     if (overlayData.length > 0) {
-      createCanvasOverlay(overlayData);
+      createOverlay(overlayData);
     } else {
       console.warn("Creating an overlay is not possible because overlayData is empty!");
     }

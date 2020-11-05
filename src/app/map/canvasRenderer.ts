@@ -56,7 +56,7 @@ class CanvasRenderer {
 
   async renderPolygons(mapLayer: FilterLayer): Promise<any> {
     this.mapLayer = mapLayer; // TODO im moment unnötig aber vermtl nötig um ständiz zu updaten!
-    //console.log("this.mapLayer: ", this.mapLayer);
+    console.log("this.mapLayer: ", this.mapLayer);
 
     //shorter alias for context
     const ctx = this.ctx;
@@ -222,12 +222,13 @@ class CanvasRenderer {
 
     //TODO render this above in an offscreen canvas and just copy result to main canvas
     this.ctx.drawImage(canvas, 0, 0);
+
+    //cleanup and delete webgl resources
+    this.cleanupResources();
   }
 
   createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
     this.combineOverlays(textures);
-    //cleanup and delete webgl resources
-    this.cleanupResources();
 
     return this.overlayCanvas;
   }
@@ -262,11 +263,13 @@ class CanvasRenderer {
   }
 }
 
-export async function createCanvasOverlay(data: any): Promise<void> {
+const renderer = new CanvasRenderer();
+
+export async function createOverlay(data: FilterLayer[]): Promise<void> {
   console.log("Creating canvas overlay now...");
 
   Benchmark.startMeasure("creating canvas overlay");
-  const renderer = new CanvasRenderer(); //TODO nur einmal am Anfang oder jedes mal neu??
+  //renderer = new CanvasRenderer(); //TODO nur einmal am Anfang oder jedes mal neu??
 
   Benchmark.startMeasure("render all Polygons");
   const allRenderProcesses = data.map((layer: FilterLayer) => renderer.renderPolygons(layer));
@@ -284,8 +287,4 @@ export async function createCanvasOverlay(data: any): Promise<void> {
   renderer.deleteImages();
 
   console.log("finished blurring and compositing");
-}
-
-export async function updateOverlay(newData: any): Promise<void> {
-  //TODO bei jeder Bewegung aufrufen und das oben neu machen
 }
