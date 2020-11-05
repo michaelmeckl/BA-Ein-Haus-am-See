@@ -17,7 +17,7 @@ let renderImageTexureCoordinatesBuffer;
 
 let gl: WebGL2RenderingContext | WebGLRenderingContext | null;
 
-export function createGaussianBlurFilter(): void {
+export function setupGaussianBlurFilter(): void {
   gl = renderCanvas.getContext("webgl2");
   if (!gl) {
     throw new Error("Couldn't get a webgl context for combining the overlays!");

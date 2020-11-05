@@ -105,10 +105,10 @@ export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HT
       resolve(image);
 
       //cleanup
-
+      /*
       image.onload = null;
-      //@ts-expect-error
       image = null;
+      */
     };
     image.onerror = (error): void => reject(error);
 

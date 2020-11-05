@@ -30,7 +30,7 @@ import FilterManager from "../mapData/filterManager";
 import mapLayerManager from "../mapData/mapLayerManager";
 import { fetchOsmDataFromServer } from "../network/networkUtils";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import createCanvasOverlay from "./canvasRenderer";
+import { createCanvasOverlay, updateOverlay } from "./canvasRenderer";
 import { getDataFromMap } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
@@ -86,13 +86,13 @@ export default class MapController {
   }
 
   setupMapEvents(): void {
-    map.on("sourcedata", this.onSourceLoaded.bind(this));
-    map.on("data", this.onDataLoaded.bind(this)); // fired when any map data begins loading or changing asynchronously.
+    //map.on("sourcedata", this.onSourceLoaded.bind(this));
+    //map.on("data", this.onDataLoaded.bind(this)); // fired when any map data begins loading or changing asynchronously.
     map.on("click", this.onMapClick.bind(this));
 
-    map.on("moveend", this.onMapMoveEnd.bind(this));
+    //map.on("moveend", this.onMapMoveEnd.bind(this));
     map.on("zoomend", this.onMapZoomEvent.bind(this));
-    map.on("dragend", this.onMapDragEvent.bind(this));
+    map.on("dragend", this.onMapDragEnd.bind(this));
   }
 
   async onMapMoveEnd(e: { originalEvent: DragEvent }): Promise<void> {
@@ -101,8 +101,9 @@ export default class MapController {
     //this.reloadData();
   }
 
-  onMapDragEvent(e: { originalEvent: DragEvent }): void {
+  onMapDragEnd(e: { originalEvent: DragEvent }): void {
     console.log("A dragend event occurred:", e.originalEvent);
+    //TODO updateOverlay();
   }
 
   onMapZoomEvent(e: MapMouseEvent | MapTouchEvent): void {

@@ -1,10 +1,11 @@
+import { permittedCrossDomainPolicies } from "helmet";
 import * as twgl from "twgl.js";
 import Benchmark from "../../shared/benchmarking";
 import type { FilterLayer } from "../mapData/filterLayer";
-import { applyGaussianBlur, createGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
+import { applyGaussianBlur, setupGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
 import { combineOverlayFragmentShader, defaultVertexShader } from "../webgl/shaders";
 import * as webglUtils from "../webgl/webglUtils";
-import { makeAlphaMask } from "./canvasUtils";
+import { makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
 import { map } from "./mapboxConfig";
 import { metersInPixel } from "./mapboxUtils";
 
@@ -15,17 +16,24 @@ let textureCount;
 //! render simply blitted onto the main canvas with c.getContext('2d').drawImage(offScreenCanvas, 0, 0);
 
 class CanvasRenderer {
+  //2D canvas api
   private overlayCanvas: HTMLCanvasElement;
-  private mapLayer!: any;
-
   private ctx!: CanvasRenderingContext2D;
 
-  allTextures: HTMLImageElement[] = [];
+  // webgl resources
+  private glCtx!: WebGL2RenderingContext | WebGLRenderingContext;
+  private glProgram!: WebGLProgram;
+  private positionBuffer: WebGLBuffer | null = null;
+  private texCoordBuffer: WebGLBuffer | null = null;
 
+  // others
+  private mapLayer!: any;
+  allTextures: HTMLImageElement[] = [];
   //TODO diese variablen hier müssten gecleared werden immer am Ende oder Anfang!
   private weights: number[] = [];
 
   constructor() {
+    console.log("hello");
     //const canvas = document.createElement("canvas");  //* doesn't work for some reason
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     canvas.width = map.getCanvas().clientWidth;
@@ -40,6 +48,8 @@ class CanvasRenderer {
       throw new Error("No 2d context from canvasRenderer");
     }
     this.ctx = context;
+
+    setupGaussianBlurFilter();
   }
 
   //TODO only clear a specific part (not the whole canvas)
@@ -49,9 +59,7 @@ class CanvasRenderer {
     this.mapLayer = mapLayer; // TODO im moment unnötig aber vermtl nötig um ständiz zu updaten!
     //console.log("this.mapLayer: ", this.mapLayer);
 
-    //* if holes must be rendered both both polygons (outside and hole) have to be in opposite clockwise order
-
-    //shorter alias
+    //shorter alias for context
     const ctx = this.ctx;
 
     // clear the canvas
@@ -75,11 +83,6 @@ class CanvasRenderer {
 
     Benchmark.startMeasure("render and blur all polygons of one layer");
 
-    //TODO kann das auch in konstruktor?
-    createGaussianBlurFilter();
-
-    //const promises: any[] = [];
-    //const promises = this.mapLayer.Points.map(async (polygon: { x: any; y: any }[]) => {
     for (const polygon of this.mapLayer.Points) {
       const vertices = polygon.flatMap((el: { x: any; y: any }) => [el.x, el.y]);
       //console.log("vertices: ", vertices);
@@ -90,12 +93,13 @@ class CanvasRenderer {
       ctx.beginPath();
       ctx.moveTo(vertices[0], vertices[1]);
       // draw the polygon
+      //* if holes must be rendered both both polygons (outside and hole) have to be in opposite clockwise order
       for (let index = 2; index < vertices.length - 1; index += 2) {
         ctx.lineTo(vertices[index], vertices[index + 1]);
       }
       ctx.closePath();
 
-      // draw polygons white
+      // draw polygons white, fully opaque
       ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
       ctx.fill("evenodd");
 
@@ -103,103 +107,31 @@ class CanvasRenderer {
     }
 
     //const allBlurredPolys = await Promise.all(promises);
-
     Benchmark.stopMeasure("render and blur all polygons of one layer");
 
-    //TODO muss das awaited werden oder ist hier parallelisieren möglich?
+    const img = await readImageFromCanvas(this.overlayCanvas);
 
-    //TODO use readImageFromCanvas() hier für beide verwenden
-    await this.blurPolygon();
-    await this.saveAsImage();
-  }
+    //TODO:
+    //if(shouldShowAreas) { do blur ]
+    Benchmark.startMeasure("blur Image in Webgl");
+    const blurredCanvas = applyGaussianBlur([img]);
+    Benchmark.stopMeasure("blur Image in Webgl");
 
-  blurPolygon(): Promise<void> {
-    let img = new Image();
+    // draw blurred canvas on the overlayCanvas
+    this.ctx.drawImage(blurredCanvas, 0, 0);
 
-    return new Promise((resolve, reject) => {
-      img.onload = (): void => {
-        //use clientWidth and Height so the image fits the current screen size
-        img.width = this.overlayCanvas.clientWidth;
-        img.height = this.overlayCanvas.clientHeight;
-
-        //const oldCanvas = cloneCanvas(this.overlayCanvas);
-
-        //TODO:
-        //if(shouldShowAreas) { do blur ]
-        Benchmark.startMeasure("blur Image with Webgl");
-        const overlayCanvas = applyGaussianBlur([img]);
-        //const canvas = renderAndBlur(img);
-        Benchmark.stopMeasure("blur Image with Webgl");
-
-        this.ctx.drawImage(overlayCanvas, 0, 0);
-
-        /*
-        this.ctx.globalCompositeOperation = "destination-over";
-        //* draw original image over the blurred one to create an outline effect
-        this.ctx.drawImage(oldCanvas, 0, 0);
-        this.ctx.globalCompositeOperation = "source-over";
-        */
-
-        img.onload = null;
-        //@ts-expect-error
-        img = null;
-        resolve();
-      };
-      img.onerror = (): void => reject();
-
-      //* setting the source should ALWAYS be done after setting the event listener!
-      img.src = this.overlayCanvas.toDataURL();
-    });
-  }
-
-  saveAsImage(): Promise<void> {
-    let img = new Image();
-
-    return new Promise((resolve, reject) => {
-      img.onload = (): void => {
-        console.log("in onload");
-
-        //use clientWidth and Height so the image fits the current screen size
-        img.width = this.overlayCanvas.clientWidth;
-        img.height = this.overlayCanvas.clientHeight;
-
-        this.allTextures.push(img);
-
-        //TODO:
-        //if(shouldShowAreas) { do blur ]
-        Benchmark.startMeasure("blur Image with Webgl");
-        //const overlayCanvas = createGaussianBlurFilter([img]);
-        //const canvas = renderAndBlur(img);
-        Benchmark.stopMeasure("blur Image with Webgl");
-
-        //this.ctx.drawImage(overlayCanvas, 0, 0);
-
-        //* draw original image over the blurred one to create an outline effect?
-        //this.ctx.drawImage(img, 0, 0);
-
-        /*
-        if (canvas) {
-          this.allCanvases.push(canvas);
-          resolve();
-        } else {
-          reject();
-        }
-        */
-
-        img.onload = null;
-        //@ts-expect-error
-        img = null;
-        resolve();
-      };
-      img.onerror = (): void => reject();
-
-      //* setting the source should ALWAYS be done after setting the event listener!
-      img.src = this.overlayCanvas.toDataURL();
-    });
+    const blurredImage = await readImageFromCanvas(this.overlayCanvas);
+    // save the blurred image for this layer
+    this.allTextures.push(blurredImage);
   }
 
   combineOverlays(textureLayers: HTMLImageElement[]): any {
-    console.log("textureLayers", textureLayers);
+    //console.log("textureLayers", textureLayers);
+
+    if (textureLayers.length === 0) {
+      console.error("TextureLayers are empty! Overlay can't be created!");
+      return;
+    }
 
     // set the number of texture to use
     textureCount = textureLayers.length;
@@ -220,6 +152,7 @@ class CanvasRenderer {
     if (!gl) {
       throw new Error("Couldn't get a webgl context for combining the overlays!");
     }
+    this.glCtx = gl;
 
     // create and link program
     const program = twgl.createProgramFromSources(gl, [vertexSource, fragmentSource]);
@@ -278,8 +211,6 @@ class CanvasRenderer {
     // Tell the shader to use texture units 0 to textureCount - 1
     gl.uniform1iv(textureLoc, Array.from(Array(textureCount).keys())); //uniform variable location and texture Index (or array of indices)
 
-    //TODO Blending hier oder doch mit custom layer??
-    //TODO verschiedene Blend Functions Testen!!
     // see https://stackoverflow.com/questions/39341564/webgl-how-to-correctly-blend-alpha-channel-png/
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for pre-multiplied alpha
@@ -297,42 +228,33 @@ class CanvasRenderer {
   createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
     this.combineOverlays(textures);
     //cleanup and delete webgl resources
-    //TODO this.cleanupResources();
+    this.cleanupResources();
 
     return this.overlayCanvas;
   }
 
-  /*
   // see https://stackoverflow.com/questions/23598471/how-do-i-clean-up-and-unload-a-webgl-canvas-context-from-gpu-after-use
   cleanupResources(): void {
     // desallocate memory and free resources to avoid memory leak issues
-    const numTextureUnits = this.gl.getParameter(this.gl.MAX_TEXTURE_IMAGE_UNITS);
+    const numTextureUnits = this.glCtx.getParameter(this.glCtx.MAX_TEXTURE_IMAGE_UNITS);
     for (let unit = 0; unit < numTextureUnits; ++unit) {
-      this.gl.activeTexture(this.gl.TEXTURE0 + unit);
-      this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-      this.gl.bindTexture(this.gl.TEXTURE_CUBE_MAP, null);
+      this.glCtx.activeTexture(this.glCtx.TEXTURE0 + unit);
+      this.glCtx.bindTexture(this.glCtx.TEXTURE_2D, null);
+      this.glCtx.bindTexture(this.glCtx.TEXTURE_CUBE_MAP, null);
     }
 
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
-    this.gl.bindRenderbuffer(this.gl.RENDERBUFFER, null);
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+    this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, null);
+    this.glCtx.bindBuffer(this.glCtx.ELEMENT_ARRAY_BUFFER, null);
+    this.glCtx.bindRenderbuffer(this.glCtx.RENDERBUFFER, null);
+    this.glCtx.bindFramebuffer(this.glCtx.FRAMEBUFFER, null);
 
     // Delete all your resources
-    this.gl.deleteProgram(this.program);
-    this.gl.deleteBuffer(this.positionBuffer);
-    //TODO ein paar fehlen noch hier!
+    this.glCtx.deleteProgram(this.glProgram);
+    this.glCtx.deleteBuffer(this.positionBuffer);
+    this.glCtx.deleteBuffer(this.texCoordBuffer);
 
-    //this.gl.canvas.width = 1;
-    //this.gl.canvas.height = 1;
-
-    //this.gl.getExtension("WEBGL_lose_context")?.loseContext();
-    //this.gl.getExtension("WEBGL_lose_context")?.restoreContext();
-  }
-  */
-
-  updateOverlay(newData: any): void {
-    //TODO bei jeder Bewegung aufrufen und das oben neu machen
+    //this.glCtx.getExtension("WEBGL_lose_context")?.loseContext();
+    //this.glCtx.getExtension("WEBGL_lose_context")?.restoreContext();
   }
 
   deleteImages(): void {
@@ -341,27 +263,30 @@ class CanvasRenderer {
   }
 }
 
-export default async function createCanvasOverlay(data: any): Promise<void> {
+export async function createCanvasOverlay(data: any): Promise<void> {
   console.log("Creating canvas overlay now...");
 
   Benchmark.startMeasure("creating canvas overlay");
-  const renderer = new CanvasRenderer();
+  const renderer = new CanvasRenderer(); //TODO nur einmal am Anfang oder jedes mal neu??
 
   Benchmark.startMeasure("render all Polygons");
   const allRenderProcesses = data.map((layer: FilterLayer) => renderer.renderPolygons(layer));
   await Promise.all(allRenderProcesses);
   Benchmark.startMeasure("render all Polygons");
 
-  console.log("Current number of saved textures in canvasRenderer: ", renderer.allTextures.length);
+  //console.log("Current number of saved textures in canvasRenderer: ", renderer.allTextures.length);
 
   const resultCanvas = renderer.createOverlay(renderer.allTextures);
-
   Benchmark.stopMeasure("creating canvas overlay");
 
-  makeAlphaMask(resultCanvas);
+  applyAlphaMask(resultCanvas);
 
   //delete all created images in the overlay class
   renderer.deleteImages();
 
-  console.log("finished blurring and overlay");
+  console.log("finished blurring and compositing");
+}
+
+export async function updateOverlay(newData: any): Promise<void> {
+  //TODO bei jeder Bewegung aufrufen und das oben neu machen
 }
