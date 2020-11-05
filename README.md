@@ -5,8 +5,8 @@ This repository contains the code for my bachelor thesis"Ein Haus am See im Brow
 Made with Mapbox GL & OpenStreetMap.
 
 ## Requirements
-The application needs a redis instance as well as the docker version of the Overpass-API running locally to work so these need to be setup before running the application. The docker version of the overpass api can be installed from Dockerhub (**Link TODO**). For detailed instructions on how to set this up, see **TODO wiktorn dockerhub**. The application assumes the Redis Instance is available at port **TODO** and the local Overpass API runs at **TODO**. You can of course change this in the code itself.
 
+The application needs a redis instance as well as the docker version of the Overpass-API running locally to work so these need to be setup before running the application. The docker version of the overpass api can be installed from Dockerhub (**Link TODO**). For detailed instructions on how to set this up, see **TODO wiktorn dockerhub**. The application assumes the Redis Instance is available at port **TODO** and the local Overpass API runs at **TODO**. You can of course change this in the code itself.
 
 ## Build Instructions
 

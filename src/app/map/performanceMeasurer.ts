@@ -1,7 +1,6 @@
 import { map } from "./mapboxConfig";
 import MapboxFPS = require("../vendors/MapboxFPS");
 import FrameRateControl from "../vendors/mapbox-gl-framerate";
-import type { Control, IControl } from "mapbox-gl";
 
 /**
  * This class is used to control performance measuring for the mapbox map.

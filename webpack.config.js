@@ -2,16 +2,10 @@ const path = require("path");
 const webpack = require("webpack");
 const nodeExternals = require("webpack-node-externals");
 const Dotenv = require('dotenv-webpack');
-/*
-//TODO:
-const HtmlWebpackPlugin = require('html-webpack-plugin');
-const { CleanWebpackPlugin } = require('clean-webpack-plugin');
-*/
 
 module.exports = {
-    mode: "development",
-    devtool: "inline-source-map",
-    //watch: true,
+    mode: "development", //TODO change to production later ?!
+    devtool: "inline-source-map", //todo omit this or change to none
     entry: [
         "./src/app/main.ts",
     ],
@@ -30,54 +24,34 @@ module.exports = {
     },
     module: {
         rules: [{
-                test: /\.worker\.ts$/,
-                use: {
-                    loader: 'worker-loader',
-                    /*
-                    options: {
-                        // for cors - problems:
-                        inline: 'fallback'
-                    },*/
-                },
-            }, {
-                test: /\.tsx?$/,
-                use: [{
-                    loader: "ts-loader",
-                    options: {
-                        transpileOnly: true,
-                        experimentalWatchApi: true,
-                    },
-                }],
-                exclude: /node_modules/,
-            }
-            /*
-            {
-                test: /\.css$/,
-                use: ['style-loader', 'css-loader'],
+            test: /\.worker\.ts$/,
+            use: {
+                loader: 'worker-loader',
+                /*
+                options: {
+                    // for cors - problems:
+                    inline: 'fallback'
+                },*/
             },
-            */
-        ],
+        }, {
+            test: /\.tsx?$/,
+            use: [{
+                loader: "ts-loader",
+                options: {
+                    transpileOnly: true,
+                    experimentalWatchApi: true,
+                },
+            }],
+            exclude: /node_modules/,
+        }],
     },
     // use target: "node" in order to ignore built-in modules like path, fs, etc. for bundling
     target: "web",
     /*
     externals: [
-        (function () {
-            var IGNORES = [
-                'electron'
-            ];
-            return function (context, request, callback) {
-                if (IGNORES.indexOf(request) >= 0) {
-                    return callback(null, "require('" + request + "')");
-                }
-                return callback();
-            };
-        })()
-        
         nodeExternals({
         whitelist: ["mapbox-gl"],
         })
-        
     ],
     */
     plugins: [
@@ -85,12 +59,5 @@ module.exports = {
         new Dotenv({
             path: path.resolve(__dirname, './.env'), // Path to .env file
         }),
-        //new CleanWebpackPlugin(),
-        //new webpack.HotModuleReplacementPlugin(),
-        /*
-        new HtmlWebpackPlugin({
-            title: "Ein Haus am See im Browser",
-        }),
-        */
     ],
 };

@@ -1,7 +1,7 @@
-import { createFragmentShaderSource, createVertexShaderSource } from "./shaders";
 import * as webglUtils from "./webglUtils";
 import * as twgl from "twgl.js";
 import { map } from "../map/mapboxConfig";
+import { defaultVertexShader } from "./shaders";
 
 //! das custom Layer unterstützt nur webgl1 !
 const vertexSource3 = `
@@ -10,15 +10,6 @@ attribute vec2 a_position;
 
 void main() {
     //vec2 scaled = a_position * 1.8
-    gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
-}
-`;
-
-const vertexSource2 = `
-uniform mat4 u_matrix;
-attribute vec2 a_position;
-
-void main() {
     gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
 }
 `;
@@ -67,9 +58,8 @@ export class MapboxCustomLayer {
     //console.log("in onAdd: ", gl.canvas.getContext("webgl"));
     //console.log("in onAdd: ", gl.canvas.getContext("webgl2"));
 
-    const vertexSource = createVertexShaderSource();
-    const fragmentSource = createFragmentShaderSource();
-    this.program = twgl.createProgramFromSources(gl, [vertexSource, fragmentSource]);
+    const vertexSource = defaultVertexShader();
+    this.program = twgl.createProgramFromSources(gl, [vertexSource, fragmentSource2]);
 
     this.program2 = twgl.createProgramFromSources(gl, [vertexSource3, fragmentSource2]);
 
@@ -222,6 +212,8 @@ export class MapboxCustomLayer {
 
     // delete the gl context
     //delete this.gl;
+
+    //this.positionBuffer.delete();
   }
 
   /**

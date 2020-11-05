@@ -1,7 +1,7 @@
 import type { Point } from "geojson";
 import mapboxgl, { Layer, LngLatLike } from "mapbox-gl";
 import { map } from "./mapboxConfig";
-import mapLayerManager from "./mapLayerManager";
+import mapLayerManager from "../mapData/mapLayerManager";
 
 export default class Heatmap {
   private sourceName: string;

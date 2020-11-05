@@ -32,6 +32,10 @@ export function showSnackbar(
   }, duration);
 }
 
+/**
+ * TODO the code below is not used right now
+ */
+
 export function logMemoryUsage(): void {
   //@ts-expect-error
   console.log(performance.memory.jsHeapSizeLimit / (8 * 1024 * 1024) + " mb"); // will give you the JS heap size

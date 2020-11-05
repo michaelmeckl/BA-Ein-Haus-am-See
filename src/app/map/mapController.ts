@@ -2,6 +2,9 @@
 
 //TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
 // e.g. const circle = await import("@turf/circle");
+import bbox from "@turf/bbox";
+import bbpolygon from "@turf/bbox-polygon";
+import { featureCollection } from "@turf/helpers";
 import type {
   Feature,
   FeatureCollection,
@@ -12,37 +15,27 @@ import type {
   Point,
   Polygon,
 } from "geojson";
-import mapboxgl, { CustomLayerInterface, Layer, LngLatLike } from "mapbox-gl";
+import mapboxgl, {
+  CustomLayerInterface,
+  EventData,
+  Layer,
+  MapDataEvent,
+  MapMouseEvent,
+  MapSourceDataEvent,
+  MapTouchEvent,
+} from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
-import { fetchMaskData, fetchOsmData } from "../network/networkUtils";
-import { renderAndBlur } from "../webgl/blurFilter";
-import LumaLayer from "../webgl/lumaLayer";
+import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
+import FilterManager from "../mapData/filterManager";
+import mapLayerManager from "../mapData/mapLayerManager";
+import { fetchOsmDataFromServer } from "../network/networkUtils";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { addBlurredImage, addCanvasOverlay, readImageFromCanvas } from "./canvasUtils";
-import ClusterManager from "./clusterManager";
-import CustomScatterplotLayer, { createMapboxLayer, getDeckGlLayer } from "./deckLayer";
-import { getAllRenderedFeatures, getAllSourceFeatures, getDataFromMap } from "./featureUtils";
+import createCanvasOverlay from "./canvasRenderer";
+import { getDataFromMap } from "./featureUtils";
 import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
-import mapLayerManager from "./mapLayerManager";
-import { loadLocations } from "./locationsPanel";
 import { PerformanceMeasurer } from "./performanceMeasurer";
-import { featureCollection, point } from "@turf/helpers";
-import circle from "@turf/circle";
-import bbpolygon from "@turf/bbox-polygon";
-import bbox from "@turf/bbox";
-import geojsonCoords from "@mapbox/geojson-coords";
-import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
-import { addWebglCircle } from "../webgl/webglCircle";
-import { testCampusExampes } from "../webgl/successfulExamples";
-import createOverlay from "../webgl/overlayCreator";
-import { resolve } from "path";
-import { reject } from "lodash";
-import html2canvas from "html2canvas";
-import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
-import createCanvasOverlay from "./canvasRenderer";
-import FilterManager from "../mapData/filterManager";
 import { addBufferToFeature } from "./turfUtils";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
@@ -89,84 +82,50 @@ export default class MapController {
     //map.showTileBoundaries = true;
 
     // setup event listeners on the map
+    this.setupMapEvents();
+  }
+
+  setupMapEvents(): void {
     map.on("sourcedata", this.onSourceLoaded.bind(this));
-    map.on("movestart", this.onMapMoveStart.bind(this));
-    map.on("moveend", () => {
-      //using an arrow function lets the this context stay the same as does bind(this)
-      this.onMapMoveEnd();
-    });
-    // fired when any map data begins loading or changing asynchronously.
-    //map.on("dataloading", this.onDataLoaded.bind(this));
-    map.once("dataloading", this.onDataLoaded.bind(this));
+    map.on("data", this.onDataLoaded.bind(this)); // fired when any map data begins loading or changing asynchronously.
     map.on("click", this.onMapClick.bind(this));
 
-    /** 
-     * * Example for updating an overlay while hovering over features:
-    map.on("mousemove", function (e) {
-      var states = map.queryRenderedFeatures(e.point, {
-        layers: ["statedata"],
-      });
-
-      if (states.length > 0) {
-        document.getElementById("pd").innerHTML =
-          "<h3><strong>" +
-          states[0].properties.name +
-          "</strong></h3><p><strong><em>" +
-          states[0].properties.density +
-          "</strong> people per square mile</em></p>";
-      } else {
-        document.getElementById("pd").innerHTML = "<p>Hover over a state!</p>";
-      }
-    });
-    */
+    map.on("moveend", this.onMapMoveEnd.bind(this));
+    map.on("zoomend", this.onMapZoomEvent.bind(this));
+    map.on("dragend", this.onMapDragEvent.bind(this));
   }
 
-  async onMapMoveStart(): Promise<void> {
-    //console.log("Move start event fired!");
-    //const pois = await getPoiTypes();
-    //console.log(pois);
-  }
-
-  async onMapMoveEnd(): Promise<void> {
-    //use tilequery API
-    //TODO idee: alle häuser in abstand bekommen, indem erst mit tilequery api landuse oder building extrahiert
-    //TODO und dann z.b. mit turf distanz oder der LatLng.distanceto()-Methode zu allen queryRendered features
-    //TODO bekommen und dann diese gebiete markieren
-    //mapboxUtils.testTilequeryAPI();
-    //refetch all data for the current viewport
-    //TODO !!
+  async onMapMoveEnd(e: { originalEvent: DragEvent }): Promise<void> {
+    console.log("A moveend event occurred:", e.originalEvent);
+    //TODO refetch all data for the current viewport
     //this.reloadData();
-    //this.blurMap();
-    //this.addLumaGlLayer();
   }
 
-  onSourceLoaded(): void {
-    /*
-      console.log(e.source);
-      if (e.isSourceLoaded) {
-        // Do something when the source has finished loading
-        console.log(e.sourceId);
-        console.log(e.source);
-        console.log(e.coord);
-        console.log(e.tile);
-
-       testGetQueryFeatures(e.source.name)
-      }
-      */
+  onMapDragEvent(e: { originalEvent: DragEvent }): void {
+    console.log("A dragend event occurred:", e.originalEvent);
   }
 
-  onDataLoaded(): void {
-    //console.log("A dataloading event occurred.");
+  onMapZoomEvent(e: MapMouseEvent | MapTouchEvent): void {
+    console.log("A zoomend event occurred: ", e);
   }
 
-  async onMapClick(e: mapboxgl.MapMouseEvent & mapboxgl.EventData): Promise<void> {
+  onSourceLoaded(e: MapSourceDataEvent): void {
+    if (e.isSourceLoaded) {
+      // the source has finished loading
+      console.log("onSourceLoaded ", e);
+    }
+  }
+
+  onDataLoaded(e: MapDataEvent): void {
+    if (e.dataType === "source") {
+      const e2 = e as MapSourceDataEvent;
+      console.log(" e is a MapSourceDataEvent");
+    }
+    console.log("A dataloading event occurred: ", e);
+  }
+
+  async onMapClick(e: MapMouseEvent & EventData): Promise<void> {
     console.log("Click:", e);
-
-    //addWebglCircle(map);
-
-    //testCampusExampes();
-
-    //this.showCurrentViewportCircle();
 
     //TODO
     //getAllRenderedFeatures(undefined, undefined, ["==", "class", "park"]);
@@ -191,7 +150,7 @@ export default class MapController {
     //TODO load data new on every move, works but needs another source than overpass api mirror
     FilterManager.activeFilters.forEach(async (param) => {
       Benchmark.startMeasure("Fetching data on moveend");
-      const data = await fetchOsmData(this.getViewportBoundsString(), param);
+      const data = await fetchOsmDataFromServer(this.getViewportBoundsString(), param);
       console.log(Benchmark.stopMeasure("Fetching data on moveend"));
 
       if (data) {
@@ -203,18 +162,6 @@ export default class MapController {
         console.log("Finished adding data to map!");
       }
     });
-
-    //TODO mal mit requestAnimationFrame versuchen zum updaten statt ein neues Layer bei jeder Bewegung zu machen?
-    /*
-    requestAnimationFrame(function draw() {
-      requestAnimationFrame(draw);
-
-      clear(gl, {
-          color: [0, 0, 0, 1]
-      });
-      customLayer.draw();
-    });
-    */
 
     //TODO use this callback instead of the code above to reload on every move?
     /*
@@ -240,18 +187,13 @@ export default class MapController {
     let westLng = currBounds.getWest();
     let northLat = currBounds.getNorth();
     let eastLng = currBounds.getEast();
-
-    console.log(currBounds);
+    //console.log(currBounds);
 
     if (additionalDistance) {
       const bufferedBBox = bbox(
-        addBufferToFeature(
-          //@ts-expect-error
-          bbpolygon([westLng, southLat, eastLng, northLat]),
-          additionalDistance
-        )
+        addBufferToFeature(bbpolygon([westLng, southLat, eastLng, northLat]), additionalDistance)
       );
-      console.log(bufferedBBox);
+      //console.log(bufferedBBox);
 
       southLat = bufferedBBox[1];
       westLng = bufferedBBox[0];
@@ -263,6 +205,7 @@ export default class MapController {
   }
 
   //TODO
+  /*
   getBBoxForBayern(): string {
     const mittelpunktOberpfalz = point([12.136, 49.402]);
     const radiusOberpfalz = 100; //km
@@ -286,7 +229,6 @@ export default class MapController {
     //@ts-expect-error
     const viewportCirclePolygon = circle([center.lng, center.lat], radius, { units: "meters" });
 
-    //@ts-expect-error
     mapLayerManager.addNewGeojsonSource("viewportCircle", viewportCirclePolygon);
     const newLayer: Layer = {
       id: "viewportCircleLayer",
@@ -298,30 +240,7 @@ export default class MapController {
     };
     mapLayerManager.addNewLayer(newLayer, true);
   }
-
-  addVectorData(data: string): void {
-    mapLayerManager.addVectorLayer(data);
-  }
-
-  testLocalVectorData(): void {
-    mapLayerManager.addLocalVectorData();
-  }
-
-  //! this could be used to get all pois in the tileset without the limitations of the tilequeryAPI
-  //! but unfortunately not all data is visible on all layers (neither is it with the tilequeryAPI btw) but
-  //! this problem remains here as well
-  addMapboxStreetsVectorData(): void {
-    // Add a circle layer with a vector source
-    map.addLayer({
-      id: "points-of-interest",
-      source: {
-        type: "vector",
-        url: "mapbox://mapbox.mapbox-streets-v8", // use the mapbox street tileset as the source
-      },
-      "source-layer": "poi_label",
-      type: "circle",
-    });
-  }
+  */
 
   removeData(sourceName: string): void {
     console.log("Removing source: ", sourceName);
@@ -404,33 +323,7 @@ export default class MapController {
     if (layer) {
       layer.Features = polyFeatures;
     }
-
-    //this.calculateMaskAndShowData(allFeatures);
     //this.showPreprocessedData(dataName, polyFeatures);
-  }
-
-  calculateMaskAndShowData(
-    allFeatures: (
-      | Feature<Point, GeoJsonProperties>
-      | Feature<LineString, GeoJsonProperties>
-      | Feature<Polygon, GeoJsonProperties>
-    )[]
-  ): void {
-    //mapboxUtils.getDifferenceBetweenViewportAndFeature([...this.currentPoints]);
-    mapboxUtils.showDifferenceBetweenViewportAndFeature(allFeatures).then((data) => {
-      console.log("returned data: ", data);
-      //this.addDeckLayer(data);
-
-      let newData = geojsonCoords(data);
-      console.log("Data after geojson coords: ", newData);
-      newData = newData.slice(5, newData.length); //remove the first 5 because they are clipspace coords from turf.mask
-      console.log("Data after slice: ", newData);
-      const MercatorCoordinates = newData.map((el: any) =>
-        mapboxgl.MercatorCoordinate.fromLngLat(el)
-      );
-      const customData = MercatorCoordinates.flatMap((x: any) => [x.x, x.y]);
-      this.addWebGlLayer(customData);
-    });
   }
 
   //TODO das funktioniert im moment irgendwie noch nicht richtig mit mehreren hintereinander?
@@ -496,51 +389,6 @@ export default class MapController {
     mapLayerManager.addLayers(sourceName);
   }
 
-  blurMap(): void {
-    if (!map.loaded) {
-      console.error("The map is not ready yet!");
-      return;
-    }
-
-    const mapCanvas = map.getCanvas();
-
-    //const gl = mapCanvas.getContext("webgl2");
-    //console.log("Mapbox GL context: ", gl);
-    //console.log("viewport:", gl?.VIEWPORT);
-    //if (!gl) return;
-
-    const img = new Image();
-
-    img.onload = () => {
-      img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
-      img.height = mapCanvas.clientHeight;
-
-      // perf-results: 101,6 ; 101,2 ; 82,6 ; 62,7 ; 45,9 (ms) -> avg: 78,8 ms (vllt lieber median?)
-      Benchmark.startMeasure("blur Image with Webgl");
-      const canvas = renderAndBlur(img);
-      Benchmark.stopMeasure("blur Image with Webgl");
-
-      if (canvas) {
-        // perf-results:  7,8; 12,5; 10,9; 7,3; 6,8  (ms) -> avg: 9,06 ms
-        Benchmark.startMeasure("addingCanvasOverlay");
-        addCanvasOverlay(canvas, 1.0);
-        Benchmark.stopMeasure("addingCanvasOverlay");
-
-        // perf-results:  178; 187; 160; 93; 111 (ms) -> avg: 145,8 ms
-        //addBlurredImage(img, canvas);
-      }
-    };
-    img.src = mapCanvas.toDataURL();
-    //console.log(img.src); // um bild anzuschauen copy paste in adress bar in browser
-  }
-
-  /**
-   * TODO test this again!
-   * 1. geojson daten speichern bevor zu layer hinzufügen, am besten separat pro layer und per type (point, linestring, polygon)
-   * 2. diese dann an vertex shader übergeben
-   * 3. in fragment shader dann kreis um alle punkte zeichnen -> fill gray -> am ende dann blur
-   */
-
   addWebGlLayer(data: any): void {
     if (map.getLayer("webglCustomLayer")) {
       // the layer exists already; remove it
@@ -553,172 +401,16 @@ export default class MapController {
     const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
     map.addLayer(customLayer, "waterway-label");
 
-    //TODO das rendert immer nur eines!
-    /*
-    for (const element of this.allPolygonFeatures) {
-      const newData = geojsonCoords(element);
-      //console.log("Data after geojson coords: ", newData);
-      const MercatorCoordinates = newData.map((el: any) =>
-        mapboxgl.MercatorCoordinate.fromLngLat(el)
-      );
-      const mapData = MercatorCoordinates.flatMap((x: any) => [x.x, x.y]);
-
-      //console.log("MapData: ", mapData);
-      const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
-      //TODO zieht mit den mask-Daten nur Triangles zwischen den einzelnen punkten, was dazu führt,
-      //TODO dass letzlich nur eine Art dünne linie um alle gezogen wird
-      //const customLayer = new MapboxCustomLayer(data) as CustomLayerInterface;
-
-      //const firstSymbolId = mapLayerManager.findLayerByType(map, "symbol");
-      // Insert the layer beneath the first symbol layer in the layer stack if one exists.
-      map.addLayer(customLayer, "waterway-label");
-    }
-    */
-
     console.log("Finished adding webgl data!");
   }
 
-  //TODO
   addHeatmap(data?: string): void {
     mapLayerManager.addHeatmapLayer(data);
     mapboxUtils.addLegend();
   }
 
-  //TODO die polygon maske sollte am besten direkt vom server (und da aus der lokalen datei) ins deckgl geojson layer
-  // geladen werden!
-  addDeckLayer(data: any): void {
-    //* für normale Deck Layer:
-    //const deck = getDeckGlLayer("GeojsonLayer", data, "geojsonLayer-1");
-    //const deck = getDeckGlLayer("GeojsonLayer", "../assets/data.geojson", "geojsonLayer-1");
-    const deck = getDeckGlLayer("ScatterplotLayer", "../assets/data.geojson", "customscatterplot");
-    const layer = (deck as unknown) as CustomLayerInterface;
-
-    //const deck2 = createOverlay("../assets/data.geojson");
-    //const layer2 = (deck2 as unknown) as CustomLayerInterface;
-
-    //* für Mapbox Layer:
-    //const layer = createMapboxLayer("../assets/data.geojson", HeatmapLayer);  //TODO um die heatmap auszuprobieren brauch ich andere Daten als Geojson
-    //const layer = createMapboxLayer("../assets/data.geojson", CustomScatterplotLayer);
-    //const layerAround = createNewMapboxLayer("../assets/data.geojson", GeoJsonLayer, 500);
-
-    //* add the layer before the waterway-label to make sure it is placed below map labels!
-    map.addLayer(layer, "waterway-label");
-    //map.addLayer(layerAround, "mapboxLayer");
-    //map.addLayer(layer2, "waterway-label");
-
-    //* Alternative für Mapbox Layer:
-    //createMapboxDeck("../assets/data.geojson");
-  }
-
   addLumaGlLayer(): void {
-    const usw = {
-      lng: 12.089283,
-      lat: 48.9920256,
-    };
-    const use = {
-      lng: 12.1025303,
-      lat: 48.9941069,
-    };
-    const unw = {
-      lng: 12.0909411,
-      lat: 49.0012031,
-    };
-
-    const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat(usw);
-    const uniSouthEast = mapboxgl.MercatorCoordinate.fromLngLat(use);
-    const uniNorthWest = mapboxgl.MercatorCoordinate.fromLngLat(unw);
-
-    const data = [uniSouthEast, uniNorthWest, uniSouthWest];
-
-    const data2 = [
-      mapboxgl.MercatorCoordinate.fromLngLat({
-        lng: 12.091103196144104,
-        lat: 49.01015216135008,
-      }),
-      mapboxgl.MercatorCoordinate.fromLngLat({
-        lng: 12.10141897201538,
-        lat: 49.0095997290631,
-      }),
-      mapboxgl.MercatorCoordinate.fromLngLat({
-        lng: 12.095990180969238,
-        lat: 49.016689397702294,
-      }),
-
-      mapboxgl.MercatorCoordinate.fromLngLat({
-        lng: 12.12177370071411,
-        lat: 49.0198169751917,
-      }),
-    ];
-
-    //TODO this should of course happen somewhere else later but for now just test it here:
-    // ########################  Overlay Stuff starts #######################
-
-    const ab = {
-      lng: 12.09822,
-      lat: 49.006714,
-    };
-
-    const cd = {
-      lng: 12.09299,
-      lat: 49.006714,
-    };
-
-    const ef = {
-      lng: 12.084302,
-      lat: 49.017167,
-    };
-
-    const gh = {
-      lng: 12.083916,
-      lat: 49.015225,
-    };
-
-    const ij = {
-      lng: 12.0873,
-      lat: 49.014634,
-    };
-
-    const kl = {
-      lng: 12.088203,
-      lat: 49.015844,
-    };
-
-    const aa = { lng: 12.106899071216729, lat: 49.011636152227666 };
-    const aaa = { lng: 12.106187741742344, lat: 49.012298273504406 };
-    const ac = { lng: 12.105293115952813, lat: 49.012856640245396 };
-    const ad = { lng: 12.104249578251874, lat: 49.01328978965319 };
-    const ae = { lng: 12.103097240488244, lat: 49.013581072390174 };
-    const af = { lng: 12.101880399066786, lat: 49.01371929295886 };
-    const ag = { lng: 12.100645830727052, lat: 49.013699140192415 };
-    const ah = { lng: 12.099440992775836, lat: 49.01352139127261 };
-    const aj = { lng: 12.098312197267857, lat: 49.01319288144877 };
-    const ak = { lng: 12.097302829613584, lat: 49.01272624068412 };
-    const al = { lng: 12.096451680322966, lat: 49.012139407453525 };
-    const am = { lng: 12.095791454144237, lat: 49.011454938505246 };
-    const an = { lng: 12.095347513915694, lat: 49.01069914124463 };
-
     console.log(this.allPolygonFeatures);
-    console.log(this.allPolygonFeatures.size);
-
-    const overlayAlternative: mapboxgl.Point[][][] = [];
-
-    const poly0 = [usw, use, ab];
-    const poly1 = [usw, use, unw, ab, cd];
-    const poly2 = [ef, gh, ij, kl];
-    const poly3 = [usw, use, ab, cd];
-    const kreis = [aa, aa, aaa, ac, ad, ae, af, ag, ah, aj, ak, al, am, an];
-
-    // layer 1
-    overlayAlternative[0] = []; //! WICHTIG
-    overlayAlternative[0].push(poly1.map((el) => mapboxUtils.convertToPixelCoord(el)));
-    overlayAlternative[0].push(poly2.map((el) => mapboxUtils.convertToPixelCoord(el)));
-    // layer 2
-    overlayAlternative[1] = [];
-    overlayAlternative[1].push(poly0.map((el) => mapboxUtils.convertToPixelCoord(el)));
-    overlayAlternative[1].push(kreis.map((el) => mapboxUtils.convertToPixelCoord(el)));
-    // layer 3
-    overlayAlternative[2] = [];
-    overlayAlternative[2].push(poly3.map((el) => mapboxUtils.convertToPixelCoord(el)));
 
     /*
     const currentMapData: Feature<Polygon | MultiPolygon, GeoJsonProperties>[][][] = [];
@@ -756,8 +448,6 @@ export default class MapController {
           //? oder will ich hier das das zu einem array "flatten" und nur dieses pushen??
           console.log("Multipolygon: ", coords);
           //const flattened: mapboxgl.Point[] = [];
-          //TODO Multipolygone führen aber so zum Beispiel bei der Donau zu vollkommen falschen Renderergebnissen!!
-          //TODO vllt doch direkt im shader statt mit turf ?
           for (const coordPart of coords) {
             //@ts-expect-error
             //prettier-ignore
@@ -800,23 +490,12 @@ export default class MapController {
      */
 
     console.log("OverlayData: ", overlayData);
-    console.log("OverlayAlternative: ", overlayAlternative);
 
     // check that there is data to overlay the map with
     if (overlayData.length > 0) {
-      //createOverlay(overlayData);
       createCanvasOverlay(overlayData);
     } else {
       console.warn("Creating an overlay is not possible because overlayData is empty!");
     }
-
-    // ########################  Overlay Stuff ends #######################
-
-    //* Lumagl code:
-    /*
-    console.log("adding luma layer ...");
-
-    const animationLoop = new LumaLayer(data, data2);
-    */
   }
 }

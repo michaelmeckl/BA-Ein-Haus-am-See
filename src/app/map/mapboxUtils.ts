@@ -2,47 +2,14 @@
  * Utility-Methods for working with Mapbox Gl.
  */
 import bboxPolygon from "@turf/bbox-polygon";
-import circle from "@turf/circle";
-import intersect from "@turf/intersect";
 import union from "@turf/union";
 import type { Feature, GeoJsonProperties, LineString, MultiPolygon, Point, Polygon } from "geojson";
-import mapboxgl, { Layer, LngLat, LngLatLike } from "mapbox-gl";
+import mapboxgl, { LngLat, LngLatLike } from "mapbox-gl";
 import WebWorker from "worker-loader!../worker";
 import Benchmark from "../../shared/benchmarking";
 import { map } from "./mapboxConfig";
-import mapLayerManager from "./mapLayerManager";
-import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
+import mapLayerManager from "../mapData/mapLayerManager";
 import { addBufferToFeature } from "./turfUtils";
-import geojsonCoords from "@mapbox/geojson-coords";
-import { chunk } from "lodash";
-import { type } from "os";
-import { Position } from "@turf/helpers";
-import { convertToMercatorCoordinates } from "./featureUtils";
-// TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
-
-export async function testTilequeryAPI(): Promise<void> {
-  const queryResult = await queryAllTiles([12.1, 49.008], 3000, 50);
-  queryResult.features.forEach((f) => {
-    console.log(f.properties?.type);
-  });
-
-  const queryResultLayer = await queryLayers([12.1, 49.008], ["poi_label", "building"], 3000, 50);
-  queryResultLayer.features.forEach((f) => {
-    console.log("Class: ", f.properties?.class);
-    console.log("Type: ", f.properties?.type);
-  });
-
-  const queryResultGeom = await queryGeometry([12.1, 49.008], "polygon", 3000, 50);
-}
-
-function getResolutions() {
-  // Calculation of resolutions that match zoom levels 1, 3, 5, 7, 9, 11, 13, 15.
-  const resolutions = [];
-  for (let i = 0; i <= 8; ++i) {
-    resolutions.push(156543.03392804097 / Math.pow(2, i * 2));
-  }
-  return resolutions;
-}
 
 // formula based on https://wiki.openstreetmap.org/wiki/Zoom_levels
 export function metersInPixel(meters: number, latitude: number, zoomLevel: number): number {
@@ -69,12 +36,6 @@ export function getViewportBounds(): number[][] {
 export function getRadiusAndCenterOfViewport(): any {
   const centerPoint = map.getCenter();
   const northEastPoint = map.getBounds().getNorthEast();
-  /*
-  const radius = distance(
-    turfHelpers.point(centerPoint.toArray()),
-    turfHelpers.point(northEastPoint)
-  ); // in km
-  */
   const radius = centerPoint.distanceTo(northEastPoint); // in meters
 
   return { center: centerPoint, radius: radius };
@@ -145,14 +106,6 @@ export function addPopupOnHover(): void {
   });
 }
 
-export function findAllFeaturesInCircle(allFeatures: any) {
-  const centerPoint = [2, 6];
-  const circleArea = circle(centerPoint, 500, { units: "meters" });
-  //TODO
-  //const withinGeoData = boolean_within(circleArea, allFeatures);
-  //TODO add layer for the withinGeoData
-}
-
 /**
  * Util - Function that returns the current viewport extent as a polygon.
  */
@@ -205,42 +158,6 @@ function performUnion(features: any): Feature<any, GeoJsonProperties> {
   return unionResult;
 }
 
-function findIntersections(
-  features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
-): Feature<any, GeoJsonProperties>[] {
-  const allIntersections: Feature<any, GeoJsonProperties>[] = [];
-
-  /*
-  //* create a lookup object to improve performance from O(m*n) to O(m+n)
-  // see https://bytes.com/topic/javascript/insights/699379-optimize-loops-compare-two-arrays
-  const lookup: any = {};
-
-  for (const key in features) {
-    if (Object.prototype.hasOwnProperty.call(features, key)) {
-      lookup[features[key]] = features[key];
-    }
-  }
-
-  for (const i in features) {
-    if (typeof lookup[list1[i]] !== "undefined") {
-        alert("found " + list1[i] + " in both lists");
-        break;
-      }
-  }
-  */
-
-  //TODO make this more efficient than O(m^2)!
-  for (const feature1 of features) {
-    for (const feature2 of features) {
-      if (feature1 !== feature2) {
-        allIntersections.push(intersect(feature1, feature2));
-      }
-    }
-  }
-
-  return allIntersections;
-}
-
 export async function calculateMaskAndIntersections(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
 ): Promise<any> {
@@ -258,23 +175,7 @@ export async function calculateMaskAndIntersections(
   const unionPolygons = performUnion(polygonFeatures);
   Benchmark.stopMeasure("performUnion");
 
-  Benchmark.startMeasure("findIntersections");
-  //get all intersections and remove all null values
-  const intersections = findIntersections(polygonFeatures).filter((it) => it !== null);
-  console.log("Intersections: ", intersections);
-  Benchmark.stopMeasure("findIntersections");
-
-  /*
-  //! out of memory error im browser!
-  const unionIntersections = performUnion(intersections);
-  */
-
-  //TODO
-  // 1. union intersections!! (sowieso gut damit nicht so überlagert)
-  // 2. nochmal mask/ difference zw. äußerem polygon und dem intersections polygon
-  // 3. in hellerem grau einzeichnen
-
-  return { unionPolygons: unionPolygons, intersections: intersections };
+  return { unionPolygons: unionPolygons };
 }
 
 export function showMask(mask: any): void {
@@ -353,11 +254,6 @@ function setupWebWorker(
     webWorker.onmessage = (event) => {
       console.log("worker result: ", event.data);
 
-      /*
-      Benchmark.startMeasure("decode geobuf");
-      const geojsonMask = geobuf.decode(new Pbf(event.data));
-      Benchmark.stopMeasure("decode geobuf");
-      */
       showMask(event.data);
       Benchmark.stopMeasure("showing mask data");
       stopWorker();
@@ -387,43 +283,13 @@ export async function showDifferenceBetweenViewportAndFeature(
 
   /*
   const maske = featureObject.unionPolygons;
-  const intersects: any[] = featureObject.intersections;
 
-  //logMemoryUsage();
-
-  //* slower than the mask version (around 7 - 10 ms), also some incorrect artifacts at the edges
-  // Benchmark.startMeasure("turf-difference");
-  // const result = difference(getViewportAsPolygon(), maske);
-  // Benchmark.stopMeasure("turf-difference");
-
-  //* also a little bit slower than the auto version below (ca. 4-6 ms), also some incorrect artifacts at the edges
-  // Benchmark.startMeasure("turf-mask");
-  // const result = mask(maske, getViewportAsPolygon());
-  // Benchmark.stopMeasure("turf-mask");
-
-  //! this is the fastest version (ca. 1 - 3 ms) and the only one that doesn't produce any incorrect rendering artifacts
   Benchmark.startMeasure("turf-mask-auto");
   const result = mask(maske);
   Benchmark.stopMeasure("turf-mask-auto");
 
   showMask(result);
   Benchmark.stopMeasure("showing mask data");
-
-  //show intersections
-  map.addSource("intersect", {
-    type: "geojson",
-    data: turfHelpers.featureCollection(intersects),
-    //data: difference(maske, turfHelpers.featureCollection(intersects)),
-  });
-
-  map.addLayer({
-    id: "intersect-layer",
-    source: "intersect",
-    type: "fill",
-    paint: {
-      "fill-color": "rgba(0,153,0,0.1)",
-    },
-  });
   */
 }
 
@@ -431,14 +297,6 @@ export async function showDifferenceBetweenViewportAndFeature(
  * Util-Function to convert LngLat coordinates to pixel coordinates on the screen.
  */
 export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
-  //TODO make the map bounds a little bit bigger for projecting so we can get points that would be outside the current screen (negative pixels)
-  //TODO but not like this:
-  /*
-  map.setZoom(map.getZoom() - 1);
-  const c = map.project(coord);
-  map.setZoom(map.getZoom() + 1);
-  return c;
-  */
   return map.project(coord);
 }
 
@@ -510,26 +368,3 @@ export function getMercatorCoordinates(
 
   return mercatorCoords;
 }
-
-//! doesn't seem to work unfortunately :(
-/*
-// add webgl 2 support to the mapbox canvas even though it is not supported officially yet
-// this function was taken from this issue: https://github.com/mapbox/mapbox-gl-js/issues/8581
-export function addWebgl2Support(): void {
-  //include webgl2 in mapboxgl
-  if (mapboxgl.Map.prototype._setupPainter.toString().indexOf("webgl2") == -1) {
-    var _setupPainter_old = mapboxgl.Map.prototype._setupPainter;
-    mapboxgl.Map.prototype._setupPainter = function () {
-      getContext_old = this._canvas.getContext;
-      this._canvas.getContext = function (name, attrib) {
-        return (
-          getContext_old.apply(this, ["webgl2", attrib]) ||
-          getContext_old.apply(this, ["webgl", attrib]) ||
-          getContext_old.apply(this, ["experimental-webgl", attrib])
-        );
-      };
-      _setupPainter_old.apply(this);
-      this._canvas.getContext = getContext_old;
-    };
-  }
-}*/

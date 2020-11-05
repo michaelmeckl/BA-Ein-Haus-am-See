@@ -1,7 +1,6 @@
 import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import mapboxgl, { Control, GeoJSONSource } from "mapbox-gl";
 import { initialZoomLevel, map } from "./mapboxConfig";
-import { queryAllTiles } from "./tilequeryApi";
 
 type mapboxGeocoder = Control;
 
@@ -23,7 +22,7 @@ class Geocoder {
       limit: 7,
       minLength: 4, // only autocomplete after at least 4 characters have been entered (optimization as autocomplete on every keystroke counts as one geocoding operation to the free limit)
       zoom: initialZoomLevel, // Set the zoom level for geocoding results
-      placeholder: "Suchen ...", // This placeholder text will display in the search bar
+      placeholder: "Ort suchen ...", // This placeholder text will display in the search bar
       language: "de-DE", // set UI language to german
       countries: "de", // limit results to Germany
       //bbox: [-105.116, 39.679, -104.898, 39.837], // Set a bounding box
@@ -118,7 +117,9 @@ class Geocoder {
         },
       });
 
-      const results = await queryAllTiles(point);
+      //TODO
+      const results = "";
+      //const results = await queryAllTiles(point);
 
       const source = map.getSource("tilequery");
       (source as GeoJSONSource).setData(results);

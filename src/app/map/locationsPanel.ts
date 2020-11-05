@@ -4,8 +4,8 @@ import mapboxgl, { LngLatLike, LngLat } from "mapbox-gl";
 import { map } from "./mapboxConfig";
 import distance from "@turf/distance";
 import * as turfHelpers from "@turf/helpers";
-import { fetchOsmData, fetchOsmDataFromClientVersion } from "../network/networkUtils";
-import osmTagCollection from "../osmModel/osmTagCollection";
+import { fetchOsmDataFromServer, fetchOsmDataFromClientVersion } from "../network/networkUtils";
+import osmTagCollection from "../mapData/osmTagCollection";
 import geojsonCoords from "@mapbox/geojson-coords";
 
 const houses = {

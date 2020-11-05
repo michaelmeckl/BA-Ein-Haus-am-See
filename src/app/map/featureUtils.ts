@@ -2,28 +2,9 @@
  * This file provides mapbox util and helper functions to query and extract features from sources and layers.
  */
 import { chunk } from "lodash";
-import geojsonCoords from "@mapbox/geojson-coords";
 import type mapboxgl from "mapbox-gl";
-import type { LngLatLike } from "mapbox-gl";
 import { map } from "./mapboxConfig";
 import { convertToMercatorCoordinates } from "./mapboxUtils";
-
-/**
- * This check is necessary for queryRenderedFeatures/querySourceFeatures, otherwise
- * (if layer is not fully loaded) it will just return an empty array.
- */
-function testIfSourceLoaded(sourceName: string): boolean {
-  //TODO
-  /*
-  var wasLoaded = false;
-  // Fired whenever the map is drawn or redrawn (e.g. new tiles or geojson) to the screen
-  map.on("render", function () {
-    if (!map.loaded() || wasLoaded) return;
-    wasLoaded = true;
-  });
-  */
-  return map.getSource(sourceName) && map.isSourceLoaded(sourceName);
-}
 
 /**
  * * .properties und .geometry (.coordinates und .type) sind bei beiden vorhanden

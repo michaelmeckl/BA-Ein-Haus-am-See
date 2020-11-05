@@ -1,7 +1,7 @@
 //import { performance } from "perf_hooks";
 
-//TODO using performance.now() might be a little bit more accurate, but it works a little bit different on the
-// node server than on the client, which might make measurements inaccurate?? -> Test more with this!
+//! using performance.now() might be a little bit more accurate, but it works a little bit different on the
+// node server than on the client, which might make measurements inaccurate?
 
 const NUMBER_OF_EXECUTIONS = 50;
 
@@ -62,8 +62,7 @@ class Benchmark {
     return 0;
   }
 
-  //TODO use performance.now() here only when the others use it too!
-  // but performance.now() is necessary as console.time() doesn't return its value
+  // performance.now() is necessary here as console.time() doesn't return its value
   public async getAverageTime(
     fn: (...args: any[]) => any,
     args: any[],

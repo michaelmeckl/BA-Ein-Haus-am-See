@@ -1,16 +1,15 @@
 /* eslint-env browser */
-import { filter } from "lodash";
 import Benchmark from "../shared/benchmarking";
 import { Config } from "../shared/config";
 import MapController from "./map/mapController";
 import { loadLocations } from "./map/locationsPanel";
 import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
 import FilterManager from "./mapData/filterManager";
-import { fetchOsmData, fetchOsmDataFromClientVersion } from "./network/networkUtils";
-import OsmTags from "./osmModel/osmTagCollection";
+import { fetchOsmDataFromServer, fetchOsmDataFromClientVersion } from "./network/networkUtils";
+import OsmTags from "./mapData/osmTagCollection";
 import { showSnackbar, SnackbarType } from "./utils";
 import filterManager from "./mapData/filterManager";
-import mapLayerManager from "./map/mapLayerManager";
+import mapLayerManager from "./mapData/mapLayerManager";
 
 // * const enum instead of enum as this inlines the elements at runtime
 //TODO alle html element accessor names hier auslagern:
@@ -61,21 +60,6 @@ const mapConatiner = document.querySelector(HtmlElements.MAP_CONTAINER) as HTMLD
 const mapElement = document.querySelector(HtmlElements.MAP) as HTMLDivElement;
 
 //TODO die buttons unten könnten auch noch hier rauf
-
-/*
-async function testVectorTileAPI(c: MapController): Promise<void> {
-  const url =
-    "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/1/0/0.mvt?access_token=pk.eyJ1IjoibWljaGFlbG1lY2tsIiwiYSI6ImNrYWNyMnd1bjA5aHAycnByamgzZHd6bTEifQ.33Midnjfp-CccC19KMMJSQ";
-
-  //const response = await fetch(url);
-  //console.info(response);
-
-  const test = "mapbox://michaelmeckl.ckajnwfb70hd62apmuw6m5rls-0pr4p";
-  const url2 = "mapbox://mapbox.mapbox-streets-v8";
-
-  c.addVectorData(test);
-}
-*/
 
 //* as onFilterRemoved is bound to a click listener the event (this) MUST be the last argument!
 function onFilterRemoved(filterName: string, ev: Event): void {

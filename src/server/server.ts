@@ -9,7 +9,7 @@ import path from "path";
 import LoggingRouter from "./loggingRouter";
 import OsmRouter from "./osmRouter";
 
-//TODO handle crashes better than killing the process?
+// handle crashes
 process.on("uncaughtException", (e) => {
   console.log(e);
   process.exit(1);
@@ -31,7 +31,7 @@ export default class Server {
     this.setupExpressApp();
 
     // serve front-end content
-    //TODO actually it would be better for performance not to send it from the node server as it is single-threaded (maybe use nginx instead?)
+    //! actually it would be better for performance not to send it from the node server as it is single-threaded
     this.app.use(express.static(publicDir));
     this.app.use(express.static(staticDir));
 

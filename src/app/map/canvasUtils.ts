@@ -3,25 +3,11 @@
  */
 import { map } from "./mapboxConfig";
 import Benchmark from "../../shared/benchmarking";
-import mapLayerManager from "./mapLayerManager";
-import type { CanvasSource, Point } from "mapbox-gl";
+import mapLayerManager from "../mapData/mapLayerManager";
 import { getViewportBounds } from "./mapboxUtils";
 import "../vendors/fast-gauss-blur.js";
 
-function drawCircle(context: CanvasRenderingContext2D, point: Point, radius = 20): void {
-  context.beginPath();
-  context.arc(point.x, point.y, radius, 0, 2 * Math.PI);
-  //context.closePath();
-  //context.fill();
-
-  // evenodd determines the "insideness" of a point in the shape by drawing a ray from that point to infinity in
-  //any direction and counting the number of path segments from the given shape that the ray crosses.
-  //If this number is odd, the point is inside; if even, the point is outside.
-  context.fill("evenodd");
-  context.stroke();
-}
-
-//! Julien hat den auf den ganzen Canvas angewandt so weit ich weiß, nicht pro kreis, polygon etc.
+// function taken from previous bachelor thesis from Julien Wachter
 export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
@@ -49,7 +35,8 @@ export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
   ctx.putImageData(imgData, 0, 0);
 }
 
-export function addImageOverlay(image: HTMLImageElement) {
+//! not used
+export function addImageOverlay(image: HTMLImageElement): void {
   // wait till map is loaded, then add a imageSource
   if (!map.loaded()) {
     return;
@@ -70,30 +57,19 @@ export function addImageOverlay(image: HTMLImageElement) {
   });
 }
 
-export function blurImage(image: HTMLImageElement, blurAmount: number) {
-  image.style.filter = `blur(${blurAmount}px)`;
+export function clearCanvasPart(
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  width: number,
+  height: number
+): void {
+  ctx.clearRect(px, py, width, height);
 }
 
-export function blurCanvas(canvas: HTMLCanvasElement, blurAmount: number) {
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.filter = `blur(${blurAmount}px)`;
-    //TODO oder: ctx.shadowBlur = blurAmount;
-  }
-}
-
-export function clearCanvas(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  ctx.clearRect(0, 0, width, height);
-}
-
+//TODO is it possible to save this source in the class and only use updateCanvas(options: ImageSourceOptions)
+//TODO  to update the canvas instead of rerendering the whole source
 export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): void {
-  /*
-  // wait till map is loaded, then add a imageSource (or a canvas source alternatively)
-  if (!map.loaded()) {
-    return;
-  }
-  */
-
   const viewportBounds = getViewportBounds();
 
   mapLayerManager.removeAllLayersForSource("canvasSource");
@@ -105,7 +81,7 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): vo
   map.addSource("canvasSource", {
     type: "canvas",
     canvas: canvas,
-    animate: false,
+    animate: false, //static canvas for performance reasons
     coordinates: viewportBounds,
   });
 
@@ -115,38 +91,8 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): vo
     type: "raster",
     paint: {
       "raster-opacity": opacity,
-      //TODO opacity auf 0.5 ändern? -> dann hätte das ganze Overlay (egal wie dunkel es ist)
-      //TODO immer 0.5 alpha und man könnte die karte noch sehen
     },
   });
-}
-
-export function addBlurredImage(img: HTMLImageElement, canvas: HTMLCanvasElement): void {
-  Benchmark.startMeasure("addingImageOverlay");
-  img.src = canvas.toDataURL();
-  const viewportBounds = getViewportBounds();
-
-  img.onload = () => {
-    map.addSource("canvasSource", {
-      type: "image",
-      coordinates: viewportBounds,
-      url: img.src,
-    });
-    //TODO save this source in the class and only use updateImage(options: ImageSourceOptions): this;
-    // to update the image instead of rerendering the whole source
-
-    map.addLayer({
-      id: "overlay",
-      source: "canvasSource",
-      type: "raster",
-      paint: {
-        "raster-opacity": 0.85,
-        //"raster-resampling": "linear",
-      },
-    });
-
-    Benchmark.stopMeasure("addingImageOverlay");
-  };
 }
 
 export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {
@@ -159,11 +105,10 @@ export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HT
       resolve(image);
 
       //cleanup
-      /*
+
       image.onload = null;
       //@ts-expect-error
       image = null;
-      */
     };
     image.onerror = (error): void => reject(error);
 
@@ -210,30 +155,7 @@ export function invertCanvas(canvas: HTMLCanvasElement): void {
     });
 }
 
-function clearCanvasPart(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  width: number,
-  height: number
-): void {
-  ctx.clearRect(px, py, width, height);
-}
-
-//copy from one channel to another
-function assignChannel(imageData: any, channelTo: number, channelFrom: number): void {
-  if (channelTo < 0 || channelTo > 3 || channelFrom < 0 || channelFrom > 3) {
-    throw new Error("bad channel number");
-  }
-  if (channelTo === channelFrom) {
-    return;
-  }
-  const px = imageData.data;
-  for (let i = 0; i < px.length; i += 4) {
-    px[i + channelTo] = px[i + channelFrom];
-  }
-}
-
+const overlayOpacity = 0.7;
 export function makeAlphaMask(canvas: HTMLCanvasElement): any {
   console.warn("in make alpha mask");
 
@@ -245,8 +167,6 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
     console.warn("no 2d context");
     return;
   }
-
-  //context.globalCompositeOperation = "copy";
 
   context.drawImage(canvas, 0, 0);
 
@@ -279,5 +199,5 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
 
   //* add canvas with opacity 0.7 (i.e. 70% overlay, 30% map background) which makes the overlay clearly visible
   //* even for lighter grey but still allows the user to see the map background everywhere
-  addCanvasOverlay(c, 0.7);
+  addCanvasOverlay(c, overlayOpacity);
 }

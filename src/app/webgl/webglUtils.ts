@@ -1,11 +1,12 @@
 // Util-Functions for abstracting some of WebGL's Boilerplate Code.
 // Some functions use a small WebGL Helper library called TWGL (see https://www.npmjs.com/package/twgl.js)
-import * as twgl from "twgl.js";
+// import * as twgl from "twgl.js";
 
 type shaderType =
   | WebGL2RenderingContext["VERTEX_SHADER"]
   | WebGL2RenderingContext["FRAGMENT_SHADER"];
 
+//! these kernels are not used right now
 // prettier-ignore
 const blurKernels = {
     // Define several convolution kernels
@@ -117,11 +118,7 @@ export function getWebGLRenderingContext(): WebGLRenderingContext | null {
   return gl;
 }
 
-export function drawWebglElements(gl: WebGL2RenderingContext, bufferInfo: twgl.BufferInfo): void {
-  //* this uses either drawArrays or drawElements automatically based on the supplied buffer info
-  return twgl.drawBufferInfo(gl, bufferInfo);
-}
-
+//! not used at the moment
 export function bindFramebufferAndSetViewport(
   gl: WebGL2RenderingContext,
   fb: WebGLFramebuffer | null,
@@ -130,36 +127,6 @@ export function bindFramebufferAndSetViewport(
 ): void {
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   gl.viewport(0, 0, width, height);
-}
-
-export function createProgramInfo(
-  gl: WebGL2RenderingContext,
-  shaderProgram: WebGLProgram,
-  attribs?: any[],
-  uniforms?: any[]
-): any {
-  //TODO extract attributes and uniforms automatically and push them to the object:
-  const programInfo = {
-    program: shaderProgram,
-    attribLocations: {
-      vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
-      vertexColor: gl.getAttribLocation(shaderProgram, "aVertexColor"),
-    },
-    uniformLocations: {
-      projectionMatrix: gl.getUniformLocation(shaderProgram, "uProjectionMatrix"),
-      modelViewMatrix: gl.getUniformLocation(shaderProgram, "uModelViewMatrix"),
-    },
-  };
-
-  return programInfo;
-}
-
-export function setupWebGLProgram(
-  glContext: WebGL2RenderingContext | WebGLRenderingContext,
-  vs: string,
-  fs: string
-): twgl.ProgramInfo {
-  return twgl.createProgramInfo(glContext, [vs, fs]);
 }
 
 export function createTexture(
@@ -301,52 +268,19 @@ export function createProgram(
   return program;
 }
 
-// see. https://webgl2fundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
-/**
- * Usage just before rendering:
- *    resize(gl.canvas);
- *    // Tell WebGL how to convert from clip space to pixels
- *    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
- */
-export function resizeCanvas(canvas: HTMLCanvasElement): void {
-  // Lookup the size the browser is displaying the canvas.
-  const displayWidth = canvas.clientWidth;
-  const displayHeight = canvas.clientHeight;
-
-  // Check if the canvas is not the same size.
-  if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
-    // Make the canvas the same size
-    canvas.width = displayWidth;
-    canvas.height = displayHeight;
-  }
-}
-
-function resetDepth(gl: WebGL2RenderingContext): void {
-  gl.clearDepth(1.0); // Clear depth
-  gl.enable(gl.DEPTH_TEST); // Enable depth testing
-  gl.depthFunc(gl.LEQUAL); // Near things obscure far things
-}
-
 /**
  * Clear the canvas and reset depth.
  */
-export function clearCanvas(gl: WebGL2RenderingContext): void {
+export function clearCanvas(gl: WebGL2RenderingContext | WebGLRenderingContext): void {
   gl.clearColor(0, 0, 0, 0.0);
-  gl.enable(gl.DEPTH_TEST);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-}
-
-//* Kombination of the two methods above
-export function resetCanvas(gl: WebGL2RenderingContext | WebGLRenderingContext): void {
-  gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
   gl.clearDepth(1.0); // Clear everything
-  gl.enable(gl.DEPTH_TEST); // Enable depth testing
+  gl.enable(gl.DEPTH_TEST);
   gl.depthFunc(gl.LEQUAL); // Near things obscure far things
 
-  // Clear the canvas before we start drawing on it.
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
+/*
 // Util to enable VAO extension for Webgl 1
 function enableVAOExtension(gl: WebGLRenderingContext): void {
   const ext = gl.getExtension("OES_vertex_array_object");
@@ -356,54 +290,4 @@ function enableVAOExtension(gl: WebGLRenderingContext): void {
     const someVAO = ext.createVertexArrayOES();
   }
 }
-
-/**
- * * Use this at init time for performance improvement (only useful with WebGL2 though!)
- */
-export function setupAttribVAO(gl: WebGL2RenderingContext, geometries: any[], attribs: any[]): any {
-  // at init time
-
-  /*
-  //TODO
-  const bufferInfo = twgl.createBufferInfoFromArrays(gl, {
-    position: {
-      numComponents: 2,
-      data: [-x, -y, x, -y, -x, y, -x, y, x, -y, x, y],
-    },
-    texcoord: [0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0],
-    id: {
-      numComponents: 1,
-      data: ids,
-      divisor: 1,
-    },
-  });
-  twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
-  */
-
-  //for each model / geometry / ...
-  for (let index = 0; index < geometries.length; index++) {
-    const vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
-    //for each attribute
-    for (let index = 0; index < attribs.length; index++) {
-      const attribute = attribs[index];
-      gl.enableVertexAttribArray(attribute);
-      //TODO gl.bindBuffer(gl.ARRAY_BUFFER, bufferForAttribute);
-      //TODO gl.vertexAttribPointer(...);
-    }
-
-    //if indexed geometry {
-    /*
-      if (geometry is indexed) {
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-      }  */
-
-    // unbind the vao
-    gl.bindVertexArray(null);
-  }
-
-  /**
-   * * at render time everything left to do is:
-   *  gl.bindVertexArray(vaoForGeometry);
-   */
-}
+*/

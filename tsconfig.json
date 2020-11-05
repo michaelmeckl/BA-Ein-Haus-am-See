@@ -17,7 +17,7 @@
     "removeComments": true,
     "rootDir": ".",
     "skipLibCheck": true,
-    "sourceMap": true, //TODO
+    "sourceMap": false,
     "strict": true,
     "typeRoots": [
       "node_modules/@danmarshall/deckgl-typings", // necessary to find the types for deck.gl
