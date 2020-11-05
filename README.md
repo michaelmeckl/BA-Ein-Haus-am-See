@@ -1,3 +1,5 @@
+This branch contains a very early version that used Snowpack as bundler instead of webpack.
+
 # BA-Ein-Haus-am-See
 Bachelorarbeit "Ein Haus am See im Browser - Interaktives Finden von geeigneten Orten"    
 
