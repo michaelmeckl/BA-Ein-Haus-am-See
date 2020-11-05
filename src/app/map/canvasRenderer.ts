@@ -33,7 +33,6 @@ class CanvasRenderer {
   private weights: number[] = [];
 
   constructor() {
-    console.log("hello");
     //const canvas = document.createElement("canvas");  //* doesn't work for some reason
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     canvas.width = map.getCanvas().clientWidth;

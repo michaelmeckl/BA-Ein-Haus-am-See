@@ -6,7 +6,6 @@ import { loadLocations } from "./map/locationsPanel";
 import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
 import FilterManager from "./mapData/filterManager";
 import { fetchOsmDataFromServer, fetchOsmDataFromClientVersion } from "./network/networkUtils";
-import OsmTags from "./mapData/osmTagCollection";
 import { showSnackbar, SnackbarType } from "./utils";
 import filterManager from "./mapData/filterManager";
 import mapLayerManager from "./mapData/mapLayerManager";
@@ -343,63 +342,12 @@ function selectData(e: Event): void {
   selectionBox.classList.remove(Config.CSS_HIDDEN);
 }
 
-async function performOsmQuery(inputQuery: string): Promise<void> {
-  //TODO change accordingly before deploying!!
-  const bounds = mapController.getViewportBoundsString(500); //load data in viewport and 500 meter around
-
-  // give feedback to the user
-  showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
-
-  console.log("Performing osm query for active filters: ", FilterManager.activeFilters);
-  Benchmark.startMeasure("Performing osm query for active filters");
-  const allQueries = Array.from(FilterManager.activeFilters).map(async (tag) => {
-    const query = OsmTags.getQueryForCategory(tag);
-
-    Benchmark.startMeasure("Fetching data from osm");
-    // request data from osm
-    const data = await fetchOsmDataFromClientVersion(bounds, query);
-    console.log(Benchmark.stopMeasure("Fetching data from osm"));
-
-    if (data) {
-      const t0 = performance.now();
-      mapController.showData(data, tag); //set the tag as the sourcename
-      //TODO nur zum Testen:
-      //mapController.addHeatmap(data);
-      const t1 = performance.now();
-      console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
-
-      //showMask(maskData);
-
-      console.log("Finished adding data to map!");
-    }
-  });
-  await Promise.all(allQueries);
-  /*
-  const allResults = await Promise.allSettled(allQueries);
-  console.log("All Results", allResults);
-  allResults.forEach((res) => {
-    if (res.status === "rejected") {
-      showSnackbar("Nicht alle Daten konnten erfolgreich geladen werden", SnackbarType.ERROR, 1500);
-      return;
-    }
-  });
-  */
-  Benchmark.stopMeasure("Performing osm query for active filters");
-
-  //console.log(await Benchmark.getAverageTime(fetchOsmDataFromClientVersionSequential, [bounds, inputQuery], 30));
-  //console.log(await Benchmark.getAverageTime(fetchOsmDataFromClientVersionParallel, [bounds, inputQuery], 30));
-  //const data =null;
-
+async function performOsmQuery(): Promise<void> {
+  mapController.loadMapData();
   //TODO
   /*
   const data = await testGuide("restaurant");
   console.log(data);
-  */
-
-  /*
-  Benchmark.startMeasure("Fetching mask from server");
-  const maskData = await fetchMaskData(inputQuery);
-  Benchmark.stopMeasure("Fetching mask from server");
   */
 }
 
@@ -483,7 +431,7 @@ function setupUI(): void {
   const queryButton = document.querySelector(HtmlElements.QUERY_BUTTON_ID);
   if (queryButton && queryInput) {
     queryButton.addEventListener("click", () => {
-      performOsmQuery(queryInput.value.toLowerCase());
+      performOsmQuery();
     });
   }
 

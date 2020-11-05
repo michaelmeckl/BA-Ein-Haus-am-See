@@ -1,7 +1,4 @@
 /* eslint-env browser */
-
-//TODO use dynamic imports to make file size smaller? (vgl. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)
-// e.g. const circle = await import("@turf/circle");
 import bbox from "@turf/bbox";
 import bbpolygon from "@turf/bbox-polygon";
 import { featureCollection } from "@turf/helpers";
@@ -19,29 +16,32 @@ import mapboxgl, {
   CustomLayerInterface,
   EventData,
   Layer,
+  LngLat,
   MapDataEvent,
   MapMouseEvent,
   MapSourceDataEvent,
-  MapTouchEvent,
 } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
 import FilterManager from "../mapData/filterManager";
 import mapLayerManager from "../mapData/mapLayerManager";
 import { fetchOsmDataFromServer } from "../network/networkUtils";
+import { showSnackbar, SnackbarType } from "../utils";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { createCanvasOverlay, updateOverlay } from "./canvasRenderer";
 import { getDataFromMap } from "./featureUtils";
-import { map } from "./mapboxConfig";
+import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import { PerformanceMeasurer } from "./performanceMeasurer";
 import { addBufferToFeature } from "./turfUtils";
+import OsmTagCollection from "../mapData/osmTagCollection";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
 
-//export let originalMapImage: HTMLImageElement | undefined;
+const zoomTreshold = 2; // 2 zoom levels difference
+const moveTreshold = 1500; // map center difference in meters
 
 /**
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
@@ -52,6 +52,13 @@ export default class MapController {
   private currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
   //prettier-ignore
   private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
+
+  private currentZoom: number = initialZoomLevel;
+  private currentMapCenter: LngLat = new LngLat(initialPosition[0], initialPosition[1]);
+
+  //TODO
+  private showingOverlay = false;
+  showOverlayAutomatically = false;
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -89,25 +96,65 @@ export default class MapController {
     //map.on("sourcedata", this.onSourceLoaded.bind(this));
     //map.on("data", this.onDataLoaded.bind(this)); // fired when any map data begins loading or changing asynchronously.
     map.on("click", this.onMapClick.bind(this));
-
-    //map.on("moveend", this.onMapMoveEnd.bind(this));
-    map.on("zoomend", this.onMapZoomEvent.bind(this));
+    map.on("zoomstart", this.onMapZoomStart.bind(this));
+    map.on("zoomend", this.onMapZoomEnd.bind(this));
+    map.on("dragstart", this.onMapDragStart.bind(this));
     map.on("dragend", this.onMapDragEnd.bind(this));
   }
 
-  async onMapMoveEnd(e: { originalEvent: DragEvent }): Promise<void> {
-    console.log("A moveend event occurred:", e.originalEvent);
-    //TODO refetch all data for the current viewport
-    //this.reloadData();
+  onMapDragStart(): void {
+    this.currentMapCenter = map.getCenter();
   }
 
-  onMapDragEnd(e: { originalEvent: DragEvent }): void {
-    console.log("A dragend event occurred:", e.originalEvent);
-    //TODO updateOverlay();
+  onMapDragEnd(): void {
+    //TODO overlay needs to be updated all the time unfortunately :(
+    if (this.showingOverlay) {
+      //updateOverlay();
+      return;
+    }
+
+    // Uses the Haversine Formula to calculate difference between tow latLng coords in meters
+    const distance = this.currentMapCenter.distanceTo(map.getCenter());
+    console.log("Distance", distance);
+    // this is a threshold to avoid firing events with small moves
+    if (distance < moveTreshold) {
+      return;
+    }
+    console.log("Distance greater than treshold - updating");
+    this.loadMapData();
   }
 
-  onMapZoomEvent(e: MapMouseEvent | MapTouchEvent): void {
-    console.log("A zoomend event occurred: ", e);
+  onMapZoomStart(): void {
+    this.currentZoom = map.getZoom();
+  }
+
+  onMapZoomEnd(): void {
+    const newZoom = map.getZoom();
+
+    if (this.showingOverlay) {
+      //updateOverlay();
+      //this.currentZoom = newZoom;
+      return;
+    }
+
+    // don't update data if the zoom level change is below the treshold
+    if (Math.abs(newZoom - this.currentZoom) <= zoomTreshold) {
+      return;
+    } else if (newZoom <= 8) {
+      // performance optimization - dont show/update overlay below a certain zoomlevel
+      //TODO snackbar nervt vllt wenn ständig
+      showSnackbar(
+        "Die aktuelle Zoomstufe ist zu niedrig, um Daten zu aktualisieren!",
+        SnackbarType.INFO,
+        2000
+      );
+      //this.currentZoom = newZoom;
+      return;
+    }
+    console.log("new zoom is different enough - updating ...");
+    this.loadMapData();
+
+    //this.currentZoom = newZoom;
   }
 
   onSourceLoaded(e: MapSourceDataEvent): void {
@@ -147,34 +194,59 @@ export default class MapController {
     map.addControl(Geocoder.geocoderControl, "bottom-left");
   }
 
-  reloadData(): void {
-    //TODO load data new on every move, works but needs another source than overpass api mirror
-    FilterManager.activeFilters.forEach(async (param) => {
-      Benchmark.startMeasure("Fetching data on moveend");
-      const data = await fetchOsmDataFromServer(this.getViewportBoundsString(), param);
-      console.log(Benchmark.stopMeasure("Fetching data on moveend"));
+  async loadMapData(): Promise<void> {
+    console.log("Performing osm query for active filters: ", FilterManager.activeFilters);
+    if (FilterManager.activeFilters.size > 0) {
+      // give feedback to the user
+      showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
+    }
+
+    Benchmark.startMeasure("Performing osm query for active filters");
+    const allQueries = Array.from(FilterManager.activeFilters).map(async (tag) => {
+      // get overpass query for each tag
+      const query = OsmTagCollection.getQueryForCategory(tag);
+
+      //get screen viewport and 500 meter around to compensate for the move treshold for new data
+      const bounds = this.getViewportBoundsString(500);
+
+      Benchmark.startMeasure("Fetching data from osm");
+      // request data from osm
+      //const data = await fetchOsmDataFromClientVersion(bounds, query);
+      const data = await fetchOsmDataFromServer(bounds, query);
+      Benchmark.stopMeasure("Fetching data from osm");
 
       if (data) {
         const t0 = performance.now();
-        this.showData(data, param);
+        this.showData(data, query);
         const t1 = performance.now();
         console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
 
         console.log("Finished adding data to map!");
       }
     });
-
-    //TODO use this callback instead of the code above to reload on every move?
+    await Promise.all(allQueries);
     /*
-    // after the GeoJSON data is loaded, update markers on the screen and do so on every map move/moveend
-    map.on('data', function(e) {
-    if (e.sourceId !== 'bars' || !e.isSourceLoaded) return;
-
-    map.on('move', updateMarkers);
-    map.on('moveend', updateMarkers);
-    updateMarkers();
+    const allResults = await Promise.allSettled(allQueries);
+    console.log("All Results", allResults);
+    allResults.forEach((res) => {
+      if (res.status === "rejected") {
+        showSnackbar("Nicht alle Daten konnten erfolgreich geladen werden", SnackbarType.ERROR, 1500);
+        return;
+      }
     });
     */
+    Benchmark.stopMeasure("Performing osm query for active filters");
+
+    if (this.showOverlayAutomatically) {
+      //TODO updateOverlay();
+    }
+
+    //TODO wohin damit?
+    if (this.showingOverlay) {
+      //updateOverlay();
+    } else {
+      // fetch new data
+    }
   }
 
   /**
