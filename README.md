@@ -1,3 +1,5 @@
+This branch contains an early version where Leaflet and Tangram were used to generate the map.
+
 # BA-Ein-Haus-am-See
 
 Bachelorarbeit "Ein Haus am See im Browser - Interaktives Finden von geeigneten Orten"
