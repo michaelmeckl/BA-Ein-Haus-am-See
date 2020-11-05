@@ -96,7 +96,7 @@ class CanvasRenderer {
 
     this.overlayCanvas = canvas;
 
-    const context = canvas.getContext("2d" /*, { alpha: false }*/); //TODO use {alpha: false} to make background dark!
+    const context = canvas.getContext("2d");
     if (!context) {
       // eslint-disable-next-line no-alert
       throw new Error("No 2d context from canvasRenderer");
@@ -389,8 +389,8 @@ class CanvasRenderer {
     const canvas = document.createElement("canvas");
     canvas.width = map.getCanvas().clientWidth;
     canvas.height = map.getCanvas().clientHeight;
-    //TODO etwas davon aktivieren?
-    //{stencil: true, antialias: true, premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: false});
+
+    //options: {stencil: true, antialias: true, premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: false});
     const gl = canvas.getContext("webgl2");
     if (!gl) {
       throw new Error("Couldn't get a webgl context for combining the overlays!");

@@ -269,8 +269,9 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
   const data = imageData.data;
   let i = 0;
   while (i < data.length) {
+    const alpha = 255 - data[i]; //in this matte, white = fully transparent
     data[i] = data[i + 1] = data[i + 2] = 0; // clear matte to black
-    data[i + 3] = 255 - data[i]; // set alpha; in this matte, white = fully transparent
+    data[i + 3] = alpha; // set alpha
     i += 4; // next pixel
   }
 
