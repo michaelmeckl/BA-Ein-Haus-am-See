@@ -3,25 +3,21 @@
  */
 import bboxPolygon from "@turf/bbox-polygon";
 import circle from "@turf/circle";
-import difference from "@turf/difference";
-import distance from "@turf/distance";
 import intersect from "@turf/intersect";
-import mask from "@turf/mask";
 import union from "@turf/union";
 import type { Feature, GeoJsonProperties, LineString, MultiPolygon, Point, Polygon } from "geojson";
-import mapboxgl, { LngLat, LngLatLike } from "mapbox-gl";
+import mapboxgl, { Layer, LngLat, LngLatLike } from "mapbox-gl";
+import WebWorker from "worker-loader!../worker";
 import Benchmark from "../../shared/benchmarking";
 import { map } from "./mapboxConfig";
-import * as turfHelpers from "@turf/helpers";
+import mapLayerManager from "./mapLayerManager";
 import { queryAllTiles, queryGeometry, queryLayers } from "./tilequeryApi";
 import { addBufferToFeature } from "./turfUtils";
-import { logMemoryUsage } from "../utils";
-import mapLayerManager from "./mapLayerManager";
-import { featureCollection } from "@turf/helpers";
-import { fetchMaskData } from "../network/networkUtils";
-import geobuf from "geobuf";
-import Pbf from "pbf";
-import WebWorker from "worker-loader!../worker";
+import geojsonCoords from "@mapbox/geojson-coords";
+import { chunk } from "lodash";
+import { type } from "os";
+import { Position } from "@turf/helpers";
+import { convertToMercatorCoordinates } from "./featureUtils";
 // TODO declare own typing for this: import { boolean_within} from "@turf/boolean-within";
 
 export async function testTilequeryAPI(): Promise<void> {
@@ -48,11 +44,26 @@ function getResolutions() {
   return resolutions;
 }
 
-// see https://stackoverflow.com/questions/37599561/drawing-a-circle-with-the-radius-in-miles-meters-with-mapbox-gl-js
-export function getMeterRatioForZoomLevel(meters: number, zoom: number): number {
-  // see https://docs.mapbox.com/help/glossary/zoom-level/
-  const metersPerPixel = 78271.484 / 2 ** zoom;
-  return meters / metersPerPixel /*/ Math.cos((latitude * Math.PI) / 180)*/;
+// formula based on https://wiki.openstreetmap.org/wiki/Zoom_levels
+export function metersInPixel(meters: number, latitude: number, zoomLevel: number): number {
+  const earthCircumference = 40075016.686;
+  const latitudeRadians = latitude * (Math.PI / 180);
+  // zoomlevel + 9 instead of +8 because mapbox uses 512*512 tiles, see https://docs.mapbox.com/help/glossary/zoom-level/
+  const metersPerPixel =
+    (earthCircumference * Math.cos(latitudeRadians)) / Math.pow(2, zoomLevel + 9);
+
+  return meters / metersPerPixel;
+}
+
+export function getViewportBounds(): number[][] {
+  const bounds = map.getBounds();
+  const viewportBounds = [
+    bounds.getNorthWest().toArray(),
+    bounds.getNorthEast().toArray(),
+    bounds.getSouthEast().toArray(),
+    bounds.getSouthWest().toArray(),
+  ];
+  return viewportBounds;
 }
 
 export function getRadiusAndCenterOfViewport(): any {
@@ -146,6 +157,7 @@ export function findAllFeaturesInCircle(allFeatures: any) {
  * Util - Function that returns the current viewport extent as a polygon.
  */
 //TODO vllt etwas mehr als den viewport gleich nehmen?
+//* not used right now
 export function getViewportAsPolygon(): Feature<Polygon, GeoJsonProperties> {
   const bounds = map.getBounds();
   const viewportBounds = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
@@ -154,29 +166,32 @@ export function getViewportAsPolygon(): Feature<Polygon, GeoJsonProperties> {
 
 export function convertAllFeaturesToPolygons(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[],
-  bufferSize = 100
+  bufferSize = 500
 ): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
   const polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
 
+  Benchmark.startMeasure("adding buffer to all features");
+
   for (let index = 0; index < features.length; index++) {
     const feature = features[index];
+    // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
+    polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
 
+    /*
     if (feature.geometry.type === "Point") {
-      //! turf can add properties mit turf.point([...], {additional Props hierher})
-      const circleOptions = { steps: 80, units: "meters" /*, properties: {foo: 'bar'}*/ };
       // replace all point features with circle polygon features
-      polygonFeatures.push(
-        circle(feature as Feature<Point, GeoJsonProperties>, bufferSize, circleOptions)
-      );
+      const circleOptions = { steps: 80, units: "meters"};
+      polygonFeatures.push(circle(feature as Feature<Point, GeoJsonProperties>, bufferSize, circleOptions));
     } else if (feature.geometry.type === "LineString" || feature.geometry.type === "Polygon") {
       // add a buffer to all lines and polygons
       // This also replaces all line features with buffered polygon features as turf.buffer() returns
       // Polygons (or Multipolygons).
-      polygonFeatures.push(addBufferToFeature(feature, "meters", bufferSize));
+      polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
     } else {
       break;
-    }
+    }*/
   }
+  Benchmark.stopMeasure("adding buffer to all features");
 
   return polygonFeatures;
 }
@@ -275,6 +290,8 @@ export function showMask(mask: any): void {
     mapLayerManager.addNewGeojsonSource("maske", mask, false);
   }
 
+  const currentLat = map.getCenter().lat;
+
   map.addLayer({
     id: "mask-layer",
     source: "maske",
@@ -298,8 +315,8 @@ export function showMask(mask: any): void {
         // this makes the line-width in meters stay relative to the current zoom level:
         "interpolate",
         ["exponential", 2], ["zoom"],
-        10, /*["*", 10, ["^", 2, -16]],*/ getMeterRatioForZoomLevel(20, 10),
-        24, /*["*", 150, ["^", 2, 8]]*/ getMeterRatioForZoomLevel(100, 24),
+        10, /*["*", 10, ["^", 2, -16]],*/ metersInPixel(20, currentLat, 10),
+        24, /*["*", 150, ["^", 2, 8]]*/ metersInPixel(100, currentLat, 24),
       ],
       //prettier-ignore
       "line-blur": ["interpolate", ["linear"], ["zoom"],
@@ -361,12 +378,6 @@ export async function showDifferenceBetweenViewportAndFeature(
 ): Promise<any> {
   //setupWebWorker(features);
 
-  Benchmark.startMeasure("calculateMaskAndIntersections");
-  const featureObject = await calculateMaskAndIntersections([...features]);
-  Benchmark.stopMeasure("calculateMaskAndIntersections");
-  console.log(featureObject);
-
-  /*
   // perf-results without web worker: 304 ms, 611 ms, 521 ms, 247 ms, 962ms => avg: 529 ms
   Benchmark.startMeasure("showing mask data");
 
@@ -374,6 +385,7 @@ export async function showDifferenceBetweenViewportAndFeature(
   const featureObject = await calculateMaskAndIntersections([...features]);
   Benchmark.stopMeasure("calculateMaskAndIntersections");
 
+  /*
   const maske = featureObject.unionPolygons;
   const intersects: any[] = featureObject.intersections;
 
@@ -419,6 +431,14 @@ export async function showDifferenceBetweenViewportAndFeature(
  * Util-Function to convert LngLat coordinates to pixel coordinates on the screen.
  */
 export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
+  //TODO make the map bounds a little bit bigger for projecting so we can get points that would be outside the current screen (negative pixels)
+  //TODO but not like this:
+  /*
+  map.setZoom(map.getZoom() - 1);
+  const c = map.project(coord);
+  map.setZoom(map.getZoom() + 1);
+  return c;
+  */
   return map.project(coord);
 }
 
@@ -428,3 +448,88 @@ export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
 export function convertToLatLngCoord(point: mapboxgl.PointLike): LngLat {
   return map.unproject(point);
 }
+
+export function getPixelCoordinates(
+  features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+): mapboxgl.Point[] {
+  const pixelCoords: mapboxgl.Point[] = [];
+
+  for (const feature of features) {
+    const coords = feature.geometry.coordinates;
+    for (const coord of coords) {
+      // check if this is a multidimensional array
+      if (Array.isArray(coords[0])) {
+        for (const coordPart of coord) {
+          pixelCoords.push(convertToPixelCoord(coordPart as LngLatLike));
+        }
+      } else {
+        pixelCoords.push(convertToPixelCoord((coord as unknown) as LngLatLike));
+      }
+    }
+  }
+
+  console.log("pixelCoords: ", pixelCoords);
+
+  return pixelCoords;
+}
+
+export function convertToMercatorCoordinates(arr: number[][]): number[] {
+  const MercatorCoordinates = arr.map((el) =>
+    mapboxgl.MercatorCoordinate.fromLngLat(el as LngLatLike)
+  );
+  //console.log("Mercator:", MercatorCoordinates);
+  return MercatorCoordinates.flatMap((x) => [x.x, x.y]);
+}
+
+export function getMercatorCoordinates(
+  features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+): mapboxgl.MercatorCoordinate[] {
+  const mercatorCoords: mapboxgl.MercatorCoordinate[] = [];
+
+  console.log(features);
+
+  for (const feature of features) {
+    const coords = feature.geometry.coordinates;
+
+    for (const coord of coords) {
+      // check if this is a multidimensional array
+      if (Array.isArray(coords[0])) {
+        for (const coordPart of coord) {
+          mercatorCoords.push(
+            mapboxgl.MercatorCoordinate.fromLngLat({ lng: coordPart[0], lat: coordPart[1] })
+          );
+        }
+      } else {
+        const mapCoord = ({ lng: coord[0], lat: coord[1] } as unknown) as LngLatLike;
+        mercatorCoords.push(mapboxgl.MercatorCoordinate.fromLngLat(mapCoord));
+      }
+    }
+  }
+
+  console.log("mercatorCoords: ", mercatorCoords);
+
+  return mercatorCoords;
+}
+
+//! doesn't seem to work unfortunately :(
+/*
+// add webgl 2 support to the mapbox canvas even though it is not supported officially yet
+// this function was taken from this issue: https://github.com/mapbox/mapbox-gl-js/issues/8581
+export function addWebgl2Support(): void {
+  //include webgl2 in mapboxgl
+  if (mapboxgl.Map.prototype._setupPainter.toString().indexOf("webgl2") == -1) {
+    var _setupPainter_old = mapboxgl.Map.prototype._setupPainter;
+    mapboxgl.Map.prototype._setupPainter = function () {
+      getContext_old = this._canvas.getContext;
+      this._canvas.getContext = function (name, attrib) {
+        return (
+          getContext_old.apply(this, ["webgl2", attrib]) ||
+          getContext_old.apply(this, ["webgl", attrib]) ||
+          getContext_old.apply(this, ["experimental-webgl", attrib])
+        );
+      };
+      _setupPainter_old.apply(this);
+      this._canvas.getContext = getContext_old;
+    };
+  }
+}*/

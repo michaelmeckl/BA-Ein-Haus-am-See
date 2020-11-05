@@ -35,17 +35,16 @@ export function getNearestPointOfLayer(e: mapboxgl.MapMouseEvent, layerName: str
   }
 }
 
+// this uses an older turf buffer version (@4.7.3 instead of @5.1.5) because of incorrect measurements
+// in the new version; track issue at https://github.com/Turfjs/turf/issues/1484
 export function addBufferToFeature(
   element: Feature<Geometry, GeoJsonProperties>,
-  units: turfUnits,
-  bufferSize = 100
+  bufferSize = 100,
+  units: turfUnits = "meters"
 ): Feature<any> {
-  //const newElement = buffer(element as Feature<Polygon, GeoJsonProperties>, 50, {units: "meters"});
-
+  //const newElement = buffer(element as Feature<Polygon, GeoJsonProperties>, 50, "meters");
   //@ts-expect-error
-  return buffer(element, bufferSize, {
-    units: units,
-  });
+  return buffer(element, bufferSize, units);
 }
 
 function addTurfPath(start: any, end: any): void {

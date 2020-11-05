@@ -16,7 +16,7 @@ const exec = Util.promisify(childProcess.exec);
  */
 export function buildOverpassQuery(bounds: string, userQuery: string): string {
   // shorthand for query instead of 3 separate ones (nwr = node, way, relation)
-  const request = `nwr[${userQuery}];`;
+  //const request = `nwr[${userQuery}];`;
 
   /*TODO: support different types and conjunctions: -> query vllt schon ganz in client bauen?
     * AND:
@@ -28,7 +28,7 @@ export function buildOverpassQuery(bounds: string, userQuery: string): string {
     ...
 
     * OR - same key, different values:
-    nwr[${userQuery1}];   // in the form of ["key"~"value1|value2|value3|..."] -> no whitespace between! (regex)
+    nwr[${userQuery1}];   // in the form of ["key"~"^value1|value2|value3|...$"] -> no whitespace between! (regex)
     */
 
   // TODO: what is the best output format: xml or json?
@@ -43,7 +43,7 @@ export function buildOverpassQuery(bounds: string, userQuery: string): string {
     const output3 = "out geom qt;<;out skel qt;";
     */
 
-  const query = `${querySettings}(${request});${output}`;
+  const query = `${querySettings}(${userQuery});${output}`;
   return query;
 }
 

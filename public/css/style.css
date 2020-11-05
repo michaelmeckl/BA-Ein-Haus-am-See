@@ -9,7 +9,8 @@ html,
 body {
     margin: 0;
     padding: 0;
-    font: 400 15px/22px 'Source Sans Pro', 'Helvetica Neue', Helvetica, Arial, Sans-serif;
+    /*font: 400 15px/22px 'Source Sans Pro', 'Helvetica Neue', Helvetica, Arial, Sans-serif;*/
+    font: 300 14px/20px Helvetica, Verdana, Geneva, Sans-serif;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -27,11 +28,13 @@ body {
     display: none;
     opacity: 0;
 
-    /* TODO better performance than display: none as transform can use hardware acceleration 
-    but unfortunately leaves the space
+    /* TODO better performance than display: none as transform can use hardware acceleration but unfortunately leaves the space
     transform: scale(0);*/
 }
 
+.divider {
+    border-top: 3px solid #bbb;
+}
 
 /** Headline Styling */
 
@@ -68,17 +71,11 @@ body {
     background-color: #11a74f;
 }
 
-
 /** Map Styling */
 
 #mapContainer {
     transition: margin-left .5s;
 }
-
-/*
-#mapContainer>div {
-    left: 20%;
-}*/
 
 #map {
     position: absolute;
@@ -94,11 +91,6 @@ body {
     background-color: rgb(255, 255, 255);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     border-radius: 3px;
-}
-
-/*TODO: */
-#deckgl-overlay {
-    /*mix-blend-mode: overlay;*/
 }
 
 /** Legend Styling */
@@ -153,6 +145,8 @@ body {
 }
 
 .dropdown-content {
+    overflow-y: auto;
+    max-height: 60vh;
     display: none;
     position: absolute;
     background-color: #f1f1f1;
@@ -197,9 +191,33 @@ body {
     background-color: #b61919;
 }
 
+/* Caret down icon */
+.caret-down {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgb(99 99 99);
+    float: right;
+    margin: 5px;
+}
+
+/* Caret up icon */
+.caret-up {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid rgb(99 99 99);
+    float: right;
+    margin: 5px;
+}
+
 /** Selection Menu Styling */
 
 .selection-box {
+    max-height: 50vh;
+    overflow-y: auto;
     position: absolute;
     z-index: 0;
     margin-top: 15px;
@@ -246,6 +264,8 @@ body {
     margin-left: 10px;
     padding: 2px 6px 2px 6px;
     background: #eeeeee00;
+    font-size: 28px;
+    font-weight: bold;
 }
 
 .close:hover {
@@ -253,6 +273,8 @@ body {
     background-color: rgba(199, 15, 15, 0.911);
     color: white;
     */
+    text-decoration: none;
+    cursor: pointer;
     background-color: #ddd;
 }
 
@@ -330,15 +352,15 @@ body {
 
 /** Sidebar Styling */
 
-#sidebar {
+.sidebar {
     position: fixed;
     height: calc(100% - 50px);
     width: 0;
     top: 50px;
     left: 0;
-    overflow: hidden;
+    overflow-y: auto;
     border-right: 1px solid rgba(0, 0, 0, 0.25);
-    background-color: #fff;
+    background-color: floralwhite;
     transition: 0.5s;
 }
 
@@ -346,13 +368,13 @@ body {
     display: flex;
     flex-direction: row;
     align-items: center;
-    background-color: #00853e;
+    background-color: #5cb85c;
     border-bottom: 1px solid #eee;
     min-height: 60px;
     line-height: 60px;
 }
 
-#sidebar h2 {
+.sideHeading h2 {
     font-size: 22px;
     margin: 0;
     font-weight: 400;
@@ -360,7 +382,48 @@ body {
     color: #fff;
 }
 
-#sidebar .closeSidebar {
+.filter-categories {
+    padding: 6px 8px 14px 16px;
+    text-decoration: none;
+    font-size: 18px;
+    color: #707070;
+    display: block;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    outline: none;
+}
+
+.filter-entries {
+    display: none;
+}
+
+.filter-entries a {
+    display: block;
+    width: 100%;
+    background-color: #f8f0e0;
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+}
+
+.filter-categories:hover {
+    color: #8a8686;
+}
+
+.filter-entries a:hover {
+    background-color: #ece6da;
+}
+
+/* Add an active class to the active dropdown button */
+.active-filter-category {
+    background-color: #acba13;
+    color: whitesmoke;
+}
+
+.sideHeading .closeSidebar {
     font-size: 30px;
     flex: 0;
     text-decoration: none;
@@ -369,44 +432,102 @@ body {
     color: #fff;
 }
 
-#sidebar .closeSidebar:hover {
-    color: #b8b6b6;
+.sideHeading .closeSidebar:hover {
+    color: #cccccc;
 }
 
-.listings {
+.no-filter {
+    padding: 20px;
+}
+
+#active-filters {
+    font-size: 0.9em;
+    list-style: none;
+    padding: 0 5px 10px 5px;
+}
+
+#active-filters li {
+    position: relative;
+    padding: 6px;
+    margin: 3px 0 3px 0;
+    transition: 0.2s;
+    border: 1px solid lightgray;
+
+    /* make the list items unselectable */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+#active-filters h4 {
+    margin: 4px 0;
+}
+
+#active-filters li:hover {
+    background: #f7f2df;
+}
+
+/* //TODO
+#active-filters .li-content {
+    display: inline-block;
+}
+*/
+
+#remove-filter-button {
+    margin-bottom: 1em;
+    padding: 0.2em 0.4em;
+    margin: 0 6px 1px 2px;
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    float: right;
+    border-radius: 15px;
+    background-color: #e20f00;
+    color: white;
+}
+
+#remove-filter-button:hover,
+#remove-filter-button:active {
+    background-color: #a50d02;
+}
+
+.location-listings {
     height: 100%;
-    overflow: auto;
-    padding-bottom: 60px;
+    overflow-y: auto;
+    padding-bottom: 10px;
 }
 
-.listings .item {
+.location-listings .item {
     display: block;
     border-bottom: 1px solid #eee;
     padding: 8px;
     text-decoration: none;
 }
 
-.listings .item:last-child {
+.location-listings .item:last-child {
     border-bottom: none;
 }
 
-.listings .item .title {
+.location-listings .item .title {
+    text-decoration: none;
     display: block;
     color: #00853e;
     font-weight: 600;
 }
 
-.listings .item .title small {
+.location-listings .item .title small {
     font-weight: 400;
 }
 
-.listings .item.active .title,
-.listings .item .title:hover {
+.location-listings .item.active .title,
+.location-listings .item .title:hover {
     color: #8cc63f;
 }
 
-.listings .item.active {
-    background-color: #f8f8f8;
+.location-listings .item.active {
+    background-color: rgb(247 238 216);
 }
 
 ::-webkit-scrollbar {
@@ -425,6 +546,18 @@ body {
     border-radius: 0;
 }
 
+/** Mapbox Marker Styling */
+
+.marker {
+    border: none;
+    cursor: pointer;
+    height: 40px;
+    width: 32px;
+    background-image: url(../assets/mapbox_marker.png);
+    background-color: rgba(0, 0, 0, 0);
+    background-repeat: no-repeat;
+}
+
 .clearfix {
     display: block;
 }
@@ -435,4 +568,264 @@ body {
     height: 0;
     clear: both;
     visibility: hidden;
+}
+
+/** Mapbox popup styling */
+
+/* translate popup above to make space for the marker */
+.mapboxgl-popup {
+    padding-bottom: 50px;
+}
+
+.mapboxgl-popup-close-button {
+    display: none;
+}
+
+.mapboxgl-popup-content {
+    font: 400 15px/22px 'Source Sans Pro', 'Helvetica Neue', Sans-serif;
+    padding: 0;
+    width: 180px;
+}
+
+.mapboxgl-popup-content-wrapper {
+    padding: 1%;
+}
+
+.mapboxgl-popup-content h3 {
+    background: #91c949;
+    color: #fff;
+    margin: 0;
+    display: block;
+    padding: 10px;
+    border-radius: 3px 3px 0 0;
+    font-weight: 700;
+    margin-top: -15px;
+}
+
+.mapboxgl-popup-content p {
+    margin: 0;
+    display: block;
+    padding: 10px;
+    font-weight: 400;
+}
+
+.mapboxgl-popup-content div {
+    padding: 10px;
+}
+
+.mapboxgl-container .leaflet-marker-icon {
+    cursor: pointer;
+}
+
+.mapboxgl-popup-anchor-top>.mapboxgl-popup-content {
+    margin-top: 15px;
+}
+
+.mapboxgl-popup-anchor-top>.mapboxgl-popup-tip {
+    border-bottom-color: #91c949;
+}
+
+/** Modal styling */
+
+/* The modal background */
+.modal {
+    display: none;
+    /* Stay in place */
+    position: fixed;
+    z-index: 2;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    /* Fallback color */
+    background-color: rgb(0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: white;
+    /* 5% from the top and bottom and horizontally centered */
+    margin: 5% auto 5% auto;
+    padding: 0;
+    position: relative;
+    border-radius: 8px;
+
+    width: 40%;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    -webkit-animation-name: animatetop;
+    -webkit-animation-duration: 0.5s;
+    animation-name: animatetop;
+    animation-duration: 0.5s
+}
+
+.modal-header {
+    padding: 12px 0;
+    background-color: #5cb85c;
+    color: white;
+    /* add rounded corners to top left and top right corner */
+    border-radius: 8px 8px 0 0;
+    /* center heading */
+    display: flex;
+    justify-content: center;
+}
+
+.modal-body {
+    padding: 2px 16px;
+}
+
+/* Add Animation */
+@-webkit-keyframes animatetop {
+    from {
+        top: -300px;
+        opacity: 0
+    }
+
+    to {
+        top: 0;
+        opacity: 1
+    }
+}
+
+@keyframes animatetop {
+    from {
+        top: -300px;
+        opacity: 0
+    }
+
+    to {
+        top: 0;
+        opacity: 1
+    }
+}
+
+.distance-container,
+.importance-container {
+    display: flex;
+    align-items: center;
+}
+
+.settings-label {
+    font-size: 16px;
+    margin-right: 12px;
+}
+
+/* Input Field for distance */
+.distance-input {
+    padding: 6px;
+    margin-right: 8px;
+    width: 8vw;
+    height: 4vh;
+    border: 1px solid gray;
+    border-radius: 2px;
+}
+
+/* Custom Radio Buttons, see https://www.w3schools.com/howto/tryit.asp?filename=tryhow_css_custom_radio */
+/* The container */
+.container {
+    display: block;
+    position: relative;
+    padding-left: 30px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    font-size: 14px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Hide the browser's default radio button */
+.container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* Create a custom radio button */
+.checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 18px;
+    width: 18px;
+    background-color: #eee;
+    border-radius: 50%;
+}
+
+/* On mouse-over, add a grey background color */
+.container:hover input~.checkmark {
+    background-color: #ccc;
+}
+
+/* When the radio button is checked, add a blue background */
+.container input:checked~.checkmark {
+    background-color: #2196F3;
+}
+
+/* Create the indicator (the dot/circle - hidden when not checked) */
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+/* Show the indicator (dot/circle) when checked */
+.container input:checked~.checkmark:after {
+    display: block;
+}
+
+/* Style the indicator (dot/circle) */
+.container .checkmark:after {
+    top: 6px;
+    left: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: white;
+}
+
+#modal-buttons {
+    margin-top: 25px;
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+}
+
+#add-filter-button {
+    margin-bottom: 1em;
+    padding: 0.8em;
+    width: 15vw;
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    border-radius: 4px;
+    background-color: #14bd5a;
+    color: whitesmoke;
+}
+
+#add-filter-button:hover,
+#add-filter-button:active {
+    background-color: #11a74f;
+}
+
+#cancel-button {
+    margin-bottom: 1em;
+    padding: 0.8em;
+    width: 15vw;
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    border-radius: 4px;
+    background-color: #e8e8e8;
+    color: black;
+}
+
+#cancel-button:hover,
+#cancel-button:active {
+    background-color: #e2dede;
 }

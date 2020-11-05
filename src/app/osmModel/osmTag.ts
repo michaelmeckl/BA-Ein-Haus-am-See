@@ -1,14 +1,5 @@
-const enum Priority {
-  not_important,
-  //optional,
-  important,
-  very_important,
-}
-
-const enum Distance {}
-//TODO(not implemented)
-
-export default interface osmTag {
+//! im moment nicht verwendet
+export default interface OsmTag {
   readonly key: string;
   // array with possible values for this key
   readonly values: string[];

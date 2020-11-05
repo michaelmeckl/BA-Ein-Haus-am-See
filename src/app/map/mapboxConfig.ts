@@ -42,4 +42,13 @@ const map = new mapboxgl.Map({
   preserveDrawingBuffer: true, // necessary to be able to export the map canvas as an image
 });
 
+//TODO resetting map like this not working, a deep copy is probably needed
+/*
+const originalMap: mapboxgl.Map = Object.assign(map);
+//const originalMap: mapboxgl.Map = {...map};
+
+export function resetMap(): void {
+  map = Object.assign(originalMap);
+}*/
+
 export { map, initialPosition, initialZoomLevel };

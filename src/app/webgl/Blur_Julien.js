@@ -25,7 +25,7 @@ _getDrawnViewportCanvas = function (ftColl, zoom, requiredTilesInfo) {
 
     // Eine logische (oder arithmetische) Verschiebung um n (Bitpositionen) nach links ist äquivalent 
     // zu einer Multiplikation mit 2^{n}
-    var z2 = (1 << zoom);
+    var z2 = (1 << zoom); //2^{zoom}
 
     var features = (ftColl.features) ? ftColl.features : ftColl;
     // if (!features)  console.log(ftColl);
@@ -66,6 +66,21 @@ _getDrawnViewportCanvas = function (ftColl, zoom, requiredTilesInfo) {
     }
 
     return viewportCanvas;
+};
+
+function convertCoords(p, tx, ty, z2) {
+
+    var sin = Math.sin((p[1] * Math.PI) / 180),
+        x = (p[0] / 360) + 0.5,
+        y = 0.5 - (0.25 * Math.log((1 + sin) / (1 - sin))) / Math.PI;
+
+    y = y < -1 ? -1 :
+        y > 1 ? 1 : y;
+
+    x = Math.round(this.tileSize * (x * z2 - tx));
+    y = Math.round(this.tileSize * (y * z2 - ty));
+
+    return [x, y];
 };
 
 /**

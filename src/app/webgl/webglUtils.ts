@@ -6,9 +6,8 @@ type shaderType =
   | WebGL2RenderingContext["VERTEX_SHADER"]
   | WebGL2RenderingContext["FRAGMENT_SHADER"];
 
-export function getBlurFilterKernel(name = "gaussianBlur"): number[] {
-  // prettier-ignore
-  const kernels = {
+// prettier-ignore
+const blurKernels = {
     // Define several convolution kernels
     gaussianBlur: [
       0.045, 0.122, 0.045,
@@ -37,18 +36,19 @@ export function getBlurFilterKernel(name = "gaussianBlur"): number[] {
     ],
   };
 
+export function getBlurFilterKernel(name = "gaussianBlur"): number[] {
   switch (name) {
     case "gaussianBlur2":
-      return kernels.gaussianBlur2;
+      return blurKernels.gaussianBlur2;
     case "gaussianBlur3":
-      return kernels.gaussianBlur3;
+      return blurKernels.gaussianBlur3;
     case "boxBlur":
-      return kernels.boxBlur;
+      return blurKernels.boxBlur;
     case "triangleBlur":
-      return kernels.triangleBlur;
+      return blurKernels.triangleBlur;
     case "gaussianBlur":
     default:
-      return kernels.gaussianBlur;
+      return blurKernels.gaussianBlur;
   }
 }
 
@@ -57,6 +57,69 @@ export function computeKernelWeight(kernel: number[]): number {
     return prev + curr;
   });
   return weight <= 0 ? 1 : weight;
+}
+
+export function getPixelsFromImage(texture: HTMLImageElement): Uint8Array | null {
+  // use canvas to get the pixel data array of the image
+  const canvas = document.createElement("canvas");
+  canvas.width = texture.width;
+  canvas.height = texture.width;
+  const ctx = canvas.getContext("2d");
+  ctx?.drawImage(texture, 0, 0);
+  const imageData = ctx?.getImageData(0, 0, texture.width, texture.height);
+  if (!imageData) {
+    return null;
+  }
+  const pixels = new Uint8Array(imageData.data.buffer);
+  return pixels;
+}
+
+// Fills the buffer with the values that define a rectangle.
+export function setRectangle(
+  gl: WebGLRenderingContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  // Set a rectangle the same size as the image at (0, 0).
+  const x1 = x;
+  const x2 = x + width;
+  const y1 = y;
+  const y2 = y + height;
+
+  // NOTE: gl.bufferData(gl.ARRAY_BUFFER, ...) will affect
+  // whatever buffer is bound to the `ARRAY_BUFFER` bind point
+  // but so far we only have one buffer. If we had more than one
+  // buffer we'd want to bind that buffer to `ARRAY_BUFFER` first.
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
+    gl.STATIC_DRAW
+  );
+}
+
+export function getWebGLRenderingContext(): WebGLRenderingContext | null {
+  const canvas = document.querySelector("canvas");
+  if (!canvas) {
+    return null;
+  }
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+  const gl = canvas.getContext("webgl");
+  if (!gl) {
+    console.error("Failed to get WebGL context. Your browser or device may not support WebGL.");
+    return null;
+  }
+  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  return gl;
+}
+
+export function drawWebglElements(gl: WebGL2RenderingContext, bufferInfo: twgl.BufferInfo): void {
+  //* this uses either drawArrays or drawElements automatically based on the supplied buffer info
+  return twgl.drawBufferInfo(gl, bufferInfo);
 }
 
 export function bindFramebufferAndSetViewport(
@@ -99,9 +162,93 @@ export function setupWebGLProgram(
   return twgl.createProgramInfo(glContext, [vs, fs]);
 }
 
+export function createTexture(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  data: Uint8Array | HTMLImageElement,
+  unit = 0,
+  filter: number = gl.NEAREST,
+  width = 1,
+  height = 1
+): WebGLTexture | null {
+  const texture = gl.createTexture();
+  //set texture unit to active;
+  //needed on some drivers, see. https://learnopengl.com/Getting-started/Textures at "Texture Units":
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  //TODO sinnvoll?
+  //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+  // Set the parameters so we can render any size image:
+  //these properties let you upload textures of any size (defaul would be to repeat, but clamping makes more sense here)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  //these determine how interpolation is made if the image is being scaled up or down
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+
+  // Upload the image or pixel data into the texture.
+  if (data instanceof Uint8Array) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  } else {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  }
+
+  //gl.bindTexture(gl.TEXTURE_2D, null);
+  return texture;
+}
+
+export function createBuffer(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  data: any
+): WebGLBuffer | null {
+  const buffer = gl.createBuffer();
+  // bind buffer (think of it as ARRAY_BUFFER = buffer)
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  return buffer;
+}
+
+export function bindFramebuffer(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  framebuffer: WebGLFramebuffer | null,
+  texture: WebGLTexture | null
+): void {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+  if (texture) {
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+  }
+}
+
+export function bindAttribute(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  buffer: WebGLBuffer | null,
+  attribute: number,
+  numComponents = 2
+): void {
+  // bind the corresponding buffer
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  // turn the attribute on
+  gl.enableVertexAttribArray(attribute);
+  // tell the attribute how to get data out of the buffer
+  gl.vertexAttribPointer(attribute, numComponents, gl.FLOAT, false, 0, 0);
+}
+
+export function setupCanvasForDrawing(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  clearColor: [number, number, number, number] = [0, 0, 0, 0]
+): void {
+  // Tell WebGL how to convert from clip space to pixels
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+  // Clear the canvas
+  gl.clearColor(...clearColor);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+}
+
 // see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
 export function createShader(
-  gl: WebGL2RenderingContext,
+  gl: WebGLRenderingContext,
   type: shaderType,
   source: string
 ): WebGLShader {
@@ -129,7 +276,7 @@ export function createShader(
  * see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
  */
 export function createProgram(
-  gl: WebGL2RenderingContext,
+  gl: WebGLRenderingContext,
   vertexShader: WebGLShader,
   fragmentShader: WebGLShader
 ): WebGLProgram {
@@ -139,7 +286,9 @@ export function createProgram(
   }
 
   gl.attachShader(program, vertexShader);
+  gl.deleteShader(vertexShader); // cleanup instantly
   gl.attachShader(program, fragmentShader);
+  gl.deleteShader(fragmentShader);
   gl.linkProgram(program);
 
   // check if creating the program was successfull
@@ -182,13 +331,13 @@ function resetDepth(gl: WebGL2RenderingContext): void {
  * Clear the canvas and reset depth.
  */
 export function clearCanvas(gl: WebGL2RenderingContext): void {
-  gl.clearColor(0, 0, 0, 1.0);
+  gl.clearColor(0, 0, 0, 0.0);
   gl.enable(gl.DEPTH_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
 //* Kombination of the two methods above
-function resetCanvas(gl: WebGL2RenderingContext): void {
+export function resetCanvas(gl: WebGL2RenderingContext | WebGLRenderingContext): void {
   gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
   gl.clearDepth(1.0); // Clear everything
   gl.enable(gl.DEPTH_TEST); // Enable depth testing
@@ -198,11 +347,39 @@ function resetCanvas(gl: WebGL2RenderingContext): void {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
+// Util to enable VAO extension for Webgl 1
+function enableVAOExtension(gl: WebGLRenderingContext): void {
+  const ext = gl.getExtension("OES_vertex_array_object");
+  if (!ext) {
+    // tell user they don't have the required extension or work around it
+  } else {
+    const someVAO = ext.createVertexArrayOES();
+  }
+}
+
 /**
  * * Use this at init time for performance improvement (only useful with WebGL2 though!)
  */
 export function setupAttribVAO(gl: WebGL2RenderingContext, geometries: any[], attribs: any[]): any {
   // at init time
+
+  /*
+  //TODO
+  const bufferInfo = twgl.createBufferInfoFromArrays(gl, {
+    position: {
+      numComponents: 2,
+      data: [-x, -y, x, -y, -x, y, -x, y, x, -y, x, y],
+    },
+    texcoord: [0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0],
+    id: {
+      numComponents: 1,
+      data: ids,
+      divisor: 1,
+    },
+  });
+  twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
+  */
+
   //for each model / geometry / ...
   for (let index = 0; index < geometries.length; index++) {
     const vao = gl.createVertexArray();

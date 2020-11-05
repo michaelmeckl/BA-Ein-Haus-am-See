@@ -3,8 +3,10 @@
  */
 import { chunk } from "lodash";
 import geojsonCoords from "@mapbox/geojson-coords";
-import mapboxgl, { LngLatLike } from "mapbox-gl";
+import type mapboxgl from "mapbox-gl";
+import type { LngLatLike } from "mapbox-gl";
 import { map } from "./mapboxConfig";
+import { convertToMercatorCoordinates } from "./mapboxUtils";
 
 /**
  * This check is necessary for queryRenderedFeatures/querySourceFeatures, otherwise
@@ -97,21 +99,12 @@ export function getMapFeaturesForFilters(filters: Set<string>): mapboxgl.MapboxG
   return allGeoData;
 }
 
-function convertToMercatorCoordinates(arr: number[][]): number[] {
-  const MercatorCoordinates = arr.map((el) =>
-    mapboxgl.MercatorCoordinate.fromLngLat(el as LngLatLike)
-  );
-  //console.log("Mercator:", MercatorCoordinates);
-  return MercatorCoordinates.flatMap((x) => [x.x, x.y]);
-}
-
 export function getDataFromMap(filters: Set<string>): number[] {
   const allGeoData = getMapFeaturesForFilters(filters);
   console.log("QuerySourceFeatures: ");
   console.log(allGeoData);
 
   const allCoordinates: number[] = [].concat(
-    //@ts-expect-error
     ...allGeoData.flatMap((el) => el.geometry.coordinates.flat(3))
   );
   //console.log(allCoordinates);

@@ -30,6 +30,11 @@ import intersect from "@turf/intersect";
 import mask from "@turf/mask";
 //import pg from "pg";  //postgres
 
+/*
+//@ts-expect-error
+import osmium from "osmium";
+*/
+
 const readFile = Util.promisify(fs.readFile);
 
 export default class OsmRouter {
@@ -40,7 +45,9 @@ export default class OsmRouter {
     this.publicDirPath = publicDir;
 
     this.osmRouter = express.Router();
-    this.initRoutes();
+    this.setupRoutes();
+
+    //this.testNodeOsmium();
   }
 
   get instance(): Router {
@@ -50,7 +57,7 @@ export default class OsmRouter {
   /**
    * Init the express router and setup routes.
    */
-  initRoutes(): void {
+  setupRoutes(): void {
     this.osmRouter.get("/testCmd", async (req: Request, res: Response, next: NextFunction) => {
       const result = await ServerUtils.executeOSMFilter(this.publicDirPath);
       console.log("Result of operation is:\n", result);
@@ -367,7 +374,7 @@ export default class OsmRouter {
         // This also replaces all line features with buffered polygon features as turf.buffer() returns
         // Polygons (or Multipolygons).
         //@ts-expect-error
-        polygonFeatures.push(buffer(feature, bufferSize, { units: "meters" }));
+        polygonFeatures.push(buffer(feature, bufferSize, "meters"));
       } else {
         break;
       }
@@ -413,6 +420,7 @@ export default class OsmRouter {
     for (const feature1 of features) {
       for (const feature2 of features) {
         if (feature1 !== feature2) {
+          //@ts-expect-error
           allIntersections.push(intersect(feature1, feature2));
         }
       }
@@ -420,4 +428,50 @@ export default class OsmRouter {
 
     return allIntersections;
   }
+
+  //! geht nur in linux
+  /*
+  testNodeOsmium(): void {
+    console.time("read with osmium");
+
+    const path = this.publicDirPath + "/assets/oberpfalz-latest.osm.pbf";
+    const file = new osmium.File(path);
+    const reader = new osmium.Reader(file, { node: true, way: true, relation: true });
+
+    const handler = new osmium.Handler();
+    //prettier-ignore
+    handler.options({ "tagged_nodes_only": true });
+
+    let count = 0;
+    handler.on("node", (node: any) => {
+      if (node.tags("park") || node.tags("amenity")) {
+        console.log(node.tags());
+        count++;
+      }
+    });
+    handler.on("way", (way: any) => {
+      if (way.tags("park") || way.tags("amenity")) {
+        count++;
+      }
+    });
+    handler.on("relation", (relation: any) => {
+      if (relation.tags("park") || relation.tags("amenity")) {
+        count++;
+      }
+    });
+
+    // wird irgendwie nie aufgerufen
+    // handler.on("done", function () {
+    //   console.log("Found " + count + " parks and amenities!");
+
+    //   console.timeEnd("read with osmium");
+    // });
+
+    osmium.apply(reader, handler);
+
+    console.log("Found " + count + " parks and amenities!");
+
+    console.timeEnd("read with osmium");
+  }
+  */
 }

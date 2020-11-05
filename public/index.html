@@ -1,22 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="author" content="Michael Meckl">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ein Haus am See</title>
     <link rel="icon" href="./favicon.ico">
 
     <!-- Styles -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,700' rel="stylesheet">
-    <link href="./css/style.css" type="text/css" rel="stylesheet">
-    <!-- include Mapbox GL style -->
+
+    <!-- Mapbox GL style -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.css" rel="stylesheet" />
-    <!-- include Mapbox Geocoder style -->
+    <!-- Mapbox Geocoder style -->
     <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.css"
         rel="stylesheet" type="text/css" />
+    <!-- own stylesheet at the end so mapbox styles can't override these! -->
+    <link href="./css/style.css" type="text/css" rel="stylesheet">
 
     <!-- TODO preload some resources for better performance ?
     <link rel="preload" href="./css/style.css" as="style">
@@ -25,10 +26,6 @@
 
     <!-- Scripts -->
 
-    <!-- TODO webgl error checker (throws lots of errors right now because of the unfinished code)
-    <script src="https://greggman.github.io/webgl-lint/webgl-lint.js"></script>
-    -->
-
     <!-- for async & defer, see https://developer.mozilla.org/en-US/docs/Glossary/Perceived_performance-->
     <script type="module" src="./dist/bundle.js" async defer></script>
 </head>
@@ -36,7 +33,8 @@
 <body>
     <noscript>
         <strong>
-            Unfortunately, this site doesn't work properly without JavaScript enabled. Please enable it to continue.
+            Leider funktioniert diese Seite nicht ohne JavaScript. Bitte aktiviere JavaScript in den
+            Browsereinstellungen, um fortzufahren.
         </strong>
     </noscript>
 
@@ -44,7 +42,8 @@
         <h1>Ein Haus am See</h1>
         <button type="button" id="deckglButton">Add Deckgl Layer</button>
         <button type="button" id="lumaButton">Add Luma Layer</button>
-        <button type="button" id="showLocations">Show suitable locations</button>
+        <button type="button" id="showLocations">Zeige geeignete Orte</button>
+        <button type="button" id="showFilters">Zeige Filter</button>
         <button type="button" id="showCustomData">Add WebGL custom data</button>
         <button type="button" id="blurButton">Test Blur</button>
     </header>
@@ -54,23 +53,27 @@
         <div id="overpass-api-controls">
             <div class="dropdown">
                 <button type="button" class="dropbtn">
-                    Select type of data
-                    <i class="fa fa-caret-down"></i>
+                    Wähle den OSM-Tag aus:
+                    <i class="caret-down"></i>
                 </button>
                 <div class="dropdown-content">
                     <!-- # scrolls to the top -->
-                    <a href="#">Bar</a>
                     <a href="#">Restaurant</a>
                     <a href="#">Cafe</a>
-                    <a href="#">Supermarket</a>
-                    <a href="#">River</a>
-                    <a href="#">University</a>
+                    <a href="#">Supermarkt</a>
+                    <a href="#">Bar</a>
                     <a href="#">Park</a>
+                    <a href="#">Fluss</a>
+                    <a href="#">Autobahn</a>
+                    <a href="#">Bushaltestelle</a>
+                    <a href="#">Bahnhof</a>
+                    <a href="#">Universität / OTH</a>
+                    <a href="#">Wald</a>
                 </div>
             </div>
 
             <input id="query-input" placeholder="amenity=bar" type="text" size="40">
-            <input id="query-button" type="button" value="Fetch from OSM">
+            <input id="query-button" type="button" value="Filter anwenden">
 
             <div class="selection-box hidden">
                 <ul id="selection-list"></ul>
@@ -82,6 +85,7 @@
         <!-- TODO -->
         <canvas id="test_canvas"></canvas>
         <canvas id="deck_canvas"></canvas>
+        <canvas id="texture_canvas">Your browser does not seem to support HTML5 canvas.</canvas>
     </div>
 
     <div class="map-overlay" id="legend"></div>
@@ -89,21 +93,184 @@
     <div id="snackbar"></div>
 
 
-    <div id="sidebar">
-        <div class="sideHeading">
-            <a href="javascript:void(0)" class="closeSidebar">&larr;</a>
-            <h2>Suitable Locations</h2>
+    <!-- Modal for filter details -->
+    <div id="filterModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-header">Modal Header</h2>
+
+            <div class="modal-body">
+
+                <form id="modal-form">
+                    <div class="distance-container">
+                        <p class="settings-label">Entfernung: </p>
+
+                        <!--<input type="number" class="distance-input" value="300">-->
+                        <input type="text" class="distance-input" value="300" pattern="\d*" />
+
+                        <div>
+                            <select id="distance-unit-select">
+                                <option value="m">m</option>
+                                <option value="km">km</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="importance-container">
+                        <p class="settings-label">Relevanz: </p>
+
+                        <div>
+                            <select id="importance-select">
+                                <option value="optional">optional</option>
+                                <option value="wichtig" selected>wichtig</option>
+                                <option value="sehr wichtig">sehr wichtig</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="polarity-container">
+                        <p class="settings-label">Dieses Kriterium soll: </p>
+
+                        <label class="container">möglichst nah sein
+                            <input type="radio" checked="checked" name="polarity" value="true">
+                            <span class="checkmark"></span>
+                        </label>
+                        <label class="container">möglichst weit entfernt sein
+                            <input type="radio" name="polarity" value="false">
+                            <span class="checkmark"></span>
+                        </label>
+                    </div>
+
+                </form>
+            </div>
+
+            <div id="modal-buttons">
+                <button type="button" id="cancel-button">Abbrechen</button>
+                <button type="button" id="add-filter-button">Hinzufügen</button>
+                <!--<button type="button" id="update-filter-button" class="hidden">Aktualisieren</button>-->
+            </div>
         </div>
-        <div id="listings" class="listings"></div>
+    </div>
+
+
+    <!-- TODO bei resizing der map stimmen manchmal die breiten von sidebar und map nicht mehr ganz! 
+        * map.resize(); könnte das lösen vllt
+    -->
+
+    <!-- sidebar container -->
+    <div class="sidebar">
+
+        <!-- Filter Selection Sidebar -->
+        <div id="filter-sidebar">
+            <div class="sideHeading">
+                <a href="javascript:void(0)" class="closeSidebar">
+                    &larr;
+                    <!--alternativ: &times;-->
+                </a>
+                <h2>Filterauswahl</h2>
+            </div>
+
+            <div id="all-filters" class="all-filters">
+
+                <button class="filter-categories">Natur
+                    <i class="caret-down"></i>
+                </button>
+                <div class="filter-entries">
+                    <a href="#">Park</a>
+                    <a href="#">Wald</a>
+                    <a href="#">Fluss</a>
+                </div>
+
+                <button class="filter-categories">Gastronomie
+                    <i class="caret-down"></i>
+                </button>
+                <div class="filter-entries">
+                    <a href="#">Restaurant</a>
+                    <a href="#">Cafe</a>
+                    <a href="#">Bar</a>
+                </div>
+
+                <button class="filter-categories">Öffentliche Verkehrsmittel
+                    <i class="caret-down"></i>
+                </button>
+                <div class="filter-entries">
+                    <a href="#">Bushaltestelle</a>
+                    <a href="#">Bahnhof</a>
+                </div>
+
+                <button class="filter-categories">Einkaufsmöglichkeiten
+                    <i class="caret-down"></i>
+                </button>
+                <div class="filter-entries">
+                    <a href="#">Supermarkt</a>
+                    <a href="#">Einkaufszentrum</a>
+                </div>
+
+                <button class="filter-categories">Bildung
+                    <i class="caret-down"></i>
+                </button>
+                <div class="filter-entries">
+                    <a href="#">Universität / OTH</a>
+                    <a href="#">Schule</a>
+                </div>
+
+                <!-- TODO -->
+                <button class="filter-categories">Sonstiges
+                    <i class="caret-down"></i>
+                </button>
+                <div class="filter-entries">
+                    <a href="#">Autobahn</a>
+                    <a href="#">Parkplatz</a>
+                </div>
+
+            </div>
+
+            <hr class="divider">
+
+            <div>
+                <div class="no-filter">
+                    <p>Keine Filter sind im Moment aktiv.</p>
+                    <p>Klicke auf eine der Kategorien oben, um Filter auszuwählen.</p>
+                </div>
+
+                <!-- List with currently active filters -->
+                <ul id="active-filters"></ul>
+            </div>
+
+            <!-- TODO noch 2 Buttons ganz unten für Reset all und Filter anwenden? -->
+
+        </div>
+
+        <!-- Locations Sidebar -->
+        <div id="loc-sidebar" class="hidden">
+            <div class="sideHeading">
+                <a href="javascript:void(0)" class="closeSidebar">&larr;</a>
+                <h2>Gefundene Häuser</h2>
+            </div>
+
+            <!-- List with locations -->
+            <div id="location-listings" class="location-listings"></div>
+        </div>
+
     </div>
 
 
     <template id="li-template">
         <li>
-            <button id="close-btn" class="close">
-                <i class="fa fa-close"></i>
-                <!--&times;-->
-            </button>
+            <button id="close-btn" class="close">&times;</button>
+        </li>
+    </template>
+
+
+    <!-- TODO erstellte Filter sollten nachträglich auch noch geupdated werden können (wenn Zeit noch implementieren!) -->
+    <template id="filter-li-template">
+        <li>
+            <!-- TODO add a checkbox at the left to allow the user to show and hide filters without completely removing them -->
+            <button id="remove-filter-button" type="button">Löschen</button>
+            <!--
+            <div class="li-content">
+                <button id="remove-filter-button" type="button">Löschen</button>
+            </div>
+            -->
         </li>
     </template>
 

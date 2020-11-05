@@ -44,6 +44,12 @@ class MapLayerManager {
   private activeLayers: (Layer | CustomLayerInterface)[] = [];
   //private activeLayers: string[] = [];
 
+  //TODO visibleLayers auch noch separat speichern?
+
+  get currentActiveLayers(): (Layer | CustomLayerInterface)[] {
+    return this.activeLayers;
+  }
+
   // Add a geojson source, see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson
   addNewGeojsonSource(
     sourceName: string,
@@ -129,6 +135,16 @@ class MapLayerManager {
     }
   }
 
+  hideLayer(layerId: string): void {
+    map.setLayoutProperty(layerId, "visibility", "none");
+  }
+
+  removeLayerFromMap(layerId: string): void {
+    map.removeLayer(layerId);
+    // filter the elements with the given layerid out
+    this.activeLayers = this.activeLayers.filter((el) => el.id !== layerId);
+  }
+
   /**
    * Delete all layers for the source with the given ID.
    */
@@ -185,6 +201,7 @@ class MapLayerManager {
       paint: {
         //increase circle radius (in pixels) when zooming in
         // see https://docs.mapbox.com/help/tutorials/mapbox-gl-js-expressions/
+        /*
         "circle-radius": [
             "interpolate", ["linear"], ["zoom"],
             0, 0.0,
@@ -192,6 +209,7 @@ class MapLayerManager {
             //12, ["/", ["get", "zoom"], 3], //TODO adjust expression values
             16, 25.0,
         ],
+        */
         // style color based on amenity type
         "circle-color": [
             "match",
@@ -202,6 +220,7 @@ class MapLayerManager {
             "supermarket", "#3bb2d0",
             "#ff0000", // fallback color for others
         ],
+        /*
         "circle-stroke-width": [
             "interpolate", ["linear"], ["zoom"],
             4, 0.0,
@@ -224,6 +243,7 @@ class MapLayerManager {
             20, 1.0,
         ],
         "circle-blur": 0.3,
+        */
       },
     };
 
@@ -235,7 +255,7 @@ class MapLayerManager {
       paint: {
         "line-color": "rgba(255, 0, 0, 255)",
         "line-width": 8,
-        "line-blur": 8,
+        //"line-blur": 8,
         //"line-offset": 3,
         //"line-opacity": 0.5,
         //"line-gap-width": 20, // renders a second line 20 pixes away
@@ -250,8 +270,7 @@ class MapLayerManager {
       filter: ["match", ["geometry-type"], polygonType, true, false],
       source: sourceName,
       paint: {
-        //"fill-outline-color": "rgba(0,0,0,0.3)",
-        "fill-outline-color": "rgba(255,255,255,0.9)", //to render white outlines around the polygon
+        //"fill-outline-color": "rgba(255,255,255,0.9)", //to render white outlines around the polygon
         "fill-color": "rgba(123,123,255,0.6)",
         "fill-opacity": 0.6,
       },

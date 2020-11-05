@@ -67,6 +67,7 @@ class Benchmark {
   public async getAverageTime(
     fn: (...args: any[]) => any,
     args: any[],
+    actionName: string,
     n = NUMBER_OF_EXECUTIONS
   ): Promise<number> {
     const times: number[] = [];
@@ -80,7 +81,7 @@ class Benchmark {
     }
 
     const average = times.reduce((prev, curr) => prev + curr, 0) / times.length;
-    console.log(`Average time taken over ${n} executions: ${average} milliseconds`);
+    console.log(`${actionName}: Average time taken over ${n} executions: ${average} milliseconds`);
     return average;
   }
 

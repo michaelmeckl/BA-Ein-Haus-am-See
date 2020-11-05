@@ -1,4 +1,4 @@
-import { vertexShaderCanvas, fragmentShaderCanvas } from "./shaders";
+import { vertexShaderCanvas, blurFragmentShaderCanvas } from "./shaders";
 import {
   computeKernelWeight,
   createProgram,
@@ -82,7 +82,11 @@ export function renderAndBlur(image: HTMLImageElement): HTMLCanvasElement | null
 
   // init shader program
   const vertexShader = createShader(glContext, glContext.VERTEX_SHADER, vertexShaderCanvas());
-  const fragmentShader = createShader(glContext, glContext.FRAGMENT_SHADER, fragmentShaderCanvas());
+  const fragmentShader = createShader(
+    glContext,
+    glContext.FRAGMENT_SHADER,
+    blurFragmentShaderCanvas()
+  );
   const program = createProgram(glContext, vertexShader, fragmentShader);
 
   // lookup attributes
@@ -168,11 +172,3 @@ export function renderAndBlur(image: HTMLImageElement): HTMLCanvasElement | null
 
   return newCanvas;
 }
-
-//TODO oder man nutzt einfach das CustomLayer (das ist vermutlich fast am sinnvollsten?)
-/**
-   * Einen Canvas darüber zu legen ist laut https://github.com/mapbox/mapbox-gl-js/issues/6456 nicht allzu 
-   * gut für die Performance, stattdessen Custom Layer verwenden! Probleme mit canvas:
-        - Severe performance hit; browsers have a hard time compositing two GL contexts.
-        - You can only draw on top of a Mapbox map — there’s no way to draw something in between
-   */

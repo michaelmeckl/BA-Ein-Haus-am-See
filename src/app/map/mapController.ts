@@ -8,6 +8,7 @@ import type {
   GeoJsonProperties,
   GeometryObject,
   LineString,
+  MultiPolygon,
   Point,
   Polygon,
 } from "geojson";
@@ -17,7 +18,7 @@ import { fetchMaskData, fetchOsmData } from "../network/networkUtils";
 import { renderAndBlur } from "../webgl/blurFilter";
 import LumaLayer from "../webgl/lumaLayer";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { addBlurredImage, addCanvasOverlay } from "./canvasUtils";
+import { addBlurredImage, addCanvasOverlay, readImageFromCanvas } from "./canvasUtils";
 import ClusterManager from "./clusterManager";
 import CustomScatterplotLayer, { createMapboxLayer, getDeckGlLayer } from "./deckLayer";
 import { getAllRenderedFeatures, getAllSourceFeatures, getDataFromMap } from "./featureUtils";
@@ -25,7 +26,7 @@ import { map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import mapLayerManager from "./mapLayerManager";
-import { loadSidebar } from "./mapTutorialStoreTest";
+import { loadLocations } from "./locationsPanel";
 import { PerformanceMeasurer } from "./performanceMeasurer";
 import { featureCollection, point } from "@turf/helpers";
 import circle from "@turf/circle";
@@ -34,30 +35,30 @@ import bbox from "@turf/bbox";
 import geojsonCoords from "@mapbox/geojson-coords";
 import { GeoJsonLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { addWebglCircle } from "../webgl/webglCircle";
+import { testCampusExampes } from "../webgl/successfulExamples";
+import createOverlay from "../webgl/overlayCreator";
+import { resolve } from "path";
+import { reject } from "lodash";
+import html2canvas from "html2canvas";
+import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
+import createCanvasOverlay from "./canvasRenderer";
+import FilterManager from "../mapData/filterManager";
+import { addBufferToFeature } from "./turfUtils";
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
+
+//export let originalMapImage: HTMLImageElement | undefined;
 
 /**
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
  */
 export default class MapController {
-  //private mapData = new Map<string, number[]>(); // type as key, array of all points as value
-  //TODO oder so:
-  //private mapData = new Map<string, Map<string, number[]>>(); // sourcename as key, value: map from above
-  //TODO oder so:
-  private mapData = new Map<string, number[] | number[][]>(); // sourcename as key, array of all points as value or array of
-  // array for polygon and linestring?? (basically do i want to flatten it??)
-
-  //private currentData?: string;
-
   private currentPoints = new Set<Feature<Point, GeoJsonProperties>>();
   private currentWays = new Set<Feature<LineString, GeoJsonProperties>>();
   private currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
-  //TODO
-  private allPolygonFeatures: any[] = [];
-
-  private activeFilters: Set<string> = new Set();
+  //prettier-ignore
+  private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -67,12 +68,9 @@ export default class MapController {
   init(): Promise<void> {
     return new Promise((resolve, reject) => {
       map.on("load", () => {
-        // setup the initial map state
-        this.setupMapState();
-
         resolve();
       });
-      map.on("error", () => reject());
+      map.on("error", (err) => reject(err));
     });
   }
 
@@ -81,16 +79,12 @@ export default class MapController {
 
     // disable map rotation using right click + drag
     map.dragRotate.disable();
-
     // disable map rotation using touch rotation gesture
     map.touchZoomRotate.disableRotation();
 
     // start measuring the frame rate
     const performanceMeasurer = new PerformanceMeasurer();
     performanceMeasurer.startMeasuring();
-
-    //TODO
-    loadSidebar();
 
     //map.showTileBoundaries = true;
 
@@ -143,6 +137,7 @@ export default class MapController {
     //TODO !!
     //this.reloadData();
     //this.blurMap();
+    //this.addLumaGlLayer();
   }
 
   onSourceLoaded(): void {
@@ -164,18 +159,12 @@ export default class MapController {
     //console.log("A dataloading event occurred.");
   }
 
-  //TODO should all map click events be handled here? -> probably
   async onMapClick(e: mapboxgl.MapMouseEvent & mapboxgl.EventData): Promise<void> {
     console.log("Click:", e);
 
-    /*
-    getPointsInRadius(map);
+    //addWebglCircle(map);
 
-    //!not working rigth now
-    //sortDistances(e.lngLat);
-    */
-
-    addWebglCircle(map);
+    //testCampusExampes();
 
     //this.showCurrentViewportCircle();
 
@@ -198,18 +187,9 @@ export default class MapController {
     map.addControl(Geocoder.geocoderControl, "bottom-left");
   }
 
-  addActiveFilter(filter: string): void {
-    this.activeFilters.add(filter);
-  }
-
-  //TODO remove map data in here? so everything is in one place?
-  removeActiveFilter(filter: string): void {
-    this.activeFilters.delete(filter);
-  }
-
   reloadData(): void {
     //TODO load data new on every move, works but needs another source than overpass api mirror
-    this.activeFilters.forEach(async (param) => {
+    FilterManager.activeFilters.forEach(async (param) => {
       Benchmark.startMeasure("Fetching data on moveend");
       const data = await fetchOsmData(this.getViewportBoundsString(), param);
       console.log(Benchmark.stopMeasure("Fetching data on moveend"));
@@ -254,12 +234,30 @@ export default class MapController {
    * southern-most latitude, western-most longitude, northern-most latitude, eastern-most longitude.
    * @return string representation of the bounds in the above order
    */
-  getViewportBoundsString(): string {
+  getViewportBoundsString(additionalDistance?: number): string {
     const currBounds = map.getBounds();
-    const southLat = currBounds.getSouth();
-    const westLng = currBounds.getWest();
-    const northLat = currBounds.getNorth();
-    const eastLng = currBounds.getEast();
+    let southLat = currBounds.getSouth();
+    let westLng = currBounds.getWest();
+    let northLat = currBounds.getNorth();
+    let eastLng = currBounds.getEast();
+
+    console.log(currBounds);
+
+    if (additionalDistance) {
+      const bufferedBBox = bbox(
+        addBufferToFeature(
+          //@ts-expect-error
+          bbpolygon([westLng, southLat, eastLng, northLat]),
+          additionalDistance
+        )
+      );
+      console.log(bufferedBBox);
+
+      southLat = bufferedBBox[1];
+      westLng = bufferedBBox[0];
+      northLat = bufferedBBox[3];
+      eastLng = bufferedBBox[2];
+    }
 
     return `${southLat},${westLng},${northLat},${eastLng}`;
   }
@@ -288,6 +286,7 @@ export default class MapController {
     //@ts-expect-error
     const viewportCirclePolygon = circle([center.lng, center.lat], radius, { units: "meters" });
 
+    //@ts-expect-error
     mapLayerManager.addNewGeojsonSource("viewportCircle", viewportCirclePolygon);
     const newLayer: Layer = {
       id: "viewportCircleLayer",
@@ -325,10 +324,11 @@ export default class MapController {
   }
 
   removeData(sourceName: string): void {
+    console.log("Removing source: ", sourceName);
     mapLayerManager.removeSource(sourceName);
   }
 
-  preprocessGeoData(data: FeatureCollection<GeometryObject, any>): void {
+  preprocessGeoData(data: FeatureCollection<GeometryObject, any>, dataName: string): void {
     // TODO another option would be to let them be and use them as a client side cache later???
     this.currentPoints.clear();
     this.currentWays.clear();
@@ -397,11 +397,19 @@ export default class MapController {
     console.log("this.currentPolygons: ", this.currentPolygons);
 
     const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
-    this.allPolygonFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures);
-    //this.showPreprocessedData(allFeatures);
+    const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures, 250);
+    this.allPolygonFeatures.set(dataName, polyFeatures); //TODO überflüssign wenn mit filterLayers
+
+    const layer = FilterManager.getFilterLayer(dataName);
+    if (layer) {
+      layer.Features = polyFeatures;
+    }
+
+    //this.calculateMaskAndShowData(allFeatures);
+    //this.showPreprocessedData(dataName, polyFeatures);
   }
 
-  showPreprocessedData(
+  calculateMaskAndShowData(
     allFeatures: (
       | Feature<Point, GeoJsonProperties>
       | Feature<LineString, GeoJsonProperties>
@@ -423,43 +431,57 @@ export default class MapController {
       const customData = MercatorCoordinates.flatMap((x: any) => [x.x, x.y]);
       this.addWebGlLayer(customData);
     });
+  }
 
-    mapLayerManager.removeAllLayersForSource("currFeatures");
+  //TODO das funktioniert im moment irgendwie noch nicht richtig mit mehreren hintereinander?
+  showPreprocessedData(
+    sourceName: string,
+    polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
+  ): void {
+    mapLayerManager.removeAllLayersForSource(sourceName);
 
-    // show the points
     const layer: Layer = {
-      id: "points",
-      source: "currFeatures",
-      type: "circle",
+      id: "currFeatures-Layer",
+      source: sourceName,
+      type: "fill",
       paint: {
-        "circle-color": "rgba(255, 0, 0, 1)",
+        "fill-color": "rgba(170, 170, 170, 0.5)",
       },
     };
 
-    if (map.getSource("currFeatures")) {
+    if (map.getSource(sourceName)) {
       // the source already exists, only update the data
-      console.log(`Source ${"currFeatures"} is already used! Updating it!`);
-      mapLayerManager.updateSource("currFeatures", featureCollection(allFeatures));
+      console.log(`Source ${sourceName} is already used! Updating it!`);
+      mapLayerManager.updateSource(sourceName, featureCollection(polygonFeatures));
     } else {
       // source doesn't exist yet, create a new one
-      mapLayerManager.addNewGeojsonSource("currFeatures", featureCollection(allFeatures), false);
+      mapLayerManager.addNewGeojsonSource(sourceName, featureCollection(polygonFeatures), false);
     }
 
     mapLayerManager.addNewLayer(layer, true);
-    //mapLayerManager.addLayers("currFeatures");
   }
 
-  showData(data: FeatureCollection<GeometryObject, any>, sourceName: string): void {
+  //TODO parameter wie distance und relevance müssen vom nutzer eingegeben werden können!
+  showData(
+    data: FeatureCollection<GeometryObject, any>,
+    sourceName: string,
+    distance?: number,
+    relevance?: FilterRelevance,
+    wanted?: boolean
+  ): void {
     console.log("original Data:", data);
     console.log("now adding to map...");
     console.log(sourceName);
 
+    //TODO falls das auf den server ausgelagert wird, muss später nur noch die features und points nachträglich gefüllt werden (mit settern am besten!)
+    FilterManager.addFilter(new FilterLayer(sourceName, distance, relevance, wanted));
+
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(sourceName);
 
-    //TODO
-    this.preprocessGeoData(data);
-    //return;
+    //! Data preprocessing could (and probably should) already happen on the server!
+    this.preprocessGeoData(data, sourceName);
+    //return; //TODO
 
     if (map.getSource(sourceName)) {
       // the source already exists, only update the data
@@ -488,8 +510,6 @@ export default class MapController {
     //if (!gl) return;
 
     const img = new Image();
-    img.src = mapCanvas.toDataURL();
-    //console.log(img.src); // um bild anzuschauen copy paste in adress bar in browser
 
     img.onload = () => {
       img.width = mapCanvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
@@ -503,13 +523,15 @@ export default class MapController {
       if (canvas) {
         // perf-results:  7,8; 12,5; 10,9; 7,3; 6,8  (ms) -> avg: 9,06 ms
         Benchmark.startMeasure("addingCanvasOverlay");
-        addCanvasOverlay(canvas);
+        addCanvasOverlay(canvas, 1.0);
         Benchmark.stopMeasure("addingCanvasOverlay");
 
         // perf-results:  178; 187; 160; 93; 111 (ms) -> avg: 145,8 ms
         //addBlurredImage(img, canvas);
       }
     };
+    img.src = mapCanvas.toDataURL();
+    //console.log(img.src); // um bild anzuschauen copy paste in adress bar in browser
   }
 
   /**
@@ -527,7 +549,7 @@ export default class MapController {
 
     console.log("adding webgl data...");
 
-    const mapData = getDataFromMap(this.activeFilters);
+    const mapData = getDataFromMap(FilterManager.activeFilters);
     const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
     map.addLayer(customLayer, "waterway-label");
 
@@ -589,20 +611,22 @@ export default class MapController {
   }
 
   addLumaGlLayer(): void {
-    console.log("adding luma layer ...");
-
-    const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat({
+    const usw = {
       lng: 12.089283,
       lat: 48.9920256,
-    });
-    const uniSouthEast = mapboxgl.MercatorCoordinate.fromLngLat({
+    };
+    const use = {
       lng: 12.1025303,
       lat: 48.9941069,
-    });
-    const uniNorthWest = mapboxgl.MercatorCoordinate.fromLngLat({
+    };
+    const unw = {
       lng: 12.0909411,
       lat: 49.0012031,
-    });
+    };
+
+    const uniSouthWest = mapboxgl.MercatorCoordinate.fromLngLat(usw);
+    const uniSouthEast = mapboxgl.MercatorCoordinate.fromLngLat(use);
+    const uniNorthWest = mapboxgl.MercatorCoordinate.fromLngLat(unw);
 
     const data = [uniSouthEast, uniNorthWest, uniSouthWest];
 
@@ -621,11 +645,178 @@ export default class MapController {
       }),
 
       mapboxgl.MercatorCoordinate.fromLngLat({
-        lng: 12.59177370071411,
+        lng: 12.12177370071411,
         lat: 49.0198169751917,
       }),
     ];
 
+    //TODO this should of course happen somewhere else later but for now just test it here:
+    // ########################  Overlay Stuff starts #######################
+
+    const ab = {
+      lng: 12.09822,
+      lat: 49.006714,
+    };
+
+    const cd = {
+      lng: 12.09299,
+      lat: 49.006714,
+    };
+
+    const ef = {
+      lng: 12.084302,
+      lat: 49.017167,
+    };
+
+    const gh = {
+      lng: 12.083916,
+      lat: 49.015225,
+    };
+
+    const ij = {
+      lng: 12.0873,
+      lat: 49.014634,
+    };
+
+    const kl = {
+      lng: 12.088203,
+      lat: 49.015844,
+    };
+
+    const aa = { lng: 12.106899071216729, lat: 49.011636152227666 };
+    const aaa = { lng: 12.106187741742344, lat: 49.012298273504406 };
+    const ac = { lng: 12.105293115952813, lat: 49.012856640245396 };
+    const ad = { lng: 12.104249578251874, lat: 49.01328978965319 };
+    const ae = { lng: 12.103097240488244, lat: 49.013581072390174 };
+    const af = { lng: 12.101880399066786, lat: 49.01371929295886 };
+    const ag = { lng: 12.100645830727052, lat: 49.013699140192415 };
+    const ah = { lng: 12.099440992775836, lat: 49.01352139127261 };
+    const aj = { lng: 12.098312197267857, lat: 49.01319288144877 };
+    const ak = { lng: 12.097302829613584, lat: 49.01272624068412 };
+    const al = { lng: 12.096451680322966, lat: 49.012139407453525 };
+    const am = { lng: 12.095791454144237, lat: 49.011454938505246 };
+    const an = { lng: 12.095347513915694, lat: 49.01069914124463 };
+
+    console.log(this.allPolygonFeatures);
+    console.log(this.allPolygonFeatures.size);
+
+    const overlayAlternative: mapboxgl.Point[][][] = [];
+
+    const poly0 = [usw, use, ab];
+    const poly1 = [usw, use, unw, ab, cd];
+    const poly2 = [ef, gh, ij, kl];
+    const poly3 = [usw, use, ab, cd];
+    const kreis = [aa, aa, aaa, ac, ad, ae, af, ag, ah, aj, ak, al, am, an];
+
+    // layer 1
+    overlayAlternative[0] = []; //! WICHTIG
+    overlayAlternative[0].push(poly1.map((el) => mapboxUtils.convertToPixelCoord(el)));
+    overlayAlternative[0].push(poly2.map((el) => mapboxUtils.convertToPixelCoord(el)));
+    // layer 2
+    overlayAlternative[1] = [];
+    overlayAlternative[1].push(poly0.map((el) => mapboxUtils.convertToPixelCoord(el)));
+    overlayAlternative[1].push(kreis.map((el) => mapboxUtils.convertToPixelCoord(el)));
+    // layer 3
+    overlayAlternative[2] = [];
+    overlayAlternative[2].push(poly3.map((el) => mapboxUtils.convertToPixelCoord(el)));
+
+    /*
+    const currentMapData: Feature<Polygon | MultiPolygon, GeoJsonProperties>[][][] = [];
+    let ii = 0;
+    this.activeFilters.forEach((filter) => {
+      const polyData = this.allPolygonFeatures.get(filter);
+      if (polyData) {
+        currentMapData[ii] = []; // needs to be initialized before adding data!
+        currentMapData[ii].push(polyData);
+      }
+      ii++;
+    });
+    console.log("currentMapData: ", currentMapData);
+    */
+
+    const overlayData: FilterLayer[] = [];
+    //const overlayData: mapboxgl.Point[][][] = [];
+
+    console.log(FilterManager.activeFilters);
+    console.log(FilterManager.allFilterLayers);
+    console.log(FilterManager);
+
+    //! wenn die polygon features sonst nirgendwo gebraucht werden, könnte man gleich oben wenn sie in die Map
+    //! gespeichert werden, sie zu mapboxgl.Points umwandeln, dann könnte man vllt die doppelte for-schleife hier vermeiden
+
+    let i = 0;
+    for (const [name, features] of this.allPolygonFeatures.entries()) {
+      overlayData[i] = new FilterLayer(name); //TODO oder lieber gleich statt this.allPolygonFeatures?
+      for (let index = 0; index < features.length; index++) {
+        const feature = features[index];
+        const coords = feature.geometry.coordinates;
+
+        // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
+        if (coords.length > 1) {
+          //? oder will ich hier das das zu einem array "flatten" und nur dieses pushen??
+          console.log("Multipolygon: ", coords);
+          //const flattened: mapboxgl.Point[] = [];
+          //TODO Multipolygone führen aber so zum Beispiel bei der Donau zu vollkommen falschen Renderergebnissen!!
+          //TODO vllt doch direkt im shader statt mit turf ?
+          for (const coordPart of coords) {
+            //@ts-expect-error
+            //prettier-ignore
+            overlayData[i].Points.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+            //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+          }
+          // overlayData[i].push(flattened);
+        } else {
+          console.log("Polygon");
+          //@ts-expect-error
+          //prettier-ignore
+          const pointData = coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord));
+          overlayData[i].Points.push(pointData);
+
+          //TODO das statt dem overlay data dann verwenden
+          const filterLayer = FilterManager.getFilterLayer(name);
+          if (filterLayer) {
+            filterLayer.Points = pointData;
+          }
+        }
+      }
+      i++;
+    }
+
+    /**
+     *[
+     *  { ### Park
+     *    points: [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...,
+     *    radius: 500,
+     *    relevance: "very important",
+     *    name: "Park"  ?? (vllt nicht relevant)
+     *  },
+     *  { ### Restaurant
+     *    points: [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...,
+     *    radius: 2000,
+     *    relevance: "not very important",
+     *  },
+     *  ...
+     * ]
+     */
+
+    console.log("OverlayData: ", overlayData);
+    console.log("OverlayAlternative: ", overlayAlternative);
+
+    // check that there is data to overlay the map with
+    if (overlayData.length > 0) {
+      //createOverlay(overlayData);
+      createCanvasOverlay(overlayData);
+    } else {
+      console.warn("Creating an overlay is not possible because overlayData is empty!");
+    }
+
+    // ########################  Overlay Stuff ends #######################
+
+    //* Lumagl code:
+    /*
+    console.log("adding luma layer ...");
+
     const animationLoop = new LumaLayer(data, data2);
+    */
   }
 }
