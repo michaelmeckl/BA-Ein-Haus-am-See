@@ -250,22 +250,33 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
 
   context.drawImage(canvas, 0, 0);
 
-  const redImageData = context.getImageData(0, 0, c.width, c.height);
+  const imageData = context.getImageData(0, 0, c.width, c.height);
 
-  const data = redImageData.data;
+  /*
+  // taken from http://jsfiddle.net/andrewjbaker/Fnx2w/
+  const buf = new ArrayBuffer(imageData.data.length);
+  const buf8 = new Uint8ClampedArray(buf);
+  const buf32 = new Uint32Array(buf);
+  
+  const color = 0;
+  for (let pixel = 0; pixel < buf32.length; pixel++) {
+    const alpha = 255 - imageData.data[pixel * 64];
+    buf32[pixel] = (alpha << 24) | (color << 16) | (color << 8) | color;
+  }
+  imageData.data.set(buf8);
+  */
+
+  const data = imageData.data;
   let i = 0;
-
   while (i < data.length) {
-    const alpha = 255 - data[i]; // in this matte, white = fully transparent
     data[i] = data[i + 1] = data[i + 2] = 0; // clear matte to black
-    data[i + 3] = alpha; // set alpha
+    data[i + 3] = 255 - data[i]; // set alpha; in this matte, white = fully transparent
     i += 4; // next pixel
   }
-  //assign red to the alpha channel (i.e. channel 3)
-  //assignChannel(redImageData, 3, 0);
 
-  //context.drawImage(canvas, 0, 0);
-  context.putImageData(redImageData, 0, 0);
+  context.putImageData(imageData, 0, 0);
 
+  //* add canvas with opacity 0.7 (i.e. 70% overlay, 30% map background) which makes the overlay clearly visible
+  //* even for lighter grey but still allows the user to see the map background everywhere
   addCanvasOverlay(c, 0.7);
 }

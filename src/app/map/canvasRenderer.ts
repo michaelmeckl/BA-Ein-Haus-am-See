@@ -572,5 +572,4 @@ export default async function createCanvasOverlay(data: any): Promise<void> {
   renderer.deleteImages();
 
   console.log("finished blurring and overlay");
-  console.log("8");
 }
