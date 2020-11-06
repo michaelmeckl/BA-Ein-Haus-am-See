@@ -1,4 +1,3 @@
-import { permittedCrossDomainPolicies } from "helmet";
 import * as twgl from "twgl.js";
 import Benchmark from "../../shared/benchmarking";
 import type { FilterLayer } from "../mapData/filterLayer";
@@ -12,8 +11,8 @@ import { metersInPixel } from "./mapboxUtils";
 // the number of textures to combine
 let textureCount;
 
-//! to improve performance everything that doesn't change can be rendered to an offscreen canvas and on next
-//! render simply blitted onto the main canvas with c.getContext('2d').drawImage(offScreenCanvas, 0, 0);
+//! to improve performance everything that doesn't change can be rendered to an offscreen canvas (in a web worker)
+//! and on next render simply blitted onto the main canvas with c.getContext('2d').drawImage(offScreenCanvas, 0, 0);
 
 class CanvasRenderer {
   //2D canvas api
@@ -27,93 +26,80 @@ class CanvasRenderer {
   private texCoordBuffer: WebGLBuffer | null = null;
 
   // others
-  private mapLayer!: any;
-  allTextures: HTMLImageElement[] = [];
-  //TODO diese variablen hier müssten gecleared werden immer am Ende oder Anfang!
   private weights: number[] = [];
+  allTextures: HTMLImageElement[] = [];
 
   constructor() {
-    //const canvas = document.createElement("canvas");  //* doesn't work for some reason
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     canvas.width = map.getCanvas().clientWidth;
     canvas.height = map.getCanvas().clientHeight;
-    //console.log("Width:", canvas.width);
-    //console.log("Height:", canvas.height);
 
     this.overlayCanvas = canvas;
 
     const context = canvas.getContext("2d");
     if (!context) {
-      throw new Error("No 2d context from canvasRenderer");
+      throw new Error("No 2d context in canvasRenderer available!");
     }
     this.ctx = context;
 
+    // setup the webgl code for the gaussian blur filter
     setupGaussianBlurFilter();
   }
 
-  //TODO only clear a specific part (not the whole canvas)
-  //! save coordinates of the old overlay and if no zoom update only the rest ??? ->  is this better?
-
   async renderPolygons(mapLayer: FilterLayer): Promise<any> {
-    this.mapLayer = mapLayer; // TODO im moment unnötig aber vermtl nötig um ständiz zu updaten!
-    console.log("this.mapLayer: ", this.mapLayer);
-
-    //shorter alias for context
-    const ctx = this.ctx;
-
     // clear the canvas
-    ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-
-    //fill canvas black initially
-    ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
-    ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+    this.ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
 
     this.weights.push(mapLayer.Relevance);
 
-    //TODO
-    console.log(
-      "Meter in pixel: ",
-      metersInPixel(mapLayer.Distance, map.getCenter().lat, map.getZoom())
-    );
+    const pixelDist = metersInPixel(mapLayer.Distance, map.getCenter().lat, map.getZoom());
+    console.log("Meter in pixel: ", pixelDist);
 
-    //ctx.globalCompositeOperation = "source-over";
+    console.log("Wanted: ", mapLayer.Wanted);
+
     // apply a "feather"/blur - effect to everything that is drawn on the canvas from now on
     //ctx.filter = "blur(32px)";
 
-    Benchmark.startMeasure("render and blur all polygons of one layer");
+    if (mapLayer.Wanted) {
+      //fill canvas black initially
+      this.ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
+      this.ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
 
-    for (const polygon of this.mapLayer.Points) {
-      const vertices = polygon.flatMap((el: { x: any; y: any }) => [el.x, el.y]);
-      //console.log("vertices: ", vertices);
-      if (vertices.length % 2 !== 0) {
-        console.warn("Not even number of vertices for ", polygon);
-      }
+      // fill polygons white, fully opaque
+      this.ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
+    } else {
+      //fill canvas white initially
+      this.ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
+      this.ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
 
-      ctx.beginPath();
-      ctx.moveTo(vertices[0], vertices[1]);
-      // draw the polygon
-      //* if holes must be rendered both both polygons (outside and hole) have to be in opposite clockwise order
-      for (let index = 2; index < vertices.length - 1; index += 2) {
-        ctx.lineTo(vertices[index], vertices[index + 1]);
-      }
-      ctx.closePath();
-
-      // draw polygons white, fully opaque
-      ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
-      ctx.fill("evenodd");
-
-      //promises.push(this.blurPolygon());
+      // fill polygons black, fully opaque
+      this.ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
     }
 
-    //const allBlurredPolys = await Promise.all(promises);
+    Benchmark.startMeasure("render and blur all polygons of one layer");
+
+    for (const polygon of mapLayer.Points) {
+      const startPoint = polygon[0];
+      this.ctx.beginPath();
+      this.ctx.moveTo(startPoint.x, startPoint.y);
+
+      // draw the polygon
+      for (let index = 1; index < polygon.length; index += 1) {
+        this.ctx.lineTo(polygon[index].x, polygon[index].y);
+      }
+      this.ctx.closePath();
+
+      this.ctx.fill("evenodd");
+    }
+
     Benchmark.stopMeasure("render and blur all polygons of one layer");
 
     const img = await readImageFromCanvas(this.overlayCanvas);
 
-    //TODO:
-    //if(shouldShowAreas) { do blur ]
+    //TODO: give user the option to specify if he wants blur and set in at the beginning of each renderOverlay
+    //if(this.shouldShowAreas) { do blur ]
     Benchmark.startMeasure("blur Image in Webgl");
-    const blurredCanvas = applyGaussianBlur([img]);
+    const blurredCanvas = applyGaussianBlur(img, pixelDist);
     Benchmark.stopMeasure("blur Image in Webgl");
 
     // draw blurred canvas on the overlayCanvas
@@ -125,10 +111,8 @@ class CanvasRenderer {
   }
 
   combineOverlays(textureLayers: HTMLImageElement[]): any {
-    //console.log("textureLayers", textureLayers);
-
     if (textureLayers.length === 0) {
-      console.error("TextureLayers are empty! Overlay can't be created!");
+      console.warn("TextureLayers are empty! Overlay can't be created!");
       return;
     }
 
@@ -205,7 +189,19 @@ class CanvasRenderer {
     textureLayers.forEach(() => {
       ws.push(1 / textureLayers.length);
     });
-    gl.uniform1fv(weightsLoc, ws);
+
+    console.log("Weights:", this.weights);
+    let sum = 0;
+    for (let i = 0; i < textureLayers.length; i++) {
+      sum += this.weights[i];
+    }
+    // calculate a normalizer value so that all values will eventually sum up to 1
+    const normalizer = 1 / sum;
+    // normalize all values
+    this.weights.map((w) => w * normalizer);
+
+    console.log("Normalized Weights:", this.weights);
+    gl.uniform1fv(weightsLoc, this.weights);
 
     // Tell the shader to use texture units 0 to textureCount - 1
     gl.uniform1iv(textureLoc, Array.from(Array(textureCount).keys())); //uniform variable location and texture Index (or array of indices)
@@ -220,7 +216,6 @@ class CanvasRenderer {
 
     gl.disable(gl.BLEND);
 
-    //TODO render this above in an offscreen canvas and just copy result to main canvas
     this.ctx.drawImage(canvas, 0, 0);
 
     //cleanup and delete webgl resources
@@ -257,8 +252,9 @@ class CanvasRenderer {
     //this.glCtx.getExtension("WEBGL_lose_context")?.restoreContext();
   }
 
-  deleteImages(): void {
-    // clear array by setting its length to 0
+  reset(): void {
+    this.weights = [];
+    // clear images by setting its length to 0
     this.allTextures.length = 0;
   }
 }
@@ -283,8 +279,16 @@ export async function createOverlay(data: FilterLayer[]): Promise<void> {
 
   applyAlphaMask(resultCanvas);
 
-  //delete all created images in the overlay class
-  renderer.deleteImages();
+  //Reset state for next rendering
+  renderer.reset();
 
   console.log("finished blurring and compositing");
 }
+
+//TODO separate method that only calculates which layers changed and only render difference??
+/*
+export async function updateOverlay(newData: FilterLayer[]): Promise<void> {
+  // calc differences
+  createOverlay(newData);
+}
+*/

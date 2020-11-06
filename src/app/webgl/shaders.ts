@@ -68,13 +68,14 @@ export function combineOverlayFragmentShader(): string {
 }
 
 export function getVSForGaussBlur(): string {
-  return `
-  precision highp float;
+  return `#version 300 es
 
-  attribute vec3 coordinate;
-  attribute vec2 textureCoordinate;
+  precision mediump float;
 
-  varying vec2 varyingTextureCoordinate;
+  in vec3 coordinate;
+  in vec2 textureCoordinate;
+
+  out vec2 varyingTextureCoordinate;
 
   void main(void) {
     gl_Position = vec4(coordinate, 1.0);
@@ -86,14 +87,13 @@ export function getVSForGaussBlur(): string {
 
 //* 2D gaussian blur fs:
 // see. http://pieper.github.io/sites/glimp/gaussian.html
-// The for loop should be unrolled for better performance!
+//! The for loop should be unrolled for better performance!
 export function getGaussianBlurFS(): string {
   return `
   precision mediump float;
 
   // Gaussian filter.  Based on https://www.shadertoy.com/view/4dfGDH#
   #define SIGMA 10.0
-  #define MSIZE 30  // Blur strength overall
   
   
   // gaussian distribution (the blur effect decreases fast the more we get away from the center)
@@ -106,13 +106,14 @@ export function getGaussianBlurFS(): string {
   uniform vec2 sourceTextureSize;
   uniform vec2 sourceTexelSize;
   
-  varying vec2 varyingTextureCoordinate;
+  in vec2 varyingTextureCoordinate;
+
+  out vec4 fragColor;
   
   void main(void) {
-    vec4 c = texture2D(sourceTextureSampler, varyingTextureCoordinate);
+    vec4 c = texture(sourceTextureSampler, varyingTextureCoordinate);
     vec4 gc = c;
     vec4 bc = c;
-
     
     //declare stuff
     const int kSize = (MSIZE-1)/2;  // kernel size
@@ -127,9 +128,6 @@ export function getGaussianBlurFS(): string {
       kernel[kSize+j] = kernel[kSize-j] = normpdf(float(j), SIGMA);
     }
 
-    // to improve the performance the kernel could also be precomputed:
-    //const float kernel[MSIZE] = float[MSIZE]( 0.031225216, 0.033322271, 0.035206333, 0.036826804, 0.038138565, 0.039104044, 0.039695028, 0.039894000, 0.039695028, 0.039104044, 0.038138565, 0.036826804, 0.035206333, 0.033322271, 0.031225216);
-
     vec3 cc;
     float gfactor;
     //read out the texels
@@ -142,7 +140,7 @@ export function getGaussianBlurFS(): string {
 
         // color at pixel in the neighborhood
         vec2 coord = varyingTextureCoordinate.xy + vec2(float(i), float(j)) * sourceTexelSize.xy;
-        cc = texture2D(sourceTextureSampler, coord).rgb;
+        cc = texture(sourceTextureSampler, coord).rgb;
 
         // compute the gaussian smoothed (multiply both so the blur effect decreases faster, see x*x 
         // in the gaussian distribution equation above)
@@ -161,7 +159,7 @@ export function getGaussianBlurFS(): string {
 
     c = gc;
       
-    gl_FragColor = c;
+    fragColor = c;
   }
   `;
 }
