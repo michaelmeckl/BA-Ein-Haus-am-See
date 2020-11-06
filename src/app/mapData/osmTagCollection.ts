@@ -36,13 +36,14 @@ class TagCollection {
       case "Bahnhof":
         return 'nwr["public_transport"="stop_position"]["railway"="stop"];';
 
+      //TODO auch bundesstraßen hier nehmen?
       case "Autobahn":
         //return 'nwr["highway"~"^motorway|trunk|motorway_link$"];';  // Autobahn und größere Straßen / trunks
         return 'nwr["highway"~"^motorway|motorway_link$"];';
 
-      case "Park":
+      case "Parks und Grünflächen":
         //return 'nwr["leisure"~"^park|nature_reserve|village_green|recreation_ground$"];';
-        return 'nwr["leisure"~"^park|nature_reserve$"];';
+        return 'nwr["leisure"~"^park|nature_reserve|village_green$"];';
 
       // landuse=meadow für Wiesen auch verwenden ?
 
