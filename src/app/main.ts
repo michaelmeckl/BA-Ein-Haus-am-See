@@ -73,7 +73,7 @@ function onFilterRemoved(filterName: string, ev: Event): void {
   }
 
   // eslint-disable-next-line no-magic-numbers
-  showSnackbar(`Filter ${filterName} wurde entfernt.`, SnackbarType.SUCCESS, 1500);
+  showSnackbar(`Filter "${filterName}" wurde entfernt.`, SnackbarType.SUCCESS, 1200);
 
   // check if there are other list elements, if not show the no filter text
   if (list.children.length === 0) {
@@ -142,7 +142,7 @@ function addNewFilter(
   );
   list.appendChild(listEl);
 
-  showSnackbar("Filter wurde erfolgreich hinzugefügt!", SnackbarType.SUCCESS, 1500);
+  showSnackbar("Filter wurde erfolgreich hinzugefügt!", SnackbarType.SUCCESS, 1200);
 
   // remove the list element when its close button is clicked
   //@ts-expect-error: not actually a ts-error but this with implicit any is fine for me in this case
@@ -330,7 +330,7 @@ function selectData(e: Event): void {
     }
 
     // eslint-disable-next-line no-magic-numbers
-    showSnackbar(`Successfully removed filter: "${value}"`, SnackbarType.SUCCESS, 2000);
+    showSnackbar(`Filter "${value}" wurde entfernt`, SnackbarType.SUCCESS, 1200);
 
     // check if there are other list elements, if not hide selection box
     if (list.children.length === 0) {
@@ -363,7 +363,7 @@ function setupUI(): void {
         showSnackbar(
           "Um Orte anzuzeigen, muss mindestens ein Filter aktiviert sein!",
           SnackbarType.WARNING,
-          2000
+          2500
         );
       }
     });

@@ -2,60 +2,9 @@
  * Util-Functions to work with the HTML5 - Canvas.
  */
 import { map } from "./mapboxConfig";
-import Benchmark from "../../shared/benchmarking";
 import mapLayerManager from "../mapData/mapLayerManager";
 import { getViewportBounds } from "./mapboxUtils";
-import "../vendors/fast-gauss-blur.js";
-
-// function taken from previous bachelor thesis from Julien Wachter
-export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-  const redChannel = [];
-
-  for (let i = 0; i < imgData.data.length; i += 4) {
-    redChannel.push(imgData.data[i]);
-  }
-
-  const blurredRedChannel: any[] = [];
-
-  const size = 25;
-  console.time("fastgaussblur");
-  //@ts-expect-error
-  FastGaussBlur.apply(redChannel, blurredRedChannel, canvas.width, canvas.height, size);
-  console.timeEnd("fastgaussblur");
-
-  for (let i = 0; i < imgData.data.length; i += 4) {
-    const colorValue = blurredRedChannel[i / 4];
-    imgData.data[i] = colorValue;
-    imgData.data[i + 1] = colorValue;
-    imgData.data[i + 2] = colorValue;
-  }
-
-  ctx.putImageData(imgData, 0, 0);
-}
-
-//! not used
-export function addImageOverlay(image: HTMLImageElement): void {
-  // wait till map is loaded, then add a imageSource
-  if (!map.loaded()) {
-    return;
-  }
-
-  map.addSource("myImageSource", {
-    type: "image",
-    url: image.src,
-  });
-
-  map.addLayer({
-    id: "overlay",
-    source: "myImageSource",
-    type: "raster",
-    paint: {
-      "raster-opacity": 0.85,
-    },
-  });
-}
+//import "../vendors/fast-gauss-blur.js";
 
 export function clearCanvasPart(
   ctx: CanvasRenderingContext2D,
@@ -117,45 +66,8 @@ export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HT
   });
 }
 
-export function cloneCanvas(oldCanvas: HTMLCanvasElement): HTMLCanvasElement {
-  //create a new canvas
-  const newCanvas = document.createElement("canvas");
-  const context = newCanvas.getContext("2d");
-
-  //set dimensions
-  newCanvas.width = oldCanvas.width;
-  newCanvas.height = oldCanvas.height;
-
-  //apply the old canvas to the new one
-  context?.drawImage(oldCanvas, 0, 0);
-
-  //return the new canvas
-  return newCanvas;
-}
-
-export function invertCanvas(canvas: HTMLCanvasElement): void {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return;
-  }
-
-  ctx.globalCompositeOperation = "difference";
-  ctx.fillStyle = "rgba(255, 255, 255, 1)";
-  ctx.beginPath();
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fill();
-
-  readImageFromCanvas(canvas)
-    .then((img) => {
-      console.log("inverted image:");
-      console.log(img.src);
-    })
-    .catch((err) => {
-      console.error(err);
-    });
-}
-
 const overlayOpacity = 0.7;
+
 export function makeAlphaMask(canvas: HTMLCanvasElement): any {
   console.warn("in make alpha mask");
 
@@ -201,3 +113,33 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
   //* even for lighter grey but still allows the user to see the map background everywhere
   addCanvasOverlay(c, overlayOpacity);
 }
+
+// function taken from previous bachelor thesis from Julien Wachter
+/*
+export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  const redChannel = [];
+
+  for (let i = 0; i < imgData.data.length; i += 4) {
+    redChannel.push(imgData.data[i]);
+  }
+
+  const blurredRedChannel: any[] = [];
+
+  const size = 25;
+  console.time("fastgaussblur");
+  //@ts-expect-error
+  FastGaussBlur.apply(redChannel, blurredRedChannel, canvas.width, canvas.height, size);
+  console.timeEnd("fastgaussblur");
+
+  for (let i = 0; i < imgData.data.length; i += 4) {
+    const colorValue = blurredRedChannel[i / 4];
+    imgData.data[i] = colorValue;
+    imgData.data[i + 1] = colorValue;
+    imgData.data[i + 2] = colorValue;
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+}
+*/

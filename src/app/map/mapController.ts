@@ -26,14 +26,14 @@ import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
 import FilterManager from "../mapData/filterManager";
 import mapLayerManager from "../mapData/mapLayerManager";
 import { fetchOsmDataFromServer } from "../network/networkUtils";
-import { showSnackbar, SnackbarType } from "../utils";
+import { hideSnackbar, showSnackbar, SnackbarType } from "../utils";
 import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
 import { createOverlay } from "./canvasRenderer";
 import { getDataFromMap } from "./featureUtils";
 import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
-import { PerformanceMeasurer } from "./performanceMeasurer";
+import { PerformanceMeasurer } from "../performanceMeasurer";
 import { addBufferToFeature } from "./turfUtils";
 import OsmTagCollection from "../mapData/osmTagCollection";
 
@@ -145,8 +145,8 @@ export default class MapController {
       //TODO snackbar nervt vllt wenn ständig
       showSnackbar(
         "Die aktuelle Zoomstufe ist zu niedrig, um Daten zu aktualisieren!",
-        SnackbarType.INFO,
-        2000
+        SnackbarType.WARNING,
+        1500
       );
       //this.currentZoom = newZoom;
       return;
@@ -198,7 +198,7 @@ export default class MapController {
     console.log("Performing osm query for active filters: ", FilterManager.activeFilters);
     if (FilterManager.activeFilters.size > 0) {
       // give feedback to the user
-      showSnackbar("Data from OpenStreetMap is loaded ...", SnackbarType.INFO);
+      showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true);
     }
 
     Benchmark.startMeasure("Performing osm query for active filters");
@@ -225,6 +225,10 @@ export default class MapController {
       }
     });
     await Promise.all(allQueries);
+    // hide the snackbar after data has finished loading
+    //TODO funktioniert nicht richtig im moment!
+    hideSnackbar();
+
     /*
     const allResults = await Promise.allSettled(allQueries);
     console.log("All Results", allResults);
@@ -241,8 +245,8 @@ export default class MapController {
 
     if (this.showOverlayAutomatically && FilterManager.allFilterLayers.length > 0) {
       console.log("updating overlay...\n", FilterManager.allFilterLayers);
-      this.showingOverlay = true;
-      createOverlay(FilterManager.allFilterLayers);
+      //this.showingOverlay = true;
+      //createOverlay(FilterManager.allFilterLayers);
     }
 
     //TODO wohin damit?

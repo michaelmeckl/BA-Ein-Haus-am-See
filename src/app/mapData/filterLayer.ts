@@ -6,17 +6,12 @@ export enum FilterRelevance {
   important = 0.5,
   veryImportant = 0.8,
 }
-/*
-//alternativ:
-export const FilterRelevance = {
-  notVeryImportant: 0.2, //= optional,
-  important: 0.5,
-  veryImportant: 0.8,
-};
-*/
 
 const defaultDistance = 300;
 
+/**
+ * This class holds all necessary information for one layer (= one specific osm filter).
+ */
 export class FilterLayer {
   private layerName: string;
   private distance: number;
@@ -30,7 +25,7 @@ export class FilterLayer {
     this.layerName = name || "";
     this.distance = distance || defaultDistance;
     this.relevanceValue = relevance || FilterRelevance.important;
-    //* || true is not possible because if wanted were false this would always evaluate to true!
+    //* using || true is not possible here because if wanted were false this would always evaluate to true!
     this.wanted = wanted !== undefined ? wanted : true;
   }
 
