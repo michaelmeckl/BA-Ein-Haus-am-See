@@ -3,7 +3,7 @@ import childProcess from "child_process";
 import os from "os";
 import Util from "util";
 
-const exec = Util.promisify(childProcess.exec);
+//const exec = Util.promisify(childProcess.exec);
 
 /**
  * Builds a query for the overpass api to fetch osm data as GeoJson in the given map bounds.
@@ -21,10 +21,10 @@ export function buildOverpassQuery(bounds: string, userQuery: string): string {
  * TODO the code below is only for executing local cmd scripts!
  */
 
-/**
- * Returns a string identifying the operating system platform. The value is set at compile time.
- * Possible values are 'aix', 'darwin', 'freebsd', 'linux', 'openbsd', 'sunos', and 'win32'.
- */
+/*
+//Returns a string identifying the operating system platform. The value is set at compile time.
+//Possible values are 'aix', 'darwin', 'freebsd', 'linux', 'openbsd', 'sunos', and 'win32'.
+
 function getPlatform(): string {
   return os.platform();
 }
@@ -102,3 +102,4 @@ export async function executeFile(command: string): Promise<void> {
 
   console.log((await script).stdout);
 }
+*/

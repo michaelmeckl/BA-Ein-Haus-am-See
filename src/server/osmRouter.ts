@@ -32,12 +32,14 @@ export default class OsmRouter {
    */
   setupRoutes(): void {
     //TODO: delete me if not needed
+    /*
     this.osmRouter.get("/testCmd", async (req: Request, res: Response, next: NextFunction) => {
       const result = await ServerUtils.executeOSMFilter(this.publicDirPath);
       console.log("Result of operation is:\n", result);
 
       res.status(OK).send(result);
     });
+    */
 
     /**
      * * Forwards the query and the bounds to the overpass api and returns and caches the result.
@@ -62,7 +64,7 @@ export default class OsmRouter {
             const geoData = await axios.get(
               `https://overpass-api.de/api/interpreter?${encodedQuery}` //TODO change to local version ?!
               // local overpass api (docker image)
-              //const url = `https://192.168.99.100:12345/api/interpreter?${encodedQuery}`;
+              //const url = `https://localhost:12347/api/interpreter?${encodedQuery}`;
             );
             console.log(Benchmark.stopMeasure("Getting data from osm total"));
 
@@ -127,6 +129,8 @@ export default class OsmRouter {
   checkCache = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const bounds = req.query.bounds?.toString();
     const query = req.query.osmQuery?.toString();
+
+    console.log("Check RedisCache Request:\n" + query + "\n" + bounds);
 
     //TODO am besten nicht die exakten Bounds, sondern auf überlappung prüfen und nur nötiges holen?
     //TODO vllt mit einer geospatial query möglich?? siehe Redis Plugin für Geodaten!

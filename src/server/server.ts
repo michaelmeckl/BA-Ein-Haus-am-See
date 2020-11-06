@@ -6,7 +6,6 @@ import express, { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import { INTERNAL_SERVER_ERROR, NOT_FOUND } from "http-status-codes";
 import path from "path";
-import LoggingRouter from "./loggingRouter";
 import OsmRouter from "./osmRouter";
 
 // handle crashes
@@ -67,9 +66,6 @@ export default class Server {
     // mount the routes with the prefix "osm"
     //this.app.use("/osm", osmRouter);
     this.app.use(osmRouter.instance);
-
-    const logRouter = new LoggingRouter(publicDir);
-    this.app.use(logRouter.instance);
   }
 
   setupErrorHandling(): void {
