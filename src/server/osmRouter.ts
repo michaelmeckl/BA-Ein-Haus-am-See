@@ -72,7 +72,10 @@ export default class OsmRouter {
 
             Benchmark.startMeasure("Caching data");
             // cache data for one hour, this should be enough for a typical usecase
-            RedisCache.cacheData(compositeKey, geoData.data, 3600);
+            //const cacheTime = 3600;
+            //! cache only for 15 minutes during study to prevent influencing the next participant!
+            const cacheTime = 900;
+            RedisCache.cacheData(compositeKey, geoData.data, cacheTime);
             Benchmark.stopMeasure("Caching data");
 
             //this.saveGeoData(geoData.data, query);
@@ -129,8 +132,7 @@ export default class OsmRouter {
   checkCache = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const bounds = req.query.bounds?.toString();
     const query = req.query.osmQuery?.toString();
-
-    console.log("Check RedisCache Request:\n" + query + "\n" + bounds);
+    //console.log("Check RedisCache Request:\n" + query + "\n" + bounds);
 
     //TODO am besten nicht die exakten Bounds, sondern auf überlappung prüfen und nur nötiges holen?
     //TODO vllt mit einer geospatial query möglich?? siehe Redis Plugin für Geodaten!
@@ -140,6 +142,7 @@ export default class OsmRouter {
     Benchmark.stopMeasure("Getting data from cache");
 
     if (result) {
+      //console.log("Found in cache!");
       res.status(OK).send(result);
     } else {
       //if not in cache proceed to next middleware function

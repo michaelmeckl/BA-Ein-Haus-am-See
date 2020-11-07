@@ -41,7 +41,6 @@ class RedisCache {
 
   cacheData(key: string, value: string, expiryTime: number): void {
     //TODO use hset instead to store as a hash for performance reasons
-    //const expiryTime = 86400; // in seconds: 86400s == 1 day
     this.redisClient.setex(key, expiryTime, value);
   }
 }

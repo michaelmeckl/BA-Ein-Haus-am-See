@@ -30,7 +30,6 @@ export default class Server {
     this.setupExpressApp();
 
     // serve front-end content
-    //! actually it would be better for performance not to send it from the node server as it is single-threaded
     this.app.use(express.static(publicDir));
     this.app.use(express.static(staticDir));
 
@@ -71,7 +70,7 @@ export default class Server {
   setupErrorHandling(): void {
     this.app.use(this.errorHandler);
 
-    // catch 404; this must be at the end!
+    // catch 404; this must be the last handler this.app uses!
     this.app.use(function (req, res, next) {
       res.status(NOT_FOUND);
       // respond with json
