@@ -3,17 +3,9 @@ const webpack = require("webpack");
 const nodeExternals = require("webpack-node-externals");
 const Dotenv = require('dotenv-webpack');
 
-module.exports = {
-    mode: "development", //TODO change to production later ?!
-    devtool: "inline-source-map", //todo omit this or change to none
-    entry: [
-        "./src/app/main.ts",
-    ],
-    output: {
-        publicPath: "./dist/",
-        filename: "bundle.js",
-        path: path.resolve(__dirname, "./public/dist"),
-    },
+//common config for client and server:
+const config = {
+    //mode: "development",
     resolve: {
         // Bundle '.ts' files as well as '.js' files.
         extensions: [".tsx", ".ts", ".js"],
@@ -45,15 +37,6 @@ module.exports = {
             exclude: /node_modules/,
         }],
     },
-    // use target: "node" in order to ignore built-in modules like path, fs, etc. for bundling
-    target: "web",
-    /*
-    externals: [
-        nodeExternals({
-        whitelist: ["mapbox-gl"],
-        })
-    ],
-    */
     plugins: [
         // Enables reading secret keys from .env file
         new Dotenv({
@@ -61,3 +44,36 @@ module.exports = {
         }),
     ],
 };
+
+const clientConfig = Object.assign({}, config, {
+    target: "web",
+    name: 'client',
+    entry: [
+        "./src/app/main.ts",
+    ],
+    output: {
+        publicPath: "./dist/",
+        filename: "client.js",
+        path: path.resolve(__dirname, "./public/dist"),
+    },
+    devtool: 'inline-source-map',
+});
+
+const serverConfig = Object.assign({}, config, {
+    //use target: "node" in order to ignore built-in modules like path, fs, etc. for bundling
+    target: 'node',
+    name: 'server',
+    entry: [
+        "./src/index.ts",
+    ],
+    output: {
+        publicPath: "./dist/",
+        filename: "server.js",
+        path: path.resolve(__dirname, "./public/dist"),
+    },
+    // webpack-node-externals package used to exclude other packages like express in the final bundle
+    externals: [nodeExternals()]
+});
+
+// Combined 'module.exports'
+module.exports = [clientConfig, serverConfig];
