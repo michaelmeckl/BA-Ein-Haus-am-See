@@ -1,6 +1,7 @@
 /**
  * Utility-Methods for working with Mapbox Gl.
  */
+import bbox from "@turf/bbox";
 import bboxPolygon from "@turf/bbox-polygon";
 import union from "@turf/union";
 import type { Feature, GeoJsonProperties, LineString, MultiPolygon, Point, Polygon } from "geojson";
@@ -32,6 +33,72 @@ export function getViewportBounds(): number[][] {
   ];
   return viewportBounds;
 }
+
+/**
+ * Get the current bounding box, in order:
+ * southern-most latitude, western-most longitude, northern-most latitude, eastern-most longitude.
+ * @return string representation of the bounds in the above order
+ */
+export function getViewportBoundsString(additionalDistance?: number): string {
+  const currBounds = map.getBounds();
+  let southLat = currBounds.getSouth();
+  let westLng = currBounds.getWest();
+  let northLat = currBounds.getNorth();
+  let eastLng = currBounds.getEast();
+  //console.log(currBounds);
+
+  if (additionalDistance) {
+    const bufferedBBox = bbox(
+      addBufferToFeature(bboxPolygon([westLng, southLat, eastLng, northLat]), additionalDistance)
+    );
+    //console.log(bufferedBBox);
+
+    southLat = bufferedBBox[1];
+    westLng = bufferedBBox[0];
+    northLat = bufferedBBox[3];
+    eastLng = bufferedBBox[2];
+  }
+
+  return `${southLat},${westLng},${northLat},${eastLng}`;
+}
+
+//TODO
+/*
+  getBBoxForBayern(): string {
+    const mittelpunktOberpfalz = point([12.136, 49.402]);
+    const radiusOberpfalz = 100; //km
+
+    const mittelpunktBayern = point([11.404, 48.946]);
+    const radiusBayern = 200; //km
+
+    //@ts-expect-error
+    const centerPoint = circle(mittelpunktOberpfalz, radiusOberpfalz, { units: "kilometers" });
+
+    const bboxExtent = bbox(centerPoint);
+    //console.log("Bbox: ", bboxExtent);
+
+    const bboxExtent2 = bbpolygon(bboxExtent);
+
+    return `${bboxExtent[1]},${bboxExtent[0]},${bboxExtent[3]},${bboxExtent[2]}`;
+  }
+
+  showCurrentViewportCircle(): void {
+    const { center, radius } = mapboxUtils.getRadiusAndCenterOfViewport();
+    //@ts-expect-error
+    const viewportCirclePolygon = circle([center.lng, center.lat], radius, { units: "meters" });
+
+    mapLayerManager.addNewGeojsonSource("viewportCircle", viewportCirclePolygon);
+    const newLayer: Layer = {
+      id: "viewportCircleLayer",
+      source: "viewportCircle",
+      type: "fill",
+      paint: {
+        "fill-color": "rgba(255, 255, 0, 0.15)",
+      },
+    };
+    mapLayerManager.addNewLayer(newLayer, true);
+  }
+  */
 
 export function getRadiusAndCenterOfViewport(): any {
   const centerPoint = map.getCenter();
@@ -130,19 +197,7 @@ export function convertAllFeaturesToPolygons(
     // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
     polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
 
-    /*
-    if (feature.geometry.type === "Point") {
-      // replace all point features with circle polygon features
-      const circleOptions = { steps: 80, units: "meters"};
-      polygonFeatures.push(circle(feature as Feature<Point, GeoJsonProperties>, bufferSize, circleOptions));
-    } else if (feature.geometry.type === "LineString" || feature.geometry.type === "Polygon") {
-      // add a buffer to all lines and polygons
-      // This also replaces all line features with buffered polygon features as turf.buffer() returns
-      // Polygons (or Multipolygons).
-      polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
-    } else {
-      break;
-    }*/
+    //TODO hier erst simplify?
   }
   Benchmark.stopMeasure("adding buffer to all features");
 

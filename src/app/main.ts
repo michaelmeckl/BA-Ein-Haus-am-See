@@ -1,14 +1,10 @@
 /* eslint-env browser */
-import Benchmark from "../shared/benchmarking";
 import { Config } from "../shared/config";
 import MapController from "./map/mapController";
-import { loadLocations } from "./map/locationsPanel";
 import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
-import FilterManager from "./mapData/filterManager";
-import { fetchOsmDataFromServer, fetchOsmDataFromClientVersion } from "./network/networkUtils";
-import { showSnackbar, SnackbarType } from "./utils";
-import filterManager from "./mapData/filterManager";
+import { default as FilterManager, default as filterManager } from "./mapData/filterManager";
 import mapLayerManager from "./mapData/mapLayerManager";
+import { showSnackbar, SnackbarType } from "./utils";
 
 // * const enum instead of enum as this inlines the elements at runtime
 //TODO alle html element accessor names hier auslagern:
@@ -40,25 +36,52 @@ const enum SidebarType {
   LocationsSidebar,
 }
 
-let mapController: MapController;
+// ###### Setup: ######
 
+let mapController: MapController;
+// map
+const mapConatiner = document.querySelector(HtmlElements.MAP_CONTAINER) as HTMLDivElement;
+const mapElement = document.querySelector(HtmlElements.MAP) as HTMLDivElement;
+
+// buttons
+const showFilterButtton = document.querySelector(
+  HtmlElements.SHOW_FILTER_BUTTON_ID
+) as HTMLButtonElement;
+const showLocationsButtton = document.querySelector(
+  HtmlElements.SHOW_LOCATIONS_BUTTON_ID
+) as HTMLButtonElement;
+const resetButtton = document.querySelector("#resetMapButton") as HTMLButtonElement;
+//const showMapDataButtton = document.querySelector("#deckglButton");
+const showOverlayButton = document.querySelector("#showOverlayButton") as HTMLButtonElement;
+const closeSidebarButtton = document.querySelector(
+  HtmlElements.CLOSE_SIDEBAR_BUTTON_CLASS
+) as HTMLButtonElement;
+const queryButton = document.querySelector(HtmlElements.QUERY_BUTTON_ID) as HTMLButtonElement;
+
+//template
 const LIST_TEMPLATE = document.querySelector(HtmlElements.LIST_TEMPLATE_ID)?.innerHTML.trim();
 const FILTER_LIST_TEMPLATE = document
   .querySelector(HtmlElements.FILTER_LIST_TEMPLATE_ID)
   ?.innerHTML.trim();
 
-const list = document.querySelector("#active-filters") as HTMLUListElement;
-const noFilterText = document.querySelector(".no-filter") as HTMLParagraphElement;
-const modal = document.querySelector("#filterModal") as HTMLDivElement;
-
+//sidebar
 const sidebarContainer = document.querySelector(HtmlElements.SIDEBAR) as HTMLDivElement;
 const filterSidebar = document.querySelector(HtmlElements.FILTER_SIDEBAR) as HTMLDivElement;
 const locationsSidebar = document.querySelector(HtmlElements.LOCATIONS_SIDEBAR) as HTMLDivElement;
 
-const mapConatiner = document.querySelector(HtmlElements.MAP_CONTAINER) as HTMLDivElement;
-const mapElement = document.querySelector(HtmlElements.MAP) as HTMLDivElement;
+const list = document.querySelector("#active-filters") as HTMLUListElement;
+const noFilterText = document.querySelector(".no-filter") as HTMLParagraphElement;
+const modal = document.querySelector("#filterModal") as HTMLDivElement;
 
-//TODO die buttons unten könnten auch noch hier rauf
+// ####### Logic starts here: ########
+
+async function performOsmQuery(): Promise<void> {
+  mapController.loadMapData(); //TODO await this and activate location button only after this has finished?
+  /*
+  const data = await testGuide("restaurant");
+  console.log(data);
+  */
+}
 
 //* as onFilterRemoved is bound to a click listener the event (this) MUST be the last argument!
 function onFilterRemoved(filterName: string, ev: Event): void {
@@ -78,6 +101,12 @@ function onFilterRemoved(filterName: string, ev: Event): void {
   // check if there are other list elements, if not show the no filter text
   if (list.children.length === 0) {
     noFilterText?.classList.remove(Config.CSS_HIDDEN);
+
+    //also disable the locations and overlay buttons
+    showLocationsButtton.classList.add(Config.CSS_BTN_DISABLED);
+    showLocationsButtton.disabled = true;
+    showOverlayButton.classList.add(Config.CSS_BTN_DISABLED);
+    showOverlayButton.disabled = true;
   }
 }
 
@@ -91,6 +120,12 @@ function addNewFilter(
   if (list.children.length === 0) {
     // the list is empty so this is the first filter -> hide the no filter text
     noFilterText?.classList.add(Config.CSS_HIDDEN);
+
+    // also enable these buttons
+    showLocationsButtton.classList.remove(Config.CSS_BTN_DISABLED);
+    showLocationsButtton.disabled = false;
+    showOverlayButton.classList.remove(Config.CSS_BTN_DISABLED);
+    showOverlayButton.disabled = false;
   }
 
   // check if that list element already exists to prevent adding it twice
@@ -104,7 +139,6 @@ function addNewFilter(
   const wanted = filterWanted === "true";
 
   let relevance;
-  //TODO sehr unflexibel!
   switch (importance) {
     case "optional":
       relevance = FilterRelevance.notVeryImportant;
@@ -129,7 +163,6 @@ function addNewFilter(
   containerElement.firstElementChild?.insertAdjacentHTML("afterbegin", title);
 
   // get the remove button for the list element
-  //const removeButton = containerElement.firstChild?.childNodes[1] as ChildNode;
   const removeButton = containerElement.querySelector("#remove-filter-button");
 
   // add the selected data to the list element and append the list element
@@ -143,6 +176,11 @@ function addNewFilter(
   list.appendChild(listEl);
 
   showSnackbar("Filter wurde erfolgreich hinzugefügt!", SnackbarType.SUCCESS, 1200);
+
+  // load map data automatically after 1 second (timeout so the snackbars wont overlap)
+  setTimeout(() => {
+    performOsmQuery();
+  }, 1000);
 
   // remove the list element when its close button is clicked
   //@ts-expect-error: not actually a ts-error but this with implicit any is fine for me in this case
@@ -178,14 +216,6 @@ function onAddFilterBtnClick(): void {
     "input[name = 'polarity']:checked"
   ) as HTMLInputElement;
 
-  /*
-  console.log(filterName.textContent);
-  console.log(distance.value);
-  console.log(distanceUnit.value);
-  console.log(importance.value);
-  console.log(filterWanted.value);
-  */
-
   addNewFilter(
     filterName.textContent || "",
     distance.value,
@@ -210,11 +240,9 @@ function setupModalButtons(): void {
   addFilterBtn?.addEventListener("click", onAddFilterBtnClick);
 }
 
-/* show the sidebar and calculalet the width of the map */
+/* show the sidebar and calculate the width of the map */
 //prettier-ignore
 function openSidebar(sidebarType: SidebarType): void {
-
-  //TODO toggle sidebar (also bei klick wieder zu)?
 
   // switch visibility of sidebars
   if(sidebarType === SidebarType.FilterSidebar) {
@@ -225,7 +253,7 @@ function openSidebar(sidebarType: SidebarType): void {
     locationsSidebar.classList.remove(Config.CSS_HIDDEN);
   }
   
-  //TODO width = 30% für mehr responsitivität
+  //! use width = 30% für mehr responsitivität
   const sidebarWidth = "350px";
   sidebarContainer.style.width = sidebarWidth;
   mapConatiner.style.marginLeft = sidebarWidth;
@@ -275,6 +303,8 @@ function setupSidebarFilterCategories(): void {
 }
 
 function showFilterPanel(): void {
+  //TODO toggle sidebar (also bei klick wieder zu)? dazu müsste nur der state hier in einer globalen variable gespeichert werden
+
   openSidebar(SidebarType.FilterSidebar);
 }
 
@@ -282,6 +312,7 @@ function showLocationsPanel(): void {
   openSidebar(SidebarType.LocationsSidebar);
 }
 
+//TODO remove this later
 function selectData(e: Event): void {
   e.stopPropagation();
   e.preventDefault();
@@ -342,73 +373,34 @@ function selectData(e: Event): void {
   selectionBox.classList.remove(Config.CSS_HIDDEN);
 }
 
-async function performOsmQuery(): Promise<void> {
-  mapController.loadMapData();
-  //TODO
-  /*
-  const data = await testGuide("restaurant");
-  console.log(data);
-  */
-}
-
 function setupUI(): void {
-  const showLocationsButtton = document.querySelector(HtmlElements.SHOW_LOCATIONS_BUTTON_ID);
-  if (showLocationsButtton) {
-    showLocationsButtton.addEventListener("click", () => {
-      // check if there are active filters, if not show snackbar warning
-      if (filterManager.activeFilters.size > 0) {
-        showLocationsPanel();
-      } else {
-        // eslint-disable-next-line no-magic-numbers
-        showSnackbar(
-          "Um Orte anzuzeigen, muss mindestens ein Filter aktiviert sein!",
-          SnackbarType.WARNING,
-          2500
-        );
-      }
-    });
-  }
+  showFilterButtton.addEventListener("click", showFilterPanel);
 
-  const showFilterButtton = document.querySelector(HtmlElements.SHOW_FILTER_BUTTON_ID);
-  if (showFilterButtton) {
-    showFilterButtton.addEventListener("click", showFilterPanel);
-  }
+  showLocationsButtton.addEventListener("click", () => {
+    // check if there are active filters, if not show snackbar warning
+    if (filterManager.activeFilters.size > 0) {
+      showLocationsPanel();
+    } else {
+      showSnackbar(
+        "Um Orte anzuzeigen, muss mindestens ein Filter aktiviert sein!",
+        SnackbarType.WARNING,
+        2500
+      );
+    }
+  });
 
-  //TODO
-  const blurButtton = document.querySelector("#blurButton");
-  if (blurButtton) {
-    //blurButtton.addEventListener("click", mapController.blurMap.bind(mapController));
-    blurButtton.addEventListener("click", () => {
-      //TODO reset map state hier!
-      mapLayerManager.removeSource("canvasSource");
-      //mapLayerManager.removeLayerFromMap("overlay");
-    });
-  }
-
-  //TODO nur die "raw" polygone und points anzeigen (mit mapbox layer)
-  const showMapDataButtton = document.querySelector("#deckglButton");
-  if (showMapDataButtton) {
-    //showMapDataButtton.addEventListener("click", mapController.addDeckLayer.bind(mapController));
-  }
+  resetButtton.addEventListener("click", () => {
+    //TODO reset map state here completely!!!
+    mapLayerManager.removeSource("canvasSource");
+    //mapLayerManager.removeLayerFromMap("overlay");
+  });
 
   //TODO
-  const lumaButton = document.querySelector("#lumaButton");
-  if (lumaButton) {
-    lumaButton.addEventListener("click", mapController.addLumaGlLayer.bind(mapController));
-  }
-
-  //testVectorTileAPI(mapController);
-  /*
-  mapController.addVectorData(
-    "http://localhost:8080/data/countries/{z}/{x}/{y}.pbf"
-  );
-  */
+  // necessary to bind so the this context stays the same!
+  showOverlayButton.addEventListener("click", mapController.addAreaOverlay.bind(mapController));
 
   //FIXME funktioniert im locations Panel nicht!!!
-  const closeSidebarButtton = document.querySelector(HtmlElements.CLOSE_SIDEBAR_BUTTON_CLASS);
-  if (closeSidebarButtton) {
-    closeSidebarButtton.addEventListener("click", closeSidebar);
-  }
+  closeSidebarButtton.addEventListener("click", closeSidebar);
 
   const dropdownList = document.querySelector(HtmlElements.DROPDOWN_CONTENT_CLASS);
   if (dropdownList) {
@@ -417,26 +409,16 @@ function setupUI(): void {
     });
   }
 
-  const showWebGLButton = document.querySelector(HtmlElements.SHOW_CUSTOM_DATA_ID);
-  if (showWebGLButton) {
-    showWebGLButton.addEventListener(
-      "click",
-      mapController.addWebGlLayer.bind(mapController) // necessary to bind as the this context would be different in the addWebGL method otherwise
-    );
-  }
+  //TODO delete me?
+  queryButton.addEventListener("click", () => {
+    performOsmQuery();
+  });
 
-  //TODO statt aus dem input field sollte aus der filter-li oder direkt aus dem filteManager ausgelesen werden!!
-  //* -> wird oben eh schon gemacht, der übergabeparameter ist prinzipiell überflüssig
-  const queryInput = document.querySelector(HtmlElements.QUERY_INPUT_ID) as HTMLInputElement;
-  const queryButton = document.querySelector(HtmlElements.QUERY_BUTTON_ID);
-  if (queryButton && queryInput) {
-    queryButton.addEventListener("click", () => {
-      performOsmQuery();
-    });
-  }
+  //disable specific buttons initially
+  showLocationsButtton.disabled = true;
+  showOverlayButton.disabled = true;
 
   //setup filter side panel
-
   setupSidebarFilterCategories();
   setupFilterSelection();
   setupModalButtons();

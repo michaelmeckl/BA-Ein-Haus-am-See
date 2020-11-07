@@ -1,7 +1,14 @@
 import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
 import buffer from "@turf/buffer";
 import * as turfHelpers from "@turf/helpers";
-import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonProperties,
+  Geometry,
+  MultiPolygon,
+  Polygon,
+} from "geojson";
 import type { GeoJSONSource } from "mapbox-gl";
 import { map } from "./mapboxConfig";
 
@@ -277,7 +284,7 @@ export function addBufferToFeature(
   element: Feature<Geometry, GeoJsonProperties>,
   bufferSize = 100,
   units: turfUnits = "meters"
-): Feature<any> {
+): Feature<Polygon | MultiPolygon, GeoJsonProperties> {
   //const newElement = buffer(element as Feature<Polygon, GeoJsonProperties>, 50, "meters");
   return buffer(element, bufferSize, units);
 }

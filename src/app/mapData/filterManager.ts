@@ -1,7 +1,7 @@
 import type { FilterLayer } from "./filterLayer";
 
 class FilterManager {
-  allFilterLayers: FilterLayer[] = [];
+  allFilterLayers: FilterLayer[] = []; //TODO use a set?
 
   activeFilters: Set<string> = new Set();
 

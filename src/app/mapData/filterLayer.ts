@@ -1,4 +1,11 @@
-import type { Feature, GeoJsonProperties, MultiPolygon, Polygon } from "geojson";
+import type {
+  Feature,
+  GeoJsonProperties,
+  Geometry,
+  GeometryCollection,
+  MultiPolygon,
+  Polygon,
+} from "geojson";
 
 // every relevance has a specific weight
 export enum FilterRelevance {
@@ -18,8 +25,9 @@ export class FilterLayer {
   private relevanceValue: number;
   private wanted: boolean;
 
+  //TODO use sets instead?
   private points: mapboxgl.Point[] = [];
-  private features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
+  private features: Feature<Geometry, GeoJsonProperties>[] = [];
 
   constructor(name?: string, distance?: number, relevance?: FilterRelevance, wanted?: boolean) {
     this.layerName = name || "";
@@ -61,10 +69,10 @@ export class FilterLayer {
     return this.points;
   }
 
-  set Features(features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]) {
+  set Features(features: Feature<Geometry, GeoJsonProperties>[]) {
     this.features = features;
   }
-  get Features(): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
+  get Features(): Feature<Geometry, GeoJsonProperties>[] {
     return this.features;
   }
 }

@@ -36,6 +36,13 @@ import * as mapboxUtils from "./mapboxUtils";
 import { PerformanceMeasurer } from "../performanceMeasurer";
 import { addBufferToFeature } from "./turfUtils";
 import OsmTagCollection from "../mapData/osmTagCollection";
+import simplify from "@turf/simplify";
+
+export const enum VisualType {
+  NORMAL,
+  OVERLAY,
+  //HEATMAP
+}
 
 //! add clear map data button or another option (or implement the removeMapData method correct) because atm
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
@@ -47,9 +54,6 @@ const moveTreshold = 1200; // map center difference in meters
  * Main Controller Class for the mapbox map that handles all different aspects of the map.
  */
 export default class MapController {
-  private currentPoints = new Set<Feature<Point, GeoJsonProperties>>();
-  private currentWays = new Set<Feature<LineString, GeoJsonProperties>>();
-  private currentPolygons = new Set<Feature<Polygon, GeoJsonProperties>>();
   //prettier-ignore
   private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
 
@@ -57,8 +61,9 @@ export default class MapController {
   private currentMapCenter: LngLat = new LngLat(initialPosition[0], initialPosition[1]);
 
   //TODO
+  private selectedVisualType: VisualType = VisualType.NORMAL; //TODO wechseln!
   private showingOverlay = false;
-  showOverlayAutomatically = true;
+  showOverlayActivated = true;
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -142,7 +147,7 @@ export default class MapController {
       return;
     } else if (newZoom <= 8) {
       // performance optimization - dont show/update overlay below a certain zoomlevel
-      //TODO snackbar nervt vllt wenn ständig
+      //TODO snackbar nervt vllt wenn ständig angezeigt
       showSnackbar(
         "Die aktuelle Zoomstufe ist zu niedrig, um Daten zu aktualisieren!",
         SnackbarType.WARNING,
@@ -157,6 +162,7 @@ export default class MapController {
     //this.currentZoom = newZoom;
   }
 
+  /*
   onSourceLoaded(e: MapSourceDataEvent): void {
     if (e.isSourceLoaded) {
       // the source has finished loading
@@ -170,7 +176,7 @@ export default class MapController {
       console.log(" e is a MapSourceDataEvent");
     }
     console.log("A dataloading event occurred: ", e);
-  }
+  }*/
 
   async onMapClick(e: MapMouseEvent & EventData): Promise<void> {
     console.log("Click:", e);
@@ -191,155 +197,115 @@ export default class MapController {
     //map.addControl(new mapboxgl.GeolocateControl(), "bottom-right");
 
     // Add the geocoder to the map
-    map.addControl(Geocoder.geocoderControl, "bottom-left");
+    map.addControl(Geocoder.geocoderControl, "bottom-left"); //TODO top-left
   }
 
   async loadMapData(): Promise<void> {
     console.log("Performing osm query for active filters: ", FilterManager.activeFilters);
     if (FilterManager.activeFilters.size > 0) {
       // give feedback to the user
-      showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true);
+      showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true); //TODO
     }
 
+    //get screen viewport and 500 meter around to compensate for the move treshold for new data
+    const bounds = mapboxUtils.getViewportBoundsString(500);
+
     Benchmark.startMeasure("Performing osm query for active filters");
-    const allQueries = Array.from(FilterManager.activeFilters).map(async (tag) => {
-      // get overpass query for each tag
-      const query = OsmTagCollection.getQueryForCategory(tag);
 
-      //get screen viewport and 500 meter around to compensate for the move treshold for new data
-      const bounds = this.getViewportBoundsString(500);
+    const allResults = await Promise.allSettled(
+      Array.from(FilterManager.activeFilters).map(async (tag) => {
+        // get overpass query for each tag
+        const query = OsmTagCollection.getQueryForCategory(tag);
 
-      Benchmark.startMeasure("Fetching data from osm");
-      // request data from osm
-      //const data = await fetchOsmDataFromClientVersion(bounds, query);
-      const data = await fetchOsmDataFromServer(bounds, query);
-      Benchmark.stopMeasure("Fetching data from osm");
+        Benchmark.startMeasure("Fetching data from osm");
+        // request data from osm
+        //const data = await fetchOsmDataFromClientVersion(bounds, query);
+        const data = await fetchOsmDataFromServer(bounds, query);
+        Benchmark.stopMeasure("Fetching data from osm");
 
-      if (data) {
-        const t0 = performance.now();
-        this.showData(data, query);
-        const t1 = performance.now();
-        console.log("Adding data to map took " + (t1 - t0).toFixed(3) + " milliseconds.");
+        if (data) {
+          //TODO das ist eigentlich nicht nötig hier sondern nur das filterlayer befüllen und dafür reichen die daten hier oder?
+          const filterLayer = this.preprocessGeoData(data, tag);
 
-        console.log("Finished adding data to map!");
+          if (this.selectedVisualType === VisualType.NORMAL) {
+            console.warn("showing normal data");
+            this.showDataOnMap(data, tag);
+          } else {
+            if (filterLayer) {
+              this.prepareDataForOverlay(filterLayer);
+            }
+          }
+        }
+      })
+    );
+
+    allResults.forEach((res) => {
+      if (res.status === "rejected") {
+        showSnackbar(
+          "Nicht alle Daten konnten erfolgreich geladen werden",
+          SnackbarType.ERROR,
+          1500
+        );
+        //return;
       }
     });
-    await Promise.all(allQueries);
+    console.log("Finished adding data to map!");
+
     // hide the snackbar after data has finished loading
     //TODO funktioniert nicht richtig im moment!
     hideSnackbar();
 
-    /*
-    const allResults = await Promise.allSettled(allQueries);
-    console.log("All Results", allResults);
-    allResults.forEach((res) => {
-      if (res.status === "rejected") {
-        showSnackbar("Nicht alle Daten konnten erfolgreich geladen werden", SnackbarType.ERROR, 1500);
-        return;
-      }
-    });
-    */
     Benchmark.stopMeasure("Performing osm query for active filters");
 
     console.log("before showOverlayAutomatically...");
 
-    if (this.showOverlayAutomatically && FilterManager.allFilterLayers.length > 0) {
+    if (this.showOverlayActivated && FilterManager.allFilterLayers.length > 0) {
       console.log("updating overlay...\n", FilterManager.allFilterLayers);
       //this.showingOverlay = true;
       //createOverlay(FilterManager.allFilterLayers);
     }
-
-    //TODO wohin damit?
-    if (this.showingOverlay) {
-      //updateOverlay();
-    } else {
-      // fetch new data
-    }
   }
-
-  /**
-   * Get the current bounding box, in order:
-   * southern-most latitude, western-most longitude, northern-most latitude, eastern-most longitude.
-   * @return string representation of the bounds in the above order
-   */
-  getViewportBoundsString(additionalDistance?: number): string {
-    const currBounds = map.getBounds();
-    let southLat = currBounds.getSouth();
-    let westLng = currBounds.getWest();
-    let northLat = currBounds.getNorth();
-    let eastLng = currBounds.getEast();
-    //console.log(currBounds);
-
-    if (additionalDistance) {
-      const bufferedBBox = bbox(
-        addBufferToFeature(bbpolygon([westLng, southLat, eastLng, northLat]), additionalDistance)
-      );
-      //console.log(bufferedBBox);
-
-      southLat = bufferedBBox[1];
-      westLng = bufferedBBox[0];
-      northLat = bufferedBBox[3];
-      eastLng = bufferedBBox[2];
-    }
-
-    return `${southLat},${westLng},${northLat},${eastLng}`;
-  }
-
-  //TODO
-  /*
-  getBBoxForBayern(): string {
-    const mittelpunktOberpfalz = point([12.136, 49.402]);
-    const radiusOberpfalz = 100; //km
-
-    const mittelpunktBayern = point([11.404, 48.946]);
-    const radiusBayern = 200; //km
-
-    //@ts-expect-error
-    const centerPoint = circle(mittelpunktOberpfalz, radiusOberpfalz, { units: "kilometers" });
-
-    const bboxExtent = bbox(centerPoint);
-    //console.log("Bbox: ", bboxExtent);
-
-    const bboxExtent2 = bbpolygon(bboxExtent);
-
-    return `${bboxExtent[1]},${bboxExtent[0]},${bboxExtent[3]},${bboxExtent[2]}`;
-  }
-
-  showCurrentViewportCircle(): void {
-    const { center, radius } = mapboxUtils.getRadiusAndCenterOfViewport();
-    //@ts-expect-error
-    const viewportCirclePolygon = circle([center.lng, center.lat], radius, { units: "meters" });
-
-    mapLayerManager.addNewGeojsonSource("viewportCircle", viewportCirclePolygon);
-    const newLayer: Layer = {
-      id: "viewportCircleLayer",
-      source: "viewportCircle",
-      type: "fill",
-      paint: {
-        "fill-color": "rgba(255, 255, 0, 0.15)",
-      },
-    };
-    mapLayerManager.addNewLayer(newLayer, true);
-  }
-  */
 
   removeData(sourceName: string): void {
     console.log("Removing source: ", sourceName);
     mapLayerManager.removeSource(sourceName);
+    //TODO should also call the filtermanager so everythings in one place
   }
 
-  preprocessGeoData(data: FeatureCollection<GeometryObject, any>, dataName: string): void {
-    // TODO another option would be to let them be and use them as a client side cache later???
-    this.currentPoints.clear();
-    this.currentWays.clear();
-    this.currentPolygons.clear();
+  //TODO use geojson merge (https://github.com/mapbox/geojson-merge) to merge existing and new features?
+  //! or use filterlayer.features.push(...newData.features) !! ("features": [... GeoJSON1.features, ... GeoJSON2.features])
 
+  //! Data preprocessing could (and probably should) already happen on the server!
+
+  //! am besten gleich hier truncate und simplify von  turf anwenden!
+  preprocessGeoData(
+    data: FeatureCollection<GeometryObject, any>,
+    dataName: string
+  ): FilterLayer | null {
+    const currentPoints: Set<Feature<Point, GeoJsonProperties>> = new Set();
+    const currentWays: Set<Feature<LineString, GeoJsonProperties>> = new Set();
+    const currentPolygons: Set<Feature<Polygon, GeoJsonProperties>> = new Set();
+
+    // TODO simplify
+    /*
+    const options = { tolerance: 0.01, highQuality: false };
+    const simplifiedPolygon = simplify(polygon, options);
+    const options2 = { precision: 3, coordinates: 2, mutate: true};
+    const truncated = truncate(point, options2);
+    */
+
+    //TODO jedem als property "type" den tag übergeben für legende?
+    // oder besser gleich das filterlayer und dann dessen id and add/update geojsonsource
+
+    //TODO kann da gleich etwas von später mit rein? z.B. der buffer?
+    //TODO macht das überhaupt sinn multipolys zu flatten ? aber dann müsst ich mir später keine sorgen mehr machen
+    //!alternativ könnte auch ausprobiert werden gleich data.features an das layer zu übergeben!
     for (let index = 0; index < data.features.length; index++) {
       const element = data.features[index];
 
       switch (element.geometry.type) {
         case "Point":
-          this.currentPoints.add(element as Feature<Point, GeoJsonProperties>);
+          currentPoints.add(element as Feature<Point, GeoJsonProperties>);
           break;
 
         case "MultiPoint":
@@ -350,12 +316,12 @@ export default class MapController {
               type: "Feature",
             } as Feature<Point, GeoJsonProperties>;
 
-            this.currentPoints.add(point);
+            currentPoints.add(point);
           }
           break;
 
         case "LineString": {
-          this.currentWays.add(element as Feature<LineString, GeoJsonProperties>);
+          currentWays.add(element as Feature<LineString, GeoJsonProperties>);
           break;
         }
         case "MultiLineString":
@@ -366,12 +332,12 @@ export default class MapController {
               type: "Feature",
             } as Feature<LineString, GeoJsonProperties>;
 
-            this.currentWays.add(way);
+            currentWays.add(way);
           }
           break;
 
         case "Polygon": {
-          this.currentPolygons.add(element as Feature<Polygon, GeoJsonProperties>);
+          currentPolygons.add(element as Feature<Polygon, GeoJsonProperties>);
           break;
         }
         case "MultiPolygon":
@@ -383,8 +349,10 @@ export default class MapController {
               type: "Feature",
             } as Feature<Polygon, GeoJsonProperties>;
 
-            this.currentPolygons.add(polygon);
+            currentPolygons.add(polygon);
           }
+          break;
+        case "GeometryCollection":
           break;
 
         default:
@@ -392,187 +360,118 @@ export default class MapController {
       }
     }
 
-    console.log("this.currentPoints: ", this.currentPoints);
-    console.log("this.currentWays: ", this.currentWays);
-    console.log("this.currentPolygons: ", this.currentPolygons);
-
-    const allFeatures = [...this.currentPoints, ...this.currentWays, ...this.currentPolygons];
-    const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(allFeatures, 250);
-    this.allPolygonFeatures.set(dataName, polyFeatures); //TODO überflüssign wenn mit filterLayers
+    const allFeatures = [...currentPoints, ...currentWays, ...currentPolygons];
+    console.log("allFeatures: ", allFeatures);
 
     const layer = FilterManager.getFilterLayer(dataName);
     if (layer) {
-      layer.Features = polyFeatures;
+      layer.Features = allFeatures;
     }
+    //TODO what to do in else? create new? it should already exist at this point!
     //this.showPreprocessedData(dataName, polyFeatures);
+
+    return layer;
   }
 
-  //TODO das funktioniert im moment irgendwie noch nicht richtig mit mehreren hintereinander?
-  showPreprocessedData(
-    sourceName: string,
-    polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
-  ): void {
-    mapLayerManager.removeAllLayersForSource(sourceName);
+  prepareDataForOverlay(data: FilterLayer): void {
+    //const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(data.Features, 250);
 
-    const layer: Layer = {
-      id: "currFeatures-Layer",
-      source: sourceName,
-      type: "fill",
-      paint: {
-        "fill-color": "rgba(170, 170, 170, 0.5)",
-      },
-    };
+    Benchmark.startMeasure("adding buffer to all features and converting to points");
 
-    if (map.getSource(sourceName)) {
-      // the source already exists, only update the data
-      console.log(`Source ${sourceName} is already used! Updating it!`);
-      mapLayerManager.updateSource(sourceName, featureCollection(polygonFeatures));
-    } else {
-      // source doesn't exist yet, create a new one
-      mapLayerManager.addNewGeojsonSource(sourceName, featureCollection(polygonFeatures), false);
-    }
+    const bufferSize = data.Distance;
+    for (let index = 0; index < data.Features.length; index++) {
+      // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
+      const bufferedPolygon = addBufferToFeature(data.Features[index], bufferSize, "meters");
 
-    mapLayerManager.addNewLayer(layer, true);
-  }
+      //TODO hier erst simplify?
 
-  //TODO parameter wie distance und relevance müssen vom nutzer eingegeben werden können!
-  showData(
-    data: FeatureCollection<GeometryObject, any>,
-    sourceName: string,
-    distance?: number,
-    relevance?: FilterRelevance,
-    wanted?: boolean
-  ): void {
-    console.log("original Data:", data);
-    console.log("now adding to map...");
-    console.log(sourceName);
-
-    //TODO falls das auf den server ausgelagert wird, muss später nur noch die features und points nachträglich gefüllt werden (mit settern am besten!)
-    FilterManager.addFilter(new FilterLayer(sourceName, distance, relevance, wanted));
-
-    //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
-    mapLayerManager.removeAllLayersForSource(sourceName);
-
-    //! Data preprocessing could (and probably should) already happen on the server!
-    this.preprocessGeoData(data, sourceName);
-    //return; //TODO
-
-    if (map.getSource(sourceName)) {
-      // the source already exists, only update the data
-      console.log(`Source ${sourceName} is already used! Updating it!`);
-      mapLayerManager.updateSource(sourceName, data);
-    } else {
-      // source doesn't exist yet, create a new one
-      mapLayerManager.addNewGeojsonSource(sourceName, data, false);
-    }
-
-    //show the source data on the map
-    mapLayerManager.addLayers(sourceName);
-  }
-
-  addWebGlLayer(data: any): void {
-    if (map.getLayer("webglCustomLayer")) {
-      // the layer exists already; remove it
-      map.removeLayer("webglCustomLayer");
-    }
-
-    console.log("adding webgl data...");
-
-    const mapData = getDataFromMap(FilterManager.activeFilters);
-    const customLayer = new MapboxCustomLayer(mapData) as CustomLayerInterface;
-    map.addLayer(customLayer, "waterway-label");
-
-    console.log("Finished adding webgl data!");
-  }
-
-  addHeatmap(data?: string): void {
-    mapLayerManager.addHeatmapLayer(data);
-    mapboxUtils.addLegend();
-  }
-
-  addLumaGlLayer(): void {
-    console.log(this.allPolygonFeatures);
-
-    /*
-    const currentMapData: Feature<Polygon | MultiPolygon, GeoJsonProperties>[][][] = [];
-    let ii = 0;
-    this.activeFilters.forEach((filter) => {
-      const polyData = this.allPolygonFeatures.get(filter);
-      if (polyData) {
-        currentMapData[ii] = []; // needs to be initialized before adding data!
-        currentMapData[ii].push(polyData);
-      }
-      ii++;
-    });
-    console.log("currentMapData: ", currentMapData);
-    */
-
-    const overlayData: FilterLayer[] = [];
-    //const overlayData: mapboxgl.Point[][][] = [];
-
-    console.log(FilterManager.activeFilters);
-    console.log(FilterManager.allFilterLayers);
-    console.log(FilterManager);
-
-    //! wenn die polygon features sonst nirgendwo gebraucht werden, könnte man gleich oben wenn sie in die Map
-    //! gespeichert werden, sie zu mapboxgl.Points umwandeln, dann könnte man vllt die doppelte for-schleife hier vermeiden
-
-    let i = 0;
-    for (const [name, features] of this.allPolygonFeatures.entries()) {
-      overlayData[i] = new FilterLayer(name); //TODO oder lieber gleich statt this.allPolygonFeatures?
-      for (let index = 0; index < features.length; index++) {
-        const feature = features[index];
-        const coords = feature.geometry.coordinates;
-
-        // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
-        if (coords.length > 1) {
-          //? oder will ich hier das das zu einem array "flatten" und nur dieses pushen??
-          console.log("Multipolygon: ", coords);
-          //const flattened: mapboxgl.Point[] = [];
-          for (const coordPart of coords) {
-            //@ts-expect-error
-            //prettier-ignore
-            overlayData[i].Points.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
-            //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
-          }
-          // overlayData[i].push(flattened);
-        } else {
-          console.log("Polygon");
-          //@ts-expect-error
-          //prettier-ignore
-          const pointData = coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord));
-          overlayData[i].Points.push(pointData);
-
-          //TODO das statt dem overlay data dann verwenden
-          const filterLayer = FilterManager.getFilterLayer(name);
-          if (filterLayer) {
-            filterLayer.Points = pointData;
-          }
-        }
-      }
-      i++;
+      this.convertToPixels(data, bufferedPolygon);
     }
 
     /**
+     * Result in FilterManager.allFilterLayers looks like this:
      *[
      *  { ### Park
      *    points: [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...,
      *    radius: 500,
-     *    relevance: "very important",
-     *    name: "Park"  ?? (vllt nicht relevant)
+     *    relevance: 0.8,  //="very important"
+     *    name: "Park"
      *  },
      *  { ### Restaurant
      *    points: [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...,
-     *    radius: 2000,
-     *    relevance: "not very important",
+     *    radius: 250,
+     *    relevance: 0.2, // ="not very important"
+     *    name: "Restaurant"
      *  },
      *  ...
      * ]
      */
 
-    console.log("OverlayData: ", overlayData);
+    Benchmark.stopMeasure("adding buffer to all features and converting to points");
+  }
 
-    // check that there is data to overlay the map with
+  showDataOnMap(data: FeatureCollection<GeometryObject, any>, tagName: string): void {
+    console.log("filter Data:", data);
+    console.log("now adding to map...");
+    console.log("Tagname: ", tagName);
+
+    //TODO falls das auf den server ausgelagert wird, muss später nur noch die features und points nachträglich gefüllt werden (mit settern am besten!)
+
+    //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
+    mapLayerManager.removeAllLayersForSource(tagName);
+
+    if (map.getSource(tagName)) {
+      // the source already exists, only update the data
+      console.log(`Source ${tagName} is already used! Updating it!`);
+      mapLayerManager.updateSource(tagName, data);
+    } else {
+      // source doesn't exist yet, create a new one
+      mapLayerManager.addNewGeojsonSource(tagName, data, false);
+    }
+
+    //show the source data on the map
+    mapLayerManager.addLayers(tagName);
+  }
+
+  //TODO sinnvoll verwendbar?
+  addHeatmap(data?: string): void {
+    mapLayerManager.addHeatmapLayer(data);
+    mapboxUtils.addLegend();
+  }
+
+  convertToPixels(
+    layer: FilterLayer,
+    polygon: Feature<Polygon | MultiPolygon, GeoJsonProperties>
+  ): void {
+    const coords = polygon.geometry.coordinates;
+
+    // check if this is a multidimensional array (i.e. a multipolygon)
+    if (coords.length > 1) {
+      //TODO oder will ich hier das das zu einem array "flatten" und nur dieses pushen??
+      console.log("Multipolygon: ", coords);
+      //const flattened: mapboxgl.Point[] = [];
+      for (const coordPart of coords) {
+        layer.Points.push(
+          //@ts-expect-error
+          coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord))
+        );
+        //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+      }
+      // layer.Points.push(flattened);
+      // or: layer.Points.push(...flattened);
+    } else {
+      console.log("Polygon");
+      //@ts-expect-error
+      //prettier-ignore
+      const pointData = coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord));
+      layer.Points.push(pointData);
+    }
+  }
+
+  addAreaOverlay(overlayData: any): void {
+    console.log("FilterManager: ", FilterManager);
+
+    // check that there is data to create an overlay for the map
     if (overlayData.length > 0) {
       createOverlay(overlayData);
     } else {

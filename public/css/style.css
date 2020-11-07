@@ -9,7 +9,6 @@ html,
 body {
     margin: 0;
     padding: 0;
-    /*font: 400 15px/22px 'Source Sans Pro', 'Helvetica Neue', Helvetica, Arial, Sans-serif;*/
     font: 300 14px/20px Helvetica, Verdana, Geneva, Sans-serif;
     -webkit-font-smoothing: antialiased;
 }
@@ -52,7 +51,7 @@ body {
     font-weight: normal;
 }
 
-.heading button {
+.head-btn {
     margin-bottom: 1em;
     padding: 0.6em;
 
@@ -62,13 +61,42 @@ body {
     outline: none;
     border-radius: 2px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
-    background-color: #14bd5a;
+    background-color: #06a046;
     color: whitesmoke;
 }
 
-.heading button:hover,
-.heading button:active {
-    background-color: #11a74f;
+.head-btn:hover,
+.head-btn:active {
+    background-color: #058f3e;
+}
+
+#resetMapButton {
+    margin-bottom: 1em;
+    padding: 0.6em;
+
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    border-radius: 6px;
+    background-color: #be150f;
+    color: whitesmoke;
+}
+
+#resetMapButton:hover,
+#resetMapButton:active {
+    background-color: #a30d08;
+}
+
+.button-disabled {
+    opacity: 0.4;
+    background-color: #5c5c5c;
+    cursor: auto;
+}
+
+.button-disabled:hover,
+.button-disabled:active {
+    background-color: #5c5c5c;
 }
 
 /** Map Styling */
@@ -121,6 +149,19 @@ body {
     width: 10px;
     height: 10px;
     margin-right: 5px;
+}
+
+/** Upload button - very small in the bottom rigth corner so users are not disturbed by it */
+#uploadLogsButton {
+    position: absolute;
+    bottom: 22px;
+    font-size: 0.7em;
+    right: 2px;
+    padding: 0.4em;
+    cursor: pointer;
+    border-width: 0;
+    background-color: #dadada;
+    color: #2f2f2fd6;
 }
 
 

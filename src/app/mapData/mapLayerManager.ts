@@ -11,8 +11,6 @@ import ClusterManager from "../map/clusterManager";
 import { map } from "../map/mapboxConfig";
 import Heatmap from "../map/heatmap";
 
-// * Info: um ein bestimmtes tile an einer position zu bekommen, hilft das vllt: https://github.com/mapbox/tilebelt
-
 type mapboxLayerType =
   | "symbol"
   | "fill"
@@ -52,12 +50,12 @@ class MapLayerManager {
 
   // Add a geojson source, see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson
   addNewGeojsonSource(
-    sourceName: string,
+    tagName: string,
     geojsonData?: string | Feature<Geometry, GeoJsonProperties> | FeatureCollection<Geometry, any>,
     clusteringEnabled = false
   ): void {
     let sourceOptions: mapboxgl.GeoJSONSourceOptions = {
-      buffer: 70, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
+      buffer: 50, // higher means fewer rendering artifacts near tile edges and decreased performance (max: 512)
       tolerance: 1.25, // higher means simpler geometries and increased performance
       data: geojsonData, // url to geojson or inline geojson
     };
@@ -84,11 +82,11 @@ class MapLayerManager {
       };
     }
 
-    map.addSource(sourceName, { type: "geojson", ...sourceOptions });
+    map.addSource(tagName, { type: "geojson", ...sourceOptions });
     //console.log("Source: ", map.getSource(sourceName));
 
     if (clusteringEnabled) {
-      const clusterManager = new ClusterManager(sourceName);
+      const clusterManager = new ClusterManager(tagName);
 
       //TODO return the cluster layers so they can be added to the activeLayers array
       clusterManager.addClusterLayer();
@@ -163,23 +161,9 @@ class MapLayerManager {
       }
     });
 
-    /*
-      const mapLayer = map.getLayer(id);
-  
-      console.log("maplayer:" + mapLayer);
-  
-      //TODO: improve this! there can be more than one layer (and they don't have the same id name as the source but only start with it)
-      if (typeof mapLayer !== "undefined") {
-        // Remove map layer & source.
-        map.removeLayer(id).removeSource(id);
-        return true;
-      }
-      */
-
     return false;
   }
 
-  //TODO add min and maxZoom to each layer for performance reasons!
   addLayers(sourceName: string): void {
     //! with ["has", "name"] it can be tested if something exists in the properties (and should be because errors
     //! have an impact on the performance!)
@@ -187,29 +171,25 @@ class MapLayerManager {
       id: sourceName + "-l1",
       type: "circle",
       source: sourceName,
+      minzoom: 7,
+      maxzoom: 20,
       // 'all' checks 2 conditions:  on this layer show only points or multipoints and only if not clustered
       filter: [
         "all",
         ["match", ["geometry-type"], pointType, true, false],
         ["!", ["has", "point_count"]],
       ],
-      //interactive: true,
-      layout: {
-        //"visibility": "visible",
-      },
       //prettier-ignore
       paint: {
         //increase circle radius (in pixels) when zooming in
         // see https://docs.mapbox.com/help/tutorials/mapbox-gl-js-expressions/
-        /*
+        
         "circle-radius": [
             "interpolate", ["linear"], ["zoom"],
-            0, 0.0,
-            8, 4.0, // 4px at zoom level 8
-            //12, ["/", ["get", "zoom"], 3], //TODO adjust expression values
+            8, 5.0, // 5px at zoom level 8
+            12, 15.0,
             16, 25.0,
         ],
-        */
         // style color based on amenity type
         "circle-color": [
             "match",
@@ -218,32 +198,15 @@ class MapLayerManager {
             "bar", "#fbb03b",
             "restaurant", "#223b53",
             "supermarket", "#3bb2d0",
-            "#ff0000", // fallback color for others
-        ],
-        /*
-        "circle-stroke-width": [
-            "interpolate", ["linear"], ["zoom"],
-            4, 0.0,
-            10, 15,
-            15, 52,
-            20, 90,
-        ],
-        "circle-stroke-color": "rgba(100, 100, 100, 100)",
-        "circle-stroke-opacity": [
-            "interpolate", ["linear"], ["zoom"],
-            4, 0.0,
-            6, 0.08,
-            15, 0.2,
-            20, 0.25,
+            "#eeeeee", // fallback color for others
         ],
         "circle-opacity": [
             "interpolate", ["linear"], ["zoom"], 
-            4, 0.0, 
+            7, 0.0, 
             12, 0.5, 
-            20, 1.0,
+            18, 1.0,
         ],
-        "circle-blur": 0.3,
-        */
+        //"circle-blur": 0.3,
       },
     };
 
@@ -251,14 +214,12 @@ class MapLayerManager {
       id: sourceName + "-l2",
       type: "line",
       source: sourceName,
+      minzoom: 7,
+      maxzoom: 20,
       filter: ["match", ["geometry-type"], lineType, true, false],
       paint: {
         "line-color": "rgba(255, 0, 0, 255)",
         "line-width": 8,
-        //"line-blur": 8,
-        //"line-offset": 3,
-        //"line-opacity": 0.5,
-        //"line-gap-width": 20, // renders a second line 20 pixes away
       },
     };
 
@@ -269,13 +230,15 @@ class MapLayerManager {
       //TODO would "==" be more efficient than "match" ?
       filter: ["match", ["geometry-type"], polygonType, true, false],
       source: sourceName,
+      minzoom: 7,
+      maxzoom: 20,
       paint: {
-        //"fill-outline-color": "rgba(255,255,255,0.9)", //to render white outlines around the polygon
         "fill-color": "rgba(123,123,255,0.6)",
-        "fill-opacity": 0.6,
+        "fill-opacity": 0.8,
       },
     };
 
+    /*
     //*add line strokes around polygons as there is no stroke paint property for polygons for performance reasons
     const polygonOutlineLayer: Layer = {
       id: sourceName + "-l4",
@@ -290,6 +253,7 @@ class MapLayerManager {
         //"line-gap-width": 20,
       },
     };
+    */
 
     //show points below the map symbols
     this.addNewLayer(pointLayer, true);
@@ -297,8 +261,6 @@ class MapLayerManager {
     this.addNewLayer(lineLayer, true);
     //show filled polygons
     this.addNewLayer(polygonFillLayer, true);
-    //show polygon outlines
-    //this.addNewLayer(polygonOutlineLayer, true);
   }
 
   /**
@@ -315,84 +277,6 @@ class MapLayerManager {
       }
     }
     return undefined;
-  }
-
-  /**
-   * * Um vektor sources hinzuzufügen müssen die sourcelayer angegeben werden!
-   * * Um das sourceLayer herauszufinden, könnte das tileinfo-package nützlich sein (https://www.npmjs.com/package/tileinfo)
-   * * oder alternativ auch https://github.com/mapbox/vector-tile-js
-   */
-  addVectorLayer(data: string): void {
-    //TODO add to active layers by calling the addNewLayer-Method
-    /*
-    map.addSource("tv", {
-      type: "vector",
-      url: data,
-    });
-
-    map.addLayer({
-      id: "tv",
-      type: "circle",
-      source: "tv",
-      "source-layer": "Regensburg_Test",
-      paint: {
-        "circle-color": "#ff69b4",
-      },
-    });*/
-
-    // Test für eigenen TileServer
-    map.addSource("customTiles", {
-      type: "vector",
-      tiles: [data],
-    });
-
-    map.addLayer({
-      id: "customTiles",
-      type: "line",
-      source: "customTiles",
-      "source-layer": "state",
-      paint: {
-        "line-color": "#ff69b4",
-      },
-    });
-  }
-
-  addLocalVectorData(): void {
-    //TODO add to active layers by calling the addNewLayer-Method
-    map.addSource("vector", {
-      type: "vector",
-      tiles: ["./assets/ny_extract.osm.pbf"],
-    });
-
-    /*
-      map.addLayer({
-        id: "vector",
-        type: "line",
-        source: "vector",
-        "source-layer": "state",
-        paint: {
-          "line-color": "#ff69b4",
-        },
-      });*/
-  }
-
-  addIconLayer(sourceName: string): void {
-    //TODO add to active layers by calling the addNewLayer-Method
-    map.addLayer({
-      id: sourceName + "-symbol",
-      type: "symbol",
-      source: sourceName,
-      layout: {
-        "icon-image": [
-          "match",
-          ["get", "amenity"],
-          "bar",
-          "bar-11",
-          "marker-11", // other
-        ],
-        "icon-allow-overlap": true,
-      },
-    });
   }
 
   addWithinStyleLayer(): void {

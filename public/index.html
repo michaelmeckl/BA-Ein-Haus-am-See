@@ -9,8 +9,6 @@
     <title>Ein Haus am See</title>
     <link rel="icon" href="./favicon.ico">
 
-    <!-- Styles -->
-
     <!-- Mapbox GL style -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.css" rel="stylesheet" />
     <!-- Mapbox Geocoder style -->
@@ -19,15 +17,8 @@
     <!-- own stylesheet at the end so mapbox styles can't override these! -->
     <link href="./css/style.css" type="text/css" rel="stylesheet">
 
-    <!-- TODO preload some resources for better performance ?
-    <link rel="preload" href="./css/style.css" as="style">
-    <link rel="preload" href="./dist/bundle.js" as="script crossorigin="anonymous"" />
-    -->
-
-    <!-- Scripts -->
-
     <!-- for async & defer, see https://developer.mozilla.org/en-US/docs/Glossary/Perceived_performance-->
-    <script type="module" src="./dist/bundle.js" async defer></script>
+    <script type="module" src="./dist/client.js" async defer></script>
 </head>
 
 <body>
@@ -40,12 +31,21 @@
 
     <header class="heading">
         <h1>Ein Haus am See</h1>
-        <button type="button" id="deckglButton">Add Deckgl Layer</button>
-        <button type="button" id="lumaButton">Add Luma Layer</button>
-        <button type="button" id="showLocations">Zeige geeignete Orte</button>
-        <button type="button" id="showFilters">Zeige Filter</button>
-        <button type="button" id="showCustomData">Add WebGL custom data</button>
-        <button type="button" id="blurButton">Test Blur</button>
+        <!--TODO 
+        <div id="button" href="#">
+            <input type="checkbox" class="check">Submit
+        </div>
+        <button type="button" class="btn btn-warning settings-btn">Use Blur-Filter
+            <input id="blur-filter-checkbox" type="checkbox" checked />
+        </button>
+        -->
+
+        <button type="button" id="showFilters" class="head-btn">Zeige Filter</button>
+        <!-- TODO add autocomplete="off" to disabled button for firefox?-->
+        <button type="button" id="showOverlayButton" class="button-disabled head-btn" disabled>Zeige geeignete
+            Gebiete</button>
+        <button type="button" id="showLocations" class="button-disabled head-btn" disabled>Zeige geeignete Orte</button>
+        <button type="button" id="resetMapButton" class="head-btn">Karte zurücksetzen</button>
     </header>
 
 
@@ -82,16 +82,17 @@
 
         <div id="map"></div>
 
-        <!-- TODO -->
-        <canvas id="test_canvas"></canvas>
-        <canvas id="deck_canvas"></canvas>
+        <!-- ! only used for the study! -->
+        <button type="button" id="uploadLogsButton">Hochladen</button>
+
+        <!-- offscreen canvas used for the overlay creation -->
         <canvas id="texture_canvas">Your browser does not seem to support HTML5 canvas.</canvas>
     </div>
 
-    <div class="map-overlay" id="legend"></div>
+    <!-- fill with map data -->
+    <div class="map-overlay hidden" id="legend"></div>
 
     <div id="snackbar"></div>
-
 
     <!-- Modal for filter details -->
     <div id="filterModal" class="modal">
@@ -213,7 +214,6 @@
                     <a href="#">Schule</a>
                 </div>
 
-                <!-- TODO -->
                 <button class="filter-categories">Sonstiges
                     <i class="caret-down"></i>
                 </button>
@@ -253,7 +253,7 @@
 
     </div>
 
-
+    <!-- TODO delete later -->
     <template id="li-template">
         <li>
             <button id="close-btn" class="close">&times;</button>
@@ -264,8 +264,9 @@
     <!-- TODO erstellte Filter sollten nachträglich auch noch geupdated werden können (wenn Zeit noch implementieren!) -->
     <template id="filter-li-template">
         <li>
-            <!-- TODO add a checkbox at the left to allow the user to show and hide filters without completely removing them -->
             <button id="remove-filter-button" type="button">Löschen</button>
+            <!-- TODO add a checkbox at the left to allow the user to show and hide filters without completely removing them -->
+
             <!--
             <div class="li-content">
                 <button id="remove-filter-button" type="button">Löschen</button>

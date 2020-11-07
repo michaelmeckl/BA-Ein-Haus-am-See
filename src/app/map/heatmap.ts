@@ -12,7 +12,8 @@ export default class Heatmap {
     // Heatmap layers work with a vector tile source as well as geojson.
     map.addSource(this.sourceName, {
       type: "geojson",
-      data: "../assets/data.geojson", //TODO use the real data given as param
+      //data: "../assets/data.geojson",
+      data: data,
     });
   }
 
@@ -21,42 +22,28 @@ export default class Heatmap {
       id: `${this.sourceName}-heat`,
       type: "heatmap",
       source: this.sourceName,
+      minzoom: 7,
       maxzoom: 15,
       paint: {
         // Increase the heatmap weight based on frequency and property magnitude
         // heatmap-weight is a measure of how much an individual point contributes to the heatmap
         //! both do not work with text values
         /*
-            "heatmap-weight": [
-              "interpolate",
-              ["linear"],
-              ["get", "type"],
-              "point",
-              0,
-              "way",
-              0.5,
-              "polygon",
-              1,
-            ],
-            */
-        /*
-            "heatmap-weight": {
-              property: "type",
-              type: "exponential",
-              stops: [
-                [0, 0.2],
-                [62, 1],
-              ],
-            },*/
+          "heatmap-weight": [
+            "interpolate",
+            ["linear"],
+            ["get", "type"],
+            "point",
+            0,
+            "way",
+            0.5,
+            "polygon",
+            1,
+          ],
+          */
         // Increase the heatmap color weight weight by zoom level
         // heatmap-intensity is a multiplier on top of heatmap-weight
-        //"heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 9, 3],
-        "heatmap-intensity": {
-          stops: [
-            [11, 1],
-            [15, 3],
-          ],
-        },
+        "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 11, 1, 15, 3],
         // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
         // Begin color ramp at 0-stop with a 0-transparancy color
         // to create a blur-like effect.
@@ -70,35 +57,16 @@ export default class Heatmap {
               0.8, "rgb(239,138,98)",
               1, "rgb(178,24,43)",
             ],
-        /*
-            // Adjust the heatmap radius by zoom level
-            // prettier-ignore
-            "heatmap-radius": [
-              "interpolate", ["linear"], ["zoom"],
-              0, 2,
-              9, 20,
-              15, 50, 
-              18, 70,
-            ],
-            */
         // increase radius as zoom increases
-        "heatmap-radius": {
+        // prettier-ignore
+        "heatmap-radius": [
           //default radius is 30 (pixel)
-          stops: [
-            [11, 15],
-            [15, 20],
-          ],
-        },
-        // Transition from heatmap to circle layer by zoom level
-        //"heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 7, 1, 9, 0],
+          "interpolate", ["linear"], ["zoom"],
+          11, 15,
+          15, 20,
+        ],
         // decrease opacity to transition into the circle layer
-        "heatmap-opacity": {
-          default: 1,
-          stops: [
-            [14, 1],
-            [15, 0],
-          ],
-        },
+        "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 14, 1, 15, 0],
       },
     };
 
@@ -107,6 +75,7 @@ export default class Heatmap {
       type: "circle",
       source: this.sourceName,
       minzoom: 14,
+      maxzoom: 20,
       paint: {
         "circle-radius": {
           property: "type",
@@ -134,7 +103,6 @@ export default class Heatmap {
         "circle-stroke-color": "white",
         "circle-stroke-width": 1,
         // Transition from heatmap to circle layer by zoom level
-        //"circle-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 16, 1],
         "circle-opacity": {
           stops: [
             [14, 0],
@@ -182,11 +150,11 @@ export default class Heatmap {
     new mapboxgl.Popup()
       // cast to point so coordinates is safe to access
       .setLngLat((clickedPoint.geometry as Point).coordinates as LngLatLike)
-      //TODO oder einfacher: setLngLat(map.unproject(e.point))
+      //or: setLngLat(map.unproject(e.point))
       .setHTML(
         "<h3>Name: </h3> " +
           clickedPoint.properties?.tags.name +
-          "<p>Amenity: " +
+          "<p>Type: " +
           clickedPoint.properties?.tags.amenity +
           "</p>"
       )
