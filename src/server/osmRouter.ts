@@ -49,7 +49,7 @@ export default class OsmRouter {
           const osmQuery = ServerUtils.buildOverpassQuery(bounds, query);
 
           try {
-            Benchmark.startMeasure("Getting data from osm total");
+            //Benchmark.startMeasure("Getting data from osm total");
             const encodedQuery = querystring.stringify({ data: osmQuery });
             const geoData = await axios.get(
               `https://overpass-api.de/api/interpreter?${encodedQuery}`, //TODO change to local version below
@@ -57,17 +57,17 @@ export default class OsmRouter {
               //const url = `https://localhost:12347/api/interpreter?${encodedQuery}`;
               { timeout: 8000 }
             );
-            console.log(Benchmark.stopMeasure("Getting data from osm total"));
+            //Benchmark.stopMeasure("Getting data from osm total");
 
             //TODO redis spatial features genauer anschauen, die könnten das hier um einiges verbessern vllt
 
-            Benchmark.startMeasure("Caching data");
+            //Benchmark.startMeasure("Caching data");
             // cache data for one hour, this should be enough for a typical usecase
             //const cacheTime = 3600;
             //! cache only for 15 minutes during study to prevent influencing the next participant!
             const cacheTime = 900;
             RedisCache.cacheData(compositeKey, geoData.data, cacheTime);
-            Benchmark.stopMeasure("Caching data");
+            //Benchmark.stopMeasure("Caching data");
 
             //this.saveGeoData(geoData.data, query);
 
@@ -128,9 +128,9 @@ export default class OsmRouter {
     //TODO am besten nicht die exakten Bounds, sondern auf überlappung prüfen und nur nötiges holen?
     //TODO vllt mit einer geospatial query möglich?? siehe Redis Plugin für Geodaten!
     const compositeKey = (bounds + "/" + query).trim().toLowerCase();
-    Benchmark.startMeasure("Getting data from cache");
+    //Benchmark.startMeasure("Getting data from cache");
     const result = await RedisCache.fetchDataFromCache(compositeKey);
-    Benchmark.stopMeasure("Getting data from cache");
+    //Benchmark.stopMeasure("Getting data from cache");
 
     if (result) {
       //console.log("Found in cache!");

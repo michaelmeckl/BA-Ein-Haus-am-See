@@ -212,7 +212,7 @@ class MapLayerManager {
     const color = TagColors.get(tagName);
 
     if (!color) {
-      console.warn("Couldn't get color for tag: ", tagName);
+      //console.warn("Couldn't get color for tag: ", tagName);
       return;
     }
 
@@ -236,7 +236,7 @@ class MapLayerManager {
         this.geojsonSourceActive = false;
       }
     } else {
-      console.warn(`Couldnt remove tag "${sourceId}" from legend!`);
+      //console.warn(`Couldnt remove tag "${sourceId}" from legend!`);
     }
   }
 

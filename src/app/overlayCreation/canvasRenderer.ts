@@ -53,9 +53,6 @@ class CanvasRenderer {
     this.weights.push(mapLayer.Relevance);
 
     const pixelDist = metersInPixel(mapLayer.Distance, map.getCenter().lat, map.getZoom());
-    console.log("Meter in pixel: ", pixelDist);
-
-    console.log("Wanted: ", mapLayer.Wanted);
 
     // apply a "feather"/blur - effect to everything that is drawn on the canvas from now on
     //ctx.filter = "blur(32px)";
@@ -76,7 +73,7 @@ class CanvasRenderer {
       this.ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
     }
 
-    Benchmark.startMeasure("render and blur all polygons of one layer");
+    //Benchmark.startMeasure("render all polygons of one layer");
 
     for (const polygon of mapLayer.Points) {
       const startPoint = polygon[0];
@@ -96,13 +93,13 @@ class CanvasRenderer {
       this.ctx.fill("evenodd");
     }
 
-    Benchmark.stopMeasure("render and blur all polygons of one layer");
+    //Benchmark.stopMeasure("render all polygons of one layer");
 
     const img = await readImageFromCanvas(this.overlayCanvas);
 
-    Benchmark.startMeasure("blur Image in Webgl");
+    //Benchmark.startMeasure("blur Image in Webgl");
     const blurredCanvas = applyGaussianBlur(img, pixelDist);
-    Benchmark.stopMeasure("blur Image in Webgl");
+    //Benchmark.stopMeasure("blur Image in Webgl");
 
     // draw blurred canvas on the overlayCanvas
     this.ctx.drawImage(blurredCanvas, 0, 0);
@@ -123,7 +120,7 @@ class CanvasRenderer {
     for (let index = 0; index < this.weights.length; index++) {
       this.weights[index] *= normalizer;
     }
-    console.log("Normalized Weights:", this.weights);
+    //console.log("Normalized Weights:", this.weights);
   }
 
   combineOverlays(textureLayers: HTMLImageElement[]): any {
@@ -283,14 +280,12 @@ class CanvasRenderer {
 const renderer = new CanvasRenderer();
 
 export async function createOverlay(data: FilterLayer[]): Promise<void> {
-  console.log("Creating canvas overlay now...");
-
   Benchmark.startMeasure("creating canvas overlay");
 
-  Benchmark.startMeasure("render all Polygons");
+  //Benchmark.startMeasure("render all Polygons");
   const allRenderProcesses = data.map((layer: FilterLayer) => renderer.renderPolygons(layer));
   await Promise.all(allRenderProcesses);
-  Benchmark.startMeasure("render all Polygons");
+  //Benchmark.startMeasure("render all Polygons");
 
   //console.log("Current number of saved textures in canvasRenderer: ", renderer.allTextures.length);
 
@@ -302,7 +297,7 @@ export async function createOverlay(data: FilterLayer[]): Promise<void> {
   //Reset state for next rendering
   renderer.reset();
 
-  console.log("finished blurring and compositing");
+  //console.log("finished blurring and compositing");
 }
 
 //TODO separate method that only calculates which layers changed and only render difference??
