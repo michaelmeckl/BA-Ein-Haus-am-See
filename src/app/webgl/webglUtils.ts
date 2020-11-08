@@ -1,10 +1,8 @@
+/* eslint-disable no-magic-numbers */
+
 // Util-Functions for abstracting some of WebGL's Boilerplate Code.
 // Some functions use a small WebGL Helper library called TWGL (see https://www.npmjs.com/package/twgl.js)
 // import * as twgl from "twgl.js";
-
-type shaderType =
-  | WebGL2RenderingContext["VERTEX_SHADER"]
-  | WebGL2RenderingContext["FRAGMENT_SHADER"];
 
 //! these kernels are not used right now
 // prettier-ignore
@@ -14,16 +12,6 @@ const blurKernels = {
       0.045, 0.122, 0.045,
       0.122, 0.332, 0.122,
       0.045, 0.122, 0.045,
-    ],
-    gaussianBlur2: [
-      1, 2, 1,
-      2, 4, 2,
-      1, 2, 1,
-    ],
-    gaussianBlur3: [
-      0, 1, 0,
-      1, 1, 1,
-      0, 1, 0,
     ],
     boxBlur: [
         0.111, 0.111, 0.111,
@@ -39,10 +27,6 @@ const blurKernels = {
 
 export function getBlurFilterKernel(name = "gaussianBlur"): number[] {
   switch (name) {
-    case "gaussianBlur2":
-      return blurKernels.gaussianBlur2;
-    case "gaussianBlur3":
-      return blurKernels.gaussianBlur3;
     case "boxBlur":
       return blurKernels.boxBlur;
     case "triangleBlur":
@@ -58,21 +42,6 @@ export function computeKernelWeight(kernel: number[]): number {
     return prev + curr;
   });
   return weight <= 0 ? 1 : weight;
-}
-
-export function getPixelsFromImage(texture: HTMLImageElement): Uint8Array | null {
-  // use canvas to get the pixel data array of the image
-  const canvas = document.createElement("canvas");
-  canvas.width = texture.width;
-  canvas.height = texture.width;
-  const ctx = canvas.getContext("2d");
-  ctx?.drawImage(texture, 0, 0);
-  const imageData = ctx?.getImageData(0, 0, texture.width, texture.height);
-  if (!imageData) {
-    return null;
-  }
-  const pixels = new Uint8Array(imageData.data.buffer);
-  return pixels;
 }
 
 // Fills the buffer with the values that define a rectangle.
@@ -100,35 +69,6 @@ export function setRectangle(
   );
 }
 
-export function getWebGLRenderingContext(): WebGLRenderingContext | null {
-  const canvas = document.querySelector("canvas");
-  if (!canvas) {
-    return null;
-  }
-  canvas.width = canvas.clientWidth;
-  canvas.height = canvas.clientHeight;
-  const gl = canvas.getContext("webgl");
-  if (!gl) {
-    console.error("Failed to get WebGL context. Your browser or device may not support WebGL.");
-    return null;
-  }
-  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-  gl.clearColor(0.0, 0.0, 0.0, 1.0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  return gl;
-}
-
-//! not used at the moment
-export function bindFramebufferAndSetViewport(
-  gl: WebGL2RenderingContext,
-  fb: WebGLFramebuffer | null,
-  width: number,
-  height: number
-): void {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-  gl.viewport(0, 0, width, height);
-}
-
 export function createTexture(
   gl: WebGL2RenderingContext | WebGLRenderingContext,
   data: Uint8Array | HTMLImageElement,
@@ -143,7 +83,6 @@ export function createTexture(
   gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, texture);
 
-  //TODO sinnvoll?
   //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
   // Set the parameters so we can render any size image:
@@ -176,17 +115,6 @@ export function createBuffer(
   return buffer;
 }
 
-export function bindFramebuffer(
-  gl: WebGL2RenderingContext | WebGLRenderingContext,
-  framebuffer: WebGLFramebuffer | null,
-  texture: WebGLTexture | null
-): void {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-  if (texture) {
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-  }
-}
-
 export function bindAttribute(
   gl: WebGL2RenderingContext | WebGLRenderingContext,
   buffer: WebGLBuffer | null,
@@ -211,6 +139,28 @@ export function setupCanvasForDrawing(
   // Clear the canvas
   gl.clearColor(...clearColor);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+}
+
+//! not used
+/*
+
+type shaderType =
+  | WebGL2RenderingContext["VERTEX_SHADER"]
+  | WebGL2RenderingContext["FRAGMENT_SHADER"];
+  
+export function getPixelsFromImage(texture: HTMLImageElement): Uint8Array | null {
+  // use canvas to get the pixel data array of the image
+  const canvas = document.createElement("canvas");
+  canvas.width = texture.width;
+  canvas.height = texture.width;
+  const ctx = canvas.getContext("2d");
+  ctx?.drawImage(texture, 0, 0);
+  const imageData = ctx?.getImageData(0, 0, texture.width, texture.height);
+  if (!imageData) {
+    return null;
+  }
+  const pixels = new Uint8Array(imageData.data.buffer);
+  return pixels;
 }
 
 // see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
@@ -238,10 +188,8 @@ export function createShader(
   return shader;
 }
 
-/**
- * Initialize a shader program, so WebGL knows how to draw the data.
- * see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
- */
+//Initialize a shader program, so WebGL knows how to draw the data.
+//see. https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
 export function createProgram(
   gl: WebGLRenderingContext,
   vertexShader: WebGLShader,
@@ -268,9 +216,21 @@ export function createProgram(
   return program;
 }
 
-/**
- * Clear the canvas and reset depth.
- */
+export function bindFramebufferAndSetViewport(
+  gl: WebGL2RenderingContext | WebGLRenderingContext,
+  fb: WebGLFramebuffer | null,
+  width: number,
+  height: number,
+  texture: WebGLTexture | null
+): void {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.viewport(0, 0, width, height);
+  if (texture) {
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+  }
+}
+
+//Clear the canvas and reset depth.
 export function clearCanvas(gl: WebGL2RenderingContext | WebGLRenderingContext): void {
   gl.clearColor(0, 0, 0, 0.0);
   gl.clearDepth(1.0); // Clear everything
@@ -280,7 +240,6 @@ export function clearCanvas(gl: WebGL2RenderingContext | WebGLRenderingContext):
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
-/*
 // Util to enable VAO extension for Webgl 1
 function enableVAOExtension(gl: WebGLRenderingContext): void {
   const ext = gl.getExtension("OES_vertex_array_object");
