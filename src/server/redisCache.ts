@@ -1,5 +1,4 @@
 import Redis from "ioredis";
-import geoRedis from "georedis";
 
 class RedisCache {
   private readonly redisClient: Redis.Redis;
@@ -12,7 +11,7 @@ class RedisCache {
 
     //TODO use this as the this.redisClient instead ot the one above?
     // see https://github.com/arjunmehta/node-georedis for more infos
-    const geoRedisClient = geoRedis.initialize(this.redisClient);
+    //const geoRedisClient = geoRedis.initialize(this.redisClient);
 
     this.redisClient.on("connect", function () {
       console.log("Connected to redis instance");

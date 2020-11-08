@@ -34,9 +34,18 @@ export default class MapController {
   private currentZoom: number = initialZoomLevel;
   private currentMapCenter: LngLat = new LngLat(initialPosition[0], initialPosition[1]);
 
-  private selectedVisualType: VisualType = VisualType.OVERLAY; //TODO wechseln!
-  private showingOverlay = false;
-  showOverlayActivated = true; //! im moment immer true
+  private selectedVisualType: VisualType = VisualType.OVERLAY;
+
+  set VisualType(type: VisualType) {
+    const changedOverlay = this.selectedVisualType !== type;
+    this.selectedVisualType = type;
+
+    //reload if type changed
+    if (changedOverlay) {
+      //console.log("reloading");
+      this.loadMapData();
+    }
+  }
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -78,7 +87,7 @@ export default class MapController {
     map.addControl(new mapboxgl.ScaleControl(), "bottom-left");
 
     // Add the geocoder to the map
-    map.addControl(Geocoder.geocoderControl, "bottom-left"); //TODO top-left
+    map.addControl(Geocoder.geocoderControl, "top-left");
   }
 
   setupMapEvents(): void {
@@ -169,6 +178,8 @@ export default class MapController {
 
   async loadMapData(): Promise<void> {
     const allCurrentFilters = FilterManager.activeFilters;
+    console.log("allcurrentfilters", allCurrentFilters);
+
     if (allCurrentFilters.size === 0) {
       //console.warn("no active filters! cant load anything!");
       return;
@@ -226,32 +237,39 @@ export default class MapController {
     hideSnackbar();
 
     //update the overlay if it is activated
-    if (this.showOverlayActivated) {
-      //TODO remove legend and other map layers // ==  mapLayerManager.removeAllDataFromMap();
-      //TODO oder nur geojson layer?
+    if (this.selectedVisualType === VisualType.OVERLAY) {
+      console.log("add overlay");
+      if (mapLayerManager.geojsonSourceActive) {
+        console.log("removing geojson");
+        mapLayerManager.removeAllDataFromMap();
+      }
+
       //console.log("updating overlay...\n", FilterManager.allFilterLayers);
-      this.showingOverlay = true;
       this.addAreaOverlay();
     }
   }
 
-  //TODO
   removeData(sourceName: string): void {
-    console.log("Removing source: ", sourceName);
-    mapLayerManager.removeGeojsonSource(sourceName);
-    //TODO should also call the filtermanager so everythings in one place
+    FilterManager.removeFilter(sourceName);
+
+    if (this.selectedVisualType === VisualType.OVERLAY) {
+      mapLayerManager.removeCanvasSource("overlaySource");
+      this.addAreaOverlay(); //recreate overlay without this filter layer
+    } else {
+      mapLayerManager.removeGeojsonSource(sourceName);
+    }
   }
 
   resetMapData(): void {
-    //TODO sollten die filter wirklich gelöscht werden???
+    //? sollten die filter wirklich gelöscht werden???
     //filterManager.clearAllFilters();
-    //console.log("After clear: ", filterManager);
-
     mapLayerManager.removeAllDataFromMap();
   }
 
   showDataOnMap(data: FeatureCollection<GeometryObject, any>, tagName: string): void {
     //console.log("Tagname: ", tagName);
+
+    mapLayerManager.removeCanvasSource("overlaySource");
 
     mapLayerManager.removeAllLayersForSource(tagName);
 

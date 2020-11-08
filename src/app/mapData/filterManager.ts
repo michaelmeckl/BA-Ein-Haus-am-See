@@ -34,7 +34,7 @@ class FilterManager {
   }
 
   //TODO for schleife umdrehen?
-  removeFilterLayer(name: string): void {
+  private removeFilterLayer(name: string): void {
     for (let index = 0; index < this.allFilterLayers.length; index++) {
       const layer = this.allFilterLayers[index];
       if (layer.LayerName === name) {

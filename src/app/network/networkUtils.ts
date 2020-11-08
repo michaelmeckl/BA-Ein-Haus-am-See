@@ -111,7 +111,6 @@ export async function fetchOsmDataFromServer(
   query: string
 ): Promise<FeatureCollection<GeometryObject, any> | null> {
   try {
-    //console.log("sending request!");
     const params = new URLSearchParams({
       bounds: mapBounds,
       osmQuery: query,

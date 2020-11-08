@@ -31,59 +31,33 @@
 
     <header class="heading">
         <h1>Ein Haus am See</h1>
-        <!--TODO 
-        <div id="button" href="#">
-            <input type="checkbox" class="check">Submit
-        </div>
-        <button type="button" class="btn btn-warning settings-btn">Use Blur-Filter
-            <input id="blur-filter-checkbox" type="checkbox" checked />
-        </button>
-        -->
-
         <button type="button" id="showFilters" class="head-btn">Wähle Filter</button>
-        <!-- TODO add autocomplete="off" to disabled button for firefox?-->
-        <button type="button" id="showOverlayButton" class="button-disabled head-btn" disabled>Zeige Gebiete</button>
-        <button type="button" id="showLocations" class="button-disabled head-btn" disabled>Zeige geeignete Orte</button>
+
+        <div id="visualMode-dropdown">
+            <label class="mode-label">
+                Darstellungsart:
+            </label>
+            <select id="mode-select" class="select-box">
+                <option value="Overlay" selected>Gebiete</option>
+                <option value="Normal">Orte</option>
+            </select>
+            <!-- <i class="caret-down"></i> -->
+        </div>
+
+        <button type="button" id="manualLoadButton" class="button-disabled head-btn" disabled>Lade Daten
+            manuell</button>
+        <!--<button type="button" id="showLocations" class="button-disabled head-btn" disabled>Zeige geeignete Orte</button>-->
+
         <button type="button" id="resetMapButton" class="head-btn">Karte zurücksetzen</button>
     </header>
 
 
     <div id="mapContainer">
-        <div id="overpass-api-controls">
-            <div class="dropdown">
-                <!-- TODO so in der headline mit Wähle Darstellungsart: -->
-                <button type="button" class="dropbtn">
-                    Wähle den OSM-Tag aus:
-                    <i class="caret-down"></i>
-                </button>
-                <div class="dropdown-content">
-                    <!-- # scrolls to the top -->
-                    <a href="#">Restaurant</a>
-                    <a href="#">Cafe</a>
-                    <a href="#">Supermarkt</a>
-                    <a href="#">Bar</a>
-                    <a href="#">Parks und Grünflächen</a>
-                    <a href="#">Fluss</a>
-                    <a href="#">Autobahn</a>
-                    <a href="#">Bushaltestelle</a>
-                    <a href="#">Bahnhof</a>
-                    <a href="#">Universität / OTH</a>
-                    <a href="#">Wald</a>
-                </div>
-            </div>
-
-            <input id="query-input" placeholder="amenity=bar" type="text" size="40">
-            <input id="query-button" type="button" value="Filter anwenden">
-
-            <div class="selection-box hidden">
-                <ul id="selection-list"></ul>
-            </div>
-        </div>
 
         <div id="map"></div>
 
         <!-- ! only used for the study! -->
-        <button type="button" id="uploadLogsButton">Hochladen</button>
+        <button type="button" id="uploadLogsButton">Upload</button>
 
         <!-- offscreen canvas used for the overlay creation -->
         <canvas id="texture_canvas">Your browser does not seem to support HTML5 canvas.</canvas>
@@ -114,6 +88,11 @@
                                 <option value="km">km</option>
                             </select>
                         </div>
+
+                    </div>
+
+                    <div id="errormessage" class="hidden">
+                        Die Entfernung kann leider im Moment höchstens 700 m sein!
                     </div>
 
                     <div class="importance-container">
@@ -151,11 +130,6 @@
             </div>
         </div>
     </div>
-
-
-    <!-- TODO bei resizing der map stimmen manchmal die breiten von sidebar und map nicht mehr ganz! 
-        * map.resize(); könnte das lösen vllt
-    -->
 
     <!-- sidebar container -->
     <div class="sidebar">
@@ -240,25 +214,18 @@
 
         </div>
 
-        <!-- Locations Sidebar -->
+        <!-- Locations Sidebar 
         <div id="loc-sidebar" class="hidden">
             <div class="sideHeading">
                 <a href="javascript:void(0)" class="closeSidebar">&larr;</a>
                 <h2>Gefundene Häuser</h2>
             </div>
 
-            <!-- List with locations -->
             <div id="location-listings" class="location-listings"></div>
         </div>
+        -->
 
     </div>
-
-    <!-- TODO delete later -->
-    <template id="li-template">
-        <li>
-            <button id="close-btn" class="close">&times;</button>
-        </li>
-    </template>
 
 
     <!-- TODO erstellte Filter sollten nachträglich auch noch geupdated werden können (wenn Zeit noch implementieren!) -->

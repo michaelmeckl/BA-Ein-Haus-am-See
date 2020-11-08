@@ -38,8 +38,6 @@ export default class Legend {
       return;
     }
 
-    console.log("show legend: ", this);
-
     this.layers = layerList;
     this.colors = colorList;
 
@@ -53,7 +51,6 @@ export default class Legend {
   }
 
   hide(): void {
-    console.log("hide legend");
     this.legendElement.classList.add(Config.CSS_HIDDEN);
 
     //clear layers and colors

@@ -6,8 +6,8 @@ import type {
   Geometry,
   GeometryObject,
 } from "geojson";
-import type { CanvasSource, CustomLayerInterface, GeoJSONSource, Layer } from "mapbox-gl";
-import ClusterManager from "../map/clusterManager";
+import type { CustomLayerInterface, GeoJSONSource, Layer } from "mapbox-gl";
+//import ClusterManager from "../map/clusterManager";
 import { map } from "../map/mapboxConfig";
 import Legend from "./legend";
 
@@ -23,26 +23,23 @@ type mapboxLayerType =
   | "hillshade"
   | undefined;
 
+//TODO farben
 export const TagColors = new Map([
   ["Bar", "#247834"],
   ["Restaurant", "#665566"],
   ["Cafe", "#345678"],
+  ["Schule", "#345678"],
+  ["Parks und Grünflächen", "#345678"],
+  ["Universität / OTH", "#345678"],
+  ["Supermarkt", "#345678"],
+  ["Einkaufszentrum", "#345678"],
+  ["Bahnhof", "#345678"],
+  ["Bushaltestelle", "#345678"],
+  ["Parkplatz", "#345678"],
+  ["Autobahn", "#345678"],
+  ["Fluss", "#345678"],
+  ["Wald", "#345678"],
 ]);
-//TODO denen farben zuweisen und oben einfügen
-/*
-  Cafe = "Cafe",
-  University = "Universität / OTH",
-  School = "Schule",
-  Supermarket = "Supermarkt",
-  Mall = "Einkaufszentrum",
-  Parking = "Parkplatz",
-  BusStop = "Bushaltestelle",
-  RailwayStation = "Restaurant",
-  Highway = "Autobahn",
-  Parks = "Parks und Grünflächen",
-  Forest = "Wald",
-  River = "Fluss",
-  */
 
 //all possible geojson geometry types
 const pointType = ["Point", "MultiPoint"],
@@ -70,6 +67,8 @@ class MapLayerManager {
 
   private legend: Legend;
   private legendIsShown = false;
+
+  geojsonSourceActive = false;
 
   constructor() {
     this.legend = new Legend();
@@ -129,18 +128,18 @@ class MapLayerManager {
     map.addSource(tagName, { type: "geojson", ...sourceOptions });
     //console.log("Source: ", map.getSource(sourceName));
 
+    this.geojsonSourceActive = true;
+
     this.updateLegend(tagName);
 
+    /*
     if (clusteringEnabled) {
       const clusterManager = new ClusterManager(tagName);
 
       //TODO return the cluster layers so they can be added to the activeLayers array
       clusterManager.addClusterLayer();
-      /*
-      clusterManager.addOtherClusterLayer();
-      clusterManager.updateMarkers();
-      */
-    }
+      
+    }*/
   }
 
   removeGeojsonSource(sourceName: string): void {
@@ -243,6 +242,7 @@ class MapLayerManager {
       if (wasLast) {
         this.legend.hide();
         this.legendIsShown = false;
+        this.geojsonSourceActive = false;
       }
     } else {
       console.warn(`Couldnt remove tag "${sourceId}" from legend!`);
@@ -495,6 +495,8 @@ class MapLayerManager {
         }
       }
     }
+
+    this.geojsonSourceActive = false;
 
     //clear local lists
     this.visibleLayers.length = 0;

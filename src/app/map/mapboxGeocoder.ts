@@ -1,6 +1,6 @@
 import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import mapboxgl, { Control } from "mapbox-gl";
-import { initialZoomLevel, map } from "./mapboxConfig";
+import { initialZoomLevel } from "./mapboxConfig";
 
 type mapboxGeocoder = Control;
 

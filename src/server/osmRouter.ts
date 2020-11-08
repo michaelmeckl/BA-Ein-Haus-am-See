@@ -31,16 +31,6 @@ export default class OsmRouter {
    * Init the express router and setup routes.
    */
   setupRoutes(): void {
-    //TODO: delete me if not needed
-    /*
-    this.osmRouter.get("/testCmd", async (req: Request, res: Response, next: NextFunction) => {
-      const result = await ServerUtils.executeOSMFilter(this.publicDirPath);
-      console.log("Result of operation is:\n", result);
-
-      res.status(OK).send(result);
-    });
-    */
-
     /**
      * * Forwards the query and the bounds to the overpass api and returns and caches the result.
      * * Also checks the redis cache first before sending requerst to overpass api to prevent unnecessary requests.
@@ -62,9 +52,10 @@ export default class OsmRouter {
             Benchmark.startMeasure("Getting data from osm total");
             const encodedQuery = querystring.stringify({ data: osmQuery });
             const geoData = await axios.get(
-              `https://overpass-api.de/api/interpreter?${encodedQuery}` //TODO change to local version ?!
+              `https://overpass-api.de/api/interpreter?${encodedQuery}`, //TODO change to local version below
               // local overpass api (docker image)
               //const url = `https://localhost:12347/api/interpreter?${encodedQuery}`;
+              { timeout: 8000 }
             );
             console.log(Benchmark.stopMeasure("Getting data from osm total"));
 

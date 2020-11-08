@@ -1,7 +1,4 @@
 /* eslint-env node */
-import childProcess from "child_process";
-import os from "os";
-import Util from "util";
 
 //const exec = Util.promisify(childProcess.exec);
 
