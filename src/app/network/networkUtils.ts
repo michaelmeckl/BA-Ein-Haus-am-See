@@ -1,17 +1,18 @@
-import { featureCollection, point } from "@turf/helpers";
-import axios from "axios";
-import type { FeatureCollection, GeoJsonProperties, Geometry, GeometryObject } from "geojson";
+import type { FeatureCollection, GeometryObject } from "geojson";
 import osmtogeojson from "osmtogeojson";
-import * as rax from "retry-axios";
+//import * as rax from "retry-axios";
 import Benchmark from "../../shared/benchmarking";
+//import axios from "axios";
+import axios from "./axiosInterceptor";
 
 // attach the retry interceptor to the global axios instance, so all requests are retried if they fail
-const interceptorId = rax.attach();
+//const interceptorId = rax.attach();
 
 /**
  * OSM Scout Requests
  */
 
+/*
 function parseOsmScoutResponse(response: any): FeatureCollection<GeometryObject, any> {
   const allLocations = [];
 
@@ -56,6 +57,7 @@ export async function testGuide(poiType: string): Promise<any> {
     return null;
   }
 }
+*/
 
 /**
  * Overpass Requests
@@ -74,32 +76,32 @@ export async function fetchOsmDataFromClientVersion(
   query: string
 ): Promise<any> {
   try {
-    console.log("sending request!");
+    //console.log("sending request!");
     const overpassQuery = new URLSearchParams({
       data: buildOverpassQuery(mapBounds, query),
     });
 
-    Benchmark.startMeasure("Request client side");
+    //Benchmark.startMeasure("Request client side");
     // online overpass api
     const url = `https://overpass-api.de/api/interpreter?${overpassQuery}`;
 
     // local overpass api (docker image)
     //const url = `https://192.168.99.100:12345/api/interpreter?${overpassQuery}`;
 
-    const response = await axios.get(url);
-    console.log(Benchmark.stopMeasure("Request client side"));
+    const response = await axios.get(url, { timeout: 7000 });
+    //console.log(Benchmark.stopMeasure("Request client side"));
 
-    console.log(response);
+    //console.log(response);
     // * measure time over 50 trials with this:
     //console.log(await Benchmark.getAverageTime(osmtogeojson, [response.data]));
 
-    Benchmark.startMeasure("o2geo client");
+    //Benchmark.startMeasure("o2geo client");
     const geoJson = osmtogeojson(response.data);
-    Benchmark.stopMeasure("o2geo client");
+    //Benchmark.stopMeasure("o2geo client");
 
     return geoJson;
   } catch (error) {
-    console.error(error);
+    //console.error(error);
     return null;
   }
 }
@@ -109,43 +111,28 @@ export async function fetchOsmDataFromServer(
   query: string
 ): Promise<FeatureCollection<GeometryObject, any> | null> {
   try {
-    console.log("sending request!");
+    //console.log("sending request!");
     const params = new URLSearchParams({
       bounds: mapBounds,
       osmQuery: query,
     });
     const url = "/osmRequestCache?" + params;
 
-    Benchmark.startMeasure("Request client side");
-    /*
-    //retry 3 times on failure
-    const response = await axios({
-      url: url,
-      //responseType: "arraybuffer", // default is json,
-      raxConfig: {
-        // Retry 3 times on requests that return a response (500, etc) before giving up.  Defaults to 3.
-        retry: 3,
-        onRetryAttempt: (err): void => {
-          const cfg = rax.getConfig(err);
-          console.warn(
-            `Retrying request to /osmRequestCache! Attempt #${cfg?.currentRetryAttempt}`
-          );
-        },
-      },
-    });
-    */
-    const response = await axios.get(url);
-    console.log(Benchmark.stopMeasure("Request client side"));
+    //Benchmark.startMeasure("Request client side");
+
+    // set a timeout of 7 seconds
+    const response = await axios.get(url, { timeout: 7000 });
+    //console.log(Benchmark.stopMeasure("Request client side"));
 
     //console.log(response);
 
-    Benchmark.startMeasure("o2geo client");
+    //Benchmark.startMeasure("o2geo client");
     const geoJson = osmtogeojson(response.data);
-    Benchmark.stopMeasure("o2geo client");
+    //Benchmark.stopMeasure("o2geo client");
 
     return geoJson as FeatureCollection<GeometryObject, any>;
   } catch (error) {
-    console.error(error);
+    //console.error(error);
     return null;
   }
 }
