@@ -4,7 +4,7 @@ export const enum TagNames {
   Bar = "Bar",
   Restaurant = "Restaurant",
   Cafe = "Cafe",
-  University = "Universität / OTH",
+  University = "Universität und OTH",
   School = "Schule",
   Supermarket = "Supermarkt",
   Mall = "Einkaufszentrum",

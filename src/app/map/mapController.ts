@@ -238,9 +238,7 @@ export default class MapController {
 
     //update the overlay if it is activated
     if (this.selectedVisualType === VisualType.OVERLAY) {
-      console.log("add overlay");
       if (mapLayerManager.geojsonSourceActive) {
-        console.log("removing geojson");
         mapLayerManager.removeAllDataFromMap();
       }
 
@@ -269,7 +267,10 @@ export default class MapController {
   showDataOnMap(data: FeatureCollection<GeometryObject, any>, tagName: string): void {
     //console.log("Tagname: ", tagName);
 
-    mapLayerManager.removeCanvasSource("overlaySource");
+    //remove area overlay if it exists
+    if (map.getSource("overlaySource")) {
+      mapLayerManager.removeCanvasSource("overlaySource");
+    }
 
     mapLayerManager.removeAllLayersForSource(tagName);
 

@@ -23,22 +23,21 @@ type mapboxLayerType =
   | "hillshade"
   | undefined;
 
-//TODO farben
 export const TagColors = new Map([
-  ["Bar", "#247834"],
-  ["Restaurant", "#665566"],
-  ["Cafe", "#345678"],
-  ["Schule", "#345678"],
-  ["Parks und Grünflächen", "#345678"],
-  ["Universität / OTH", "#345678"],
-  ["Supermarkt", "#345678"],
-  ["Einkaufszentrum", "#345678"],
-  ["Bahnhof", "#345678"],
-  ["Bushaltestelle", "#345678"],
-  ["Parkplatz", "#345678"],
-  ["Autobahn", "#345678"],
-  ["Fluss", "#345678"],
-  ["Wald", "#345678"],
+  ["Bar", "#7209b7"],
+  ["Restaurant", "#e63946"],
+  ["Cafe", "#38a3a5"],
+  ["Schule", "#aa998f"],
+  ["Parks und Grünflächen", "#90be6d"],
+  ["Universität und OTH", "#cb997e"],
+  ["Supermarkt", "#fe7f2d"],
+  ["Einkaufszentrum", "#f20089"],
+  ["Bahnhof", "#a44a3f"],
+  ["Bushaltestelle", "#00b4d8"],
+  ["Parkplatz", "#de9e36"],
+  ["Autobahn", "#f4a261"],
+  ["Fluss", "#1d3557"],
+  ["Wald", "#386641"],
 ]);
 
 //all possible geojson geometry types
@@ -143,7 +142,6 @@ class MapLayerManager {
   }
 
   removeGeojsonSource(sourceName: string): void {
-    console.log("Removing source: ", sourceName);
     if (!map.getSource(sourceName)) {
       console.warn(`Couldn't remove source ${sourceName}`);
       return;
@@ -162,7 +160,6 @@ class MapLayerManager {
     id: string,
     data: FeatureCollection<GeometryObject, GeoJsonProperties>
   ): boolean {
-    console.log("Updating source: ", id);
     if (map.getSource(id)?.type !== "geojson") {
       return false;
     }
@@ -212,11 +209,7 @@ class MapLayerManager {
 
   //add item to legend and show if it isn't shown already
   private updateLegend(tagName: string): void {
-    //TODO test
-    //const tag = getTagForLayer(tagName);
-    console.log("tag", tagName);
     const color = TagColors.get(tagName);
-    console.log("Color: ", color);
 
     if (!color) {
       console.warn("Couldn't get color for tag: ", tagName);
@@ -232,8 +225,6 @@ class MapLayerManager {
   }
 
   private removeSourceFromLegend(sourceId: string): void {
-    console.log("remove source from legend: ", sourceId);
-
     //const tag = getTagForLayer(layerId);
     const tagColor = TagColors.get(sourceId);
 
@@ -262,7 +253,8 @@ class MapLayerManager {
    *! local "activeLayers" - Array.
    */
   addNewGeojsonLayer(layer: Layer | CustomLayerInterface, beforeSymbols = false): void {
-    console.log("add new layer: ", layer);
+    //console.log("add new layer: ", layer);
+
     // show on map
     if (beforeSymbols) {
       map.addLayer(layer, "waterway-label");
@@ -272,18 +264,11 @@ class MapLayerManager {
 
     // add to local list
     this.visibleLayers.push(layer);
-
-    this.logState();
   }
 
-  //TODO delete this
-  private logState(): void {
-    console.log("this.visibleLayers: ", this.visibleLayers);
-    console.log("this.hiddenLayers: ", this.hiddenLayers);
-  }
-
+  //! hiding not used yet
   hideGeojsonLayer(layer: Layer | CustomLayerInterface): void {
-    console.log("hiding layer: ", layer);
+    //console.log("hiding layer: ", layer);
 
     //hide layer on map
     map.setLayoutProperty(layer.id, "visibility", "none");
@@ -297,12 +282,10 @@ class MapLayerManager {
     //remove it from the legend
     this.removeSourceFromLegend();
     */
-
-    this.logState();
   }
 
   removeGeojsonLayerFromMap(layerId: string): void {
-    console.log("removing layer from map: ", layerId);
+    //console.log("removing layer from map: ", layerId);
     //remove it from the map
     map.removeLayer(layerId);
 
@@ -318,32 +301,17 @@ class MapLayerManager {
     // eslint-disable-next-line no-unused-expressions
     map.getStyle().layers?.forEach((layer) => {
       if (layer.source === sourceID) {
-        console.log("deleting layer:" + JSON.stringify(layer));
+        //console.log("deleting layer:" + JSON.stringify(layer));
 
         this.removeGeojsonLayerFromMap(layer.id);
-        /*
-        map.removeLayer(layer.id);
-        // remove it from the local active layers as well
-        const index = this.visibleLayers.indexOf(layer, 0);
-        if (index > -1) {
-          this.visibleLayers.splice(index, 1);
-        }
-        */
       }
     });
-
-    this.logState();
   }
 
   removeCanvasLayer(layerID: string): void {
     map.removeLayer(layerID);
-
-    console.log("removing canvas layer");
-
-    console.log("before remove overlay", this.visibleLayers[0]);
     // remove it from the local list
     this.visibleLayers = this.visibleLayers.filter((el) => el.id !== layerID);
-    console.log("after remove overlay", this.visibleLayers[0]);
   }
 
   addLayersForSource(sourceName: string): void {
@@ -369,15 +337,15 @@ class MapLayerManager {
         "circle-radius": [
             "interpolate", ["linear"], ["zoom"],
             6, 1.0, // = 1px at zoom level 6
-            10, 5.0,
-            20, 12.0,
+            10, 4.0,
+            20, 8.0,
         ],
         // style color based on amenity type
         "circle-color": tagColor,
         "circle-opacity": [
             "interpolate", ["linear"], ["zoom"], 
             6, 0.0, 
-            10, 0.6, 
+            10, 0.7, 
             14, 1.0,
         ],
         //"circle-blur": 0.3,
@@ -468,26 +436,13 @@ class MapLayerManager {
   }
 
   removeAllDataFromMap(): void {
-    console.log("Sources: ", map.getStyle().sources);
-
-    /*
-    // clear all layers from map (needs to be done before sources are cleared!)
-    for (let index = 0; index < this.visibleLayers.length; index++) {
-      const layer = this.visibleLayers[index];
-      map.removeLayer(layer.id);
-    }
-    for (let index = 0; index < this.hiddenLayers.length; index++) {
-      const layer = this.hiddenLayers[index];
-      map.removeLayer(layer.id);
-    }
-    */
+    //console.log("Sources: ", map.getStyle().sources);
 
     //clear all sources on map
     const allSources = map.getStyle().sources;
     for (const source in allSources) {
       // "composite" is the default vector layer of mapbox-streets; don't delete this!
       if (source !== "composite") {
-        //TODO does this work?
         if (source === "overlaySource") {
           this.removeCanvasSource(source);
         } else {
@@ -507,8 +462,6 @@ class MapLayerManager {
       this.legend.hide();
       this.legendIsShown = false;
     }
-
-    this.logState();
   }
 
   /*

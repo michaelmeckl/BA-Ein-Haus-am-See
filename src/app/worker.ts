@@ -9,13 +9,3 @@ ctx.addEventListener("message", async (event) => {
   // return result to main thread
   //ctx.postMessage(resultGeo);
 });
-
-/*
-export default class WebpackWorker extends Worker {
-  constructor() {
-    super("");
-  }
-}
-*/
-
-//export default null as any;

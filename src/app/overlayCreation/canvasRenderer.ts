@@ -146,6 +146,23 @@ class CanvasRenderer {
     canvas.width = map.getCanvas().clientWidth;
     canvas.height = map.getCanvas().clientHeight;
 
+    //handle webgl context loss
+    canvas.addEventListener(
+      "webglcontextlost",
+      (event) => {
+        console.error("Webgl Context lost");
+        event.preventDefault();
+      },
+      false
+    );
+    canvas.addEventListener(
+      "webglcontextrestored",
+      () => {
+        //this.combineOverlays(textureLayers);
+      },
+      false
+    );
+
     //options: {stencil: true, antialias: true, premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: false});
     const gl = canvas.getContext("webgl2");
     if (!gl) {
