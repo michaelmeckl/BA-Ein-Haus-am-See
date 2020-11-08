@@ -1,7 +1,4 @@
 /* eslint-env browser */
-import bbox from "@turf/bbox";
-import bbpolygon from "@turf/bbox-polygon";
-import { featureCollection } from "@turf/helpers";
 import type {
   Feature,
   FeatureCollection,
@@ -12,31 +9,20 @@ import type {
   Point,
   Polygon,
 } from "geojson";
-import mapboxgl, {
-  CustomLayerInterface,
-  EventData,
-  Layer,
-  LngLat,
-  MapDataEvent,
-  MapMouseEvent,
-  MapSourceDataEvent,
-} from "mapbox-gl";
+import mapboxgl, { EventData, LngLat, MapMouseEvent } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
-import { FilterLayer, FilterRelevance } from "../mapData/filterLayer";
+import type { FilterLayer } from "../mapData/filterLayer";
 import FilterManager from "../mapData/filterManager";
 import mapLayerManager from "../mapData/mapLayerManager";
+import OsmTagCollection from "../mapData/osmTagCollection";
 import { fetchOsmDataFromServer } from "../network/networkUtils";
+import { PerformanceMeasurer } from "../performanceMeasurer";
 import { hideSnackbar, showSnackbar, SnackbarType } from "../utils";
-import { MapboxCustomLayer } from "../webgl/mapboxCustomLayer";
-import { createOverlay } from "./canvasRenderer";
-import { getDataFromMap } from "./featureUtils";
+import { createOverlay } from "../overlayCreation/canvasRenderer";
 import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
-import { PerformanceMeasurer } from "../performanceMeasurer";
 import { addBufferToFeature } from "./turfUtils";
-import OsmTagCollection from "../mapData/osmTagCollection";
-import simplify from "@turf/simplify";
 
 export const enum VisualType {
   NORMAL,
@@ -48,22 +34,23 @@ export const enum VisualType {
 //! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
 
 const zoomTreshold = 2; // 2 zoom levels difference
-const moveTreshold = 1200; // map center difference in meters
+const moveTreshold = 1500; // map center difference in meters
 
 /**
- * Main Controller Class for the mapbox map that handles all different aspects of the map.
+ * Main Controller Class for mapbox that handles all different aspects of the map.
  */
 export default class MapController {
-  //prettier-ignore
-  private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
-
   private currentZoom: number = initialZoomLevel;
   private currentMapCenter: LngLat = new LngLat(initialPosition[0], initialPosition[1]);
 
-  //TODO
   private selectedVisualType: VisualType = VisualType.NORMAL; //TODO wechseln!
   private showingOverlay = false;
-  showOverlayActivated = true;
+  showOverlayActivated = true; //! im moment immer true
+
+  //TODO
+  private logControllerState(): void {
+    console.log("Controller: ", this);
+  }
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -151,7 +138,7 @@ export default class MapController {
       showSnackbar(
         "Die aktuelle Zoomstufe ist zu niedrig, um Daten zu aktualisieren!",
         SnackbarType.WARNING,
-        1500
+        2000
       );
       //this.currentZoom = newZoom;
       return;
@@ -162,50 +149,35 @@ export default class MapController {
     //this.currentZoom = newZoom;
   }
 
-  /*
-  onSourceLoaded(e: MapSourceDataEvent): void {
-    if (e.isSourceLoaded) {
-      // the source has finished loading
-      console.log("onSourceLoaded ", e);
-    }
-  }
-
-  onDataLoaded(e: MapDataEvent): void {
-    if (e.dataType === "source") {
-      const e2 = e as MapSourceDataEvent;
-      console.log(" e is a MapSourceDataEvent");
-    }
-    console.log("A dataloading event occurred: ", e);
-  }*/
-
   async onMapClick(e: MapMouseEvent & EventData): Promise<void> {
-    console.log("Click:", e);
-
-    //TODO
-    //getAllRenderedFeatures(undefined, undefined, ["==", "class", "park"]);
-    //getAllSourceFeatures("amenity=restaurant");
+    //console.log("Click:", e);
   }
 
   addMapControls(): void {
     // Add navigation controls to the map
-    map.addControl(
-      new mapboxgl.NavigationControl({
-        showCompass: false,
-      })
-    );
-    map.addControl(new mapboxgl.FullscreenControl(), "top-right");
+    map.addControl(new mapboxgl.NavigationControl());
+    //map.addControl(new mapboxgl.FullscreenControl(), "top-right");
     //map.addControl(new mapboxgl.GeolocateControl(), "bottom-right");
+    map.addControl(new mapboxgl.ScaleControl(), "bottom-left");
 
     // Add the geocoder to the map
     map.addControl(Geocoder.geocoderControl, "bottom-left"); //TODO top-left
   }
 
   async loadMapData(): Promise<void> {
-    console.log("Performing osm query for active filters: ", FilterManager.activeFilters);
-    if (FilterManager.activeFilters.size > 0) {
-      // give feedback to the user
-      showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true); //TODO
+    const allCurrentFilters = FilterManager.activeFilters;
+
+    if (allCurrentFilters.size === 0) {
+      console.log("keine aktiven Filter, es kann nichts geladen werden");
+      return;
     }
+
+    this.logControllerState();
+
+    console.log("Performing osm query for active filters: ", allCurrentFilters);
+
+    // give feedback to the user
+    showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true); //TODO doch zeitdauer?
 
     //get screen viewport and 500 meter around to compensate for the move treshold for new data
     const bounds = mapboxUtils.getViewportBoundsString(500);
@@ -213,7 +185,7 @@ export default class MapController {
     Benchmark.startMeasure("Performing osm query for active filters");
 
     const allResults = await Promise.allSettled(
-      Array.from(FilterManager.activeFilters).map(async (tag) => {
+      Array.from(allCurrentFilters).map(async (tag) => {
         // get overpass query for each tag
         const query = OsmTagCollection.getQueryForCategory(tag);
 
@@ -228,9 +200,10 @@ export default class MapController {
           const filterLayer = this.preprocessGeoData(data, tag);
 
           if (this.selectedVisualType === VisualType.NORMAL) {
-            console.warn("showing normal data");
+            console.log("showing normal data");
             this.showDataOnMap(data, tag);
           } else {
+            console.log("showing overlay data");
             if (filterLayer) {
               this.prepareDataForOverlay(filterLayer);
             }
@@ -239,17 +212,20 @@ export default class MapController {
       })
     );
 
-    allResults.forEach((res) => {
-      if (res.status === "rejected") {
-        showSnackbar(
-          "Nicht alle Daten konnten erfolgreich geladen werden",
-          SnackbarType.ERROR,
-          1500
-        );
-        //return;
-      }
-    });
     console.log("Finished adding data to map!");
+
+    let success = true;
+    for (const res of allResults) {
+      if (res.status === "rejected") {
+        success = false;
+        break;
+      }
+    }
+
+    if (!success) {
+      showSnackbar("Nicht alle Daten konnten erfolgreich geladen werden", SnackbarType.ERROR, 1500);
+      //return;
+    }
 
     // hide the snackbar after data has finished loading
     //TODO funktioniert nicht richtig im moment!
@@ -260,7 +236,8 @@ export default class MapController {
     console.log("before showOverlayAutomatically...");
 
     if (this.showOverlayActivated && FilterManager.allFilterLayers.length > 0) {
-      console.log("updating overlay...\n", FilterManager.allFilterLayers);
+      //TODO remove legend and other map layers
+      //console.log("updating overlay...\n", FilterManager.allFilterLayers);
       //this.showingOverlay = true;
       //createOverlay(FilterManager.allFilterLayers);
     }
@@ -268,8 +245,16 @@ export default class MapController {
 
   removeData(sourceName: string): void {
     console.log("Removing source: ", sourceName);
-    mapLayerManager.removeSource(sourceName);
+    mapLayerManager.removeGeojsonSource(sourceName);
     //TODO should also call the filtermanager so everythings in one place
+  }
+
+  resetMapData(): void {
+    //TODO sollten die filter wirklich gelöscht werden???
+    //filterManager.clearAllFilters();
+    //console.log("After clear: ", filterManager);
+
+    mapLayerManager.removeAllDataFromMap();
   }
 
   //TODO use geojson merge (https://github.com/mapbox/geojson-merge) to merge existing and new features?
@@ -363,18 +348,21 @@ export default class MapController {
     const allFeatures = [...currentPoints, ...currentWays, ...currentPolygons];
     console.log("allFeatures: ", allFeatures);
 
+    this.logControllerState();
+
     const layer = FilterManager.getFilterLayer(dataName);
     if (layer) {
-      layer.Features = allFeatures;
+      layer.Features = allFeatures; //TODO push or = ?
     }
     //TODO what to do in else? create new? it should already exist at this point!
-    //this.showPreprocessedData(dataName, polyFeatures);
 
     return layer;
   }
 
   prepareDataForOverlay(data: FilterLayer): void {
     //const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(data.Features, 250);
+
+    this.logControllerState();
 
     Benchmark.startMeasure("adding buffer to all features and converting to points");
 
@@ -415,6 +403,7 @@ export default class MapController {
     console.log("now adding to map...");
     console.log("Tagname: ", tagName);
 
+    this.logControllerState();
     //TODO falls das auf den server ausgelagert wird, muss später nur noch die features und points nachträglich gefüllt werden (mit settern am besten!)
 
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
@@ -423,20 +412,14 @@ export default class MapController {
     if (map.getSource(tagName)) {
       // the source already exists, only update the data
       console.log(`Source ${tagName} is already used! Updating it!`);
-      mapLayerManager.updateSource(tagName, data);
+      mapLayerManager.updateGeojsonSource(tagName, data);
     } else {
       // source doesn't exist yet, create a new one
       mapLayerManager.addNewGeojsonSource(tagName, data, false);
     }
 
     //show the source data on the map
-    mapLayerManager.addLayers(tagName);
-  }
-
-  //TODO sinnvoll verwendbar?
-  addHeatmap(data?: string): void {
-    mapLayerManager.addHeatmapLayer(data);
-    mapboxUtils.addLegend();
+    mapLayerManager.addLayersForSource(tagName);
   }
 
   convertToPixels(

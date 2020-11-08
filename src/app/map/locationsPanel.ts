@@ -155,7 +155,7 @@ function buildLocationList(data: {
       details.innerHTML += "unbekannt";
     }
 
-    //TODO prop.distance isn't implemented right now!
+    //TODO prop.distance doesnt exist yet!
     if (prop.distance) {
       const roundedDistance = Math.round(prop.distance * 100) / 100;
       details.innerHTML += "<p><strong>" + roundedDistance + " kilometers away</strong></p>";

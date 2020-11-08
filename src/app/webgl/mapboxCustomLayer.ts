@@ -23,6 +23,7 @@ void main() {
 }
 `;
 
+//! not used at the moment
 // Mapbox Custom layer implemented as ES6 class
 export class MapboxCustomLayer {
   id: string;

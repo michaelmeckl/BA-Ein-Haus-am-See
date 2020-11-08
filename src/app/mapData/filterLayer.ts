@@ -1,11 +1,5 @@
-import type {
-  Feature,
-  GeoJsonProperties,
-  Geometry,
-  GeometryCollection,
-  MultiPolygon,
-  Polygon,
-} from "geojson";
+/* eslint-disable no-magic-numbers */
+import type { Feature, GeoJsonProperties, Geometry } from "geojson";
 
 // every relevance has a specific weight
 export enum FilterRelevance {

@@ -3,6 +3,7 @@ import mapboxgl, { Layer, LngLatLike } from "mapbox-gl";
 import { map } from "./mapboxConfig";
 import mapLayerManager from "../mapData/mapLayerManager";
 
+//! not used at the moment
 export default class Heatmap {
   private sourceName: string;
 
@@ -113,8 +114,8 @@ export default class Heatmap {
     };
 
     // use the mapLayerManagers add-Method to make sure this layers are added to the local activeLayers.
-    mapLayerManager.addNewLayer(heatLayer, true);
-    mapLayerManager.addNewLayer(pointLayer, true);
+    mapLayerManager.addNewGeojsonLayer(heatLayer, true);
+    mapLayerManager.addNewGeojsonLayer(pointLayer, true);
 
     map.on("mouseover", `${this.sourceName}-point`, (e) => {
       // change the cursor style to show the user this is clickable

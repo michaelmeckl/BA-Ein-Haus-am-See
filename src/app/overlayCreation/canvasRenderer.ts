@@ -5,8 +5,8 @@ import { applyGaussianBlur, setupGaussianBlurFilter } from "../webgl/gaussianBlu
 import { combineOverlayFragmentShader, defaultVertexShader } from "../webgl/shaders";
 import * as webglUtils from "../webgl/webglUtils";
 import { makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
-import { map } from "./mapboxConfig";
-import { metersInPixel } from "./mapboxUtils";
+import { map } from "../map/mapboxConfig";
+import { metersInPixel } from "../map/mapboxUtils";
 
 // the number of textures to combine
 let textureCount;

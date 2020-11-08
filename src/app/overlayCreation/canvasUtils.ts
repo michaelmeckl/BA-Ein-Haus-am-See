@@ -1,9 +1,9 @@
 /**
  * Util-Functions to work with the HTML5 - Canvas.
  */
-import { map } from "./mapboxConfig";
+import { map } from "../map/mapboxConfig";
 import mapLayerManager from "../mapData/mapLayerManager";
-import { getViewportBounds } from "./mapboxUtils";
+import { getViewportBounds } from "../map/mapboxUtils";
 //import "../vendors/fast-gauss-blur.js";
 
 export function clearCanvasPart(
@@ -16,32 +16,26 @@ export function clearCanvasPart(
   ctx.clearRect(px, py, width, height);
 }
 
-//TODO is it possible to save this source in the class and only use updateCanvas(options: ImageSourceOptions)
-//TODO  to update the canvas instead of rerendering the whole source
+const overlaySourceID = "overlaySource";
+
 export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): void {
   const viewportBounds = getViewportBounds();
 
-  mapLayerManager.removeAllLayersForSource("canvasSource");
+  //TODO nötig?
+  // mapLayerManager.removeAllLayersForSource(overlaySourceID);
+  //mapLayerManager.removeCanvasLayer();
 
-  if (map.getSource("canvasSource")) {
-    map.removeSource("canvasSource");
+  if (map.getSource(overlaySourceID)) {
+    //mapLayerManager.removeCanvasSource(overlaySourceID);
+    //TODO test
+    console.log(`${overlaySourceID} is already used! Updating it!`);
+    mapLayerManager.updateCanvasSource(overlaySourceID, canvas, viewportBounds);
+  } else {
+    mapLayerManager.addNewCanvasSource(overlaySourceID, canvas, viewportBounds);
   }
 
-  map.addSource("canvasSource", {
-    type: "canvas",
-    canvas: canvas,
-    animate: false, //static canvas for performance reasons
-    coordinates: viewportBounds,
-  });
-
-  map.addLayer({
-    id: "overlay",
-    source: "canvasSource",
-    type: "raster",
-    paint: {
-      "raster-opacity": opacity,
-    },
-  });
+  //show the source data on the map
+  mapLayerManager.addCanvasLayer(overlaySourceID, opacity);
 }
 
 export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {

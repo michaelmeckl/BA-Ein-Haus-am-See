@@ -108,37 +108,6 @@ export function getRadiusAndCenterOfViewport(): any {
   return { center: centerPoint, radius: radius };
 }
 
-/**
- * Mainly used for the heatmap, but may be useful for the other approaches too.
- */
-export function addLegend(): void {
-  //TODO sinnvolle Werte einsetzen
-  const layers = ["0-10", "10-20", "20-50", "50-100", "100-200", "200-500", "500-1000", "1000+"];
-  //prettier-ignore
-  const colors = ["rgba(33,102,172,0)", "rgb(103,169,207)", "rgb(209,229,240)", "rgb(253,219,199)", "rgb(239,138,98)", "rgb(178,24,43)"];
-
-  const legend = document.querySelector("#legend");
-
-  if (!legend) {
-    return;
-  }
-
-  for (let i = 0; i < layers.length; i++) {
-    const layer = layers[i];
-    const color = colors[i];
-    const item = document.createElement("div");
-    const key = document.createElement("span");
-    key.className = "legend-key";
-    key.style.backgroundColor = color;
-
-    const value = document.createElement("span");
-    value.innerHTML = layer;
-    item.appendChild(key);
-    item.appendChild(value);
-    legend.appendChild(item);
-  }
-}
-
 export function addPopupOnHover(): void {
   // Create a popup, but don't add it to the map yet.
   const popup = new mapboxgl.Popup({
@@ -240,7 +209,7 @@ export function showMask(mask: any): void {
   if (map.getSource("maske")) {
     // the source already exists, only update the data
     console.log(`Source ${"maske"} is already used! Updating it!`);
-    mapLayerManager.updateSource("maske", mask);
+    mapLayerManager.updateGeojsonSource("maske", mask);
   } else {
     // source doesn't exist yet, create a new one
     mapLayerManager.addNewGeojsonSource("maske", mask, false);

@@ -390,9 +390,7 @@ function setupUI(): void {
   });
 
   resetButtton.addEventListener("click", () => {
-    //TODO reset map state here completely!!!
-    mapLayerManager.removeSource("canvasSource");
-    //mapLayerManager.removeLayerFromMap("overlay");
+    mapController.resetMapData();
   });
 
   //TODO

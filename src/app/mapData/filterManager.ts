@@ -43,6 +43,14 @@ class FilterManager {
       }
     }
   }
+
+  /**
+   * Reset all Filter layers.
+   */
+  clearAllFilters(): void {
+    this.allFilterLayers.length = 0;
+    this.activeFilters.clear();
+  }
 }
 
 export default new FilterManager();

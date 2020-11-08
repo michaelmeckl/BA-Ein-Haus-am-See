@@ -1,56 +1,72 @@
 /* eslint-disable quotes */
 
+export const enum TagNames {
+  Bar = "Bar",
+  Restaurant = "Restaurant",
+  Cafe = "Cafe",
+  University = "Universität / OTH",
+  School = "Schule",
+  Supermarket = "Supermarkt",
+  Mall = "Einkaufszentrum",
+  Parking = "Parkplatz",
+  BusStop = "Bushaltestelle",
+  RailwayStation = "Bahnhof",
+  Highway = "Autobahn",
+  Parks = "Parks und Grünflächen",
+  Forest = "Wald",
+  River = "Fluss",
+}
+
 class TagCollection {
-  //* die case namen könnten noch extrahiert werden, z.B. in ein enum oder einen type für mehr type-safety
   getQueryForCategory(categoryName: string): string {
     switch (categoryName) {
-      case "Bar":
+      case TagNames.Bar:
         // nwr is shorthand for query instead of 3 separate ones (nwr = node, way, relation)
         return 'nwr["amenity"~"^pub|bar|biergarten$"]; nwr["biergarten"="yes"];';
 
-      case "Restaurant":
+      case TagNames.Restaurant:
         return 'nwr["amenity"="restaurant"];';
 
-      case "Cafe":
+      case TagNames.Cafe:
         return 'nwr["amenity"="cafe"];';
 
-      case "Universität / OTH":
+      case TagNames.University:
         //return 'nwr["building"="university"];'; // to get the buildings itself
         return 'nwr["amenity"~"^university|college$"];'; // to get the whole area
 
-      case "Schule":
+      case TagNames.School:
         return 'nwr["amenity"="school"];';
 
-      case "Supermarkt":
+      case TagNames.Supermarket:
         return 'nwr["shop"="supermarket"];';
 
-      case "Einkaufszentrum":
+      case TagNames.Mall:
         return 'nwr["shop"~"^department_store|mall$"];';
 
-      case "Parkplatz":
+      case TagNames.Parking:
         return 'nwr["amenity"="parking"];';
 
-      case "Bushaltestelle":
+      case TagNames.BusStop:
         return 'nwr["public_transport"="stop_position"]["bus"="yes"]; nwr["highway"="bus_stop"];';
 
-      case "Bahnhof":
+      case TagNames.RailwayStation:
         return 'nwr["public_transport"="stop_position"]["railway"="stop"];';
 
       //TODO auch bundesstraßen hier nehmen?
-      case "Autobahn":
+      case TagNames.Highway:
         //return 'nwr["highway"~"^motorway|trunk|motorway_link$"];';  // Autobahn und größere Straßen / trunks
         return 'nwr["highway"~"^motorway|motorway_link$"];';
 
-      case "Parks und Grünflächen":
+      case TagNames.Parks:
         //return 'nwr["leisure"~"^park|nature_reserve|village_green|recreation_ground$"];';
         return 'nwr["leisure"~"^park|nature_reserve|village_green$"];';
 
       // landuse=meadow für Wiesen auch verwenden ?
 
-      case "Wald":
+      case TagNames.Forest:
         return 'nwr["landuse"="forest"]; nwr["natural"="wood"];';
 
-      case "Fluss":
+      case TagNames.River:
         //return 'nwr["waterway"~"^river|stream|canal$"];'; // um zusätzlich noch kleine Bäche und Kanäle zu bekommen
         return 'nwr["waterway"="river"];';
 

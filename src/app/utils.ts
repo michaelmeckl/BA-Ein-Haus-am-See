@@ -34,9 +34,7 @@ export function showSnackbar(
   }
 }
 
-//! the code below is not used right now
-export function getOSMTagName(query: string): string {
-  //TODO ~ und | auch parsen und klammern am Ende entfernen!
-  const regex = /[=~]/;
-  return query.split(regex)[1];
+export function getTagForLayer(layerID: string): string {
+  //const regex = /[=~]/;
+  return layerID.split("-")[0]; //the first part of the layer id is the tag name (e.g. "Restaurant")
 }

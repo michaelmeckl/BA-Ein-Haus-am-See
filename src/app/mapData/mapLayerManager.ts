@@ -6,10 +6,10 @@ import type {
   Geometry,
   GeometryObject,
 } from "geojson";
-import type { CustomLayerInterface, GeoJSONSource, Layer } from "mapbox-gl";
+import type { CanvasSource, CustomLayerInterface, GeoJSONSource, Layer } from "mapbox-gl";
 import ClusterManager from "../map/clusterManager";
 import { map } from "../map/mapboxConfig";
-import Heatmap from "../map/heatmap";
+import Legend from "./legend";
 
 type mapboxLayerType =
   | "symbol"
@@ -22,6 +22,27 @@ type mapboxLayerType =
   | "heatmap"
   | "hillshade"
   | undefined;
+
+export const TagColors = new Map([
+  ["Bar", "#247834"],
+  ["Restaurant", "#665566"],
+  ["Cafe", "#345678"],
+]);
+//TODO denen farben zuweisen und oben einfügen
+/*
+  Cafe = "Cafe",
+  University = "Universität / OTH",
+  School = "Schule",
+  Supermarket = "Supermarkt",
+  Mall = "Einkaufszentrum",
+  Parking = "Parkplatz",
+  BusStop = "Bushaltestelle",
+  RailwayStation = "Restaurant",
+  Highway = "Autobahn",
+  Parks = "Parks und Grünflächen",
+  Forest = "Wald",
+  River = "Fluss",
+  */
 
 //all possible geojson geometry types
 const pointType = ["Point", "MultiPoint"],
@@ -36,22 +57,45 @@ const cafe = ["==", ["get", "amenity"], "Cafe"];
 const other = ["==", ["get", "amenity"], ""]; //TODO oder null statt leerstring?
 
 /**
- * Util-Class to handle all sorts of source and layer related methods and keep track of all active custom layers.
+ * Util-Class to handle all sorts of source and layer related methods and keep track of all active (or hidden)
+ * layers on the map that were created by the user.
  */
 class MapLayerManager {
-  private activeLayers: (Layer | CustomLayerInterface)[] = [];
-  //private activeLayers: string[] = [];
+  private visibleLayers: (Layer | CustomLayerInterface)[] = [];
+  private hiddenLayers: (Layer | CustomLayerInterface)[] = [];
 
-  //TODO visibleLayers auch noch separat speichern?
+  // small performance optimizations:
+  private minZoom = 6; // Bavaria can be seen as a whole on this level
+  private maxZoom = 20;
 
-  get currentActiveLayers(): (Layer | CustomLayerInterface)[] {
-    return this.activeLayers;
+  private legend: Legend;
+  private legendIsShown = false;
+
+  constructor() {
+    this.legend = new Legend();
   }
+
+  get currentVisibleLayers(): (Layer | CustomLayerInterface)[] {
+    return this.visibleLayers;
+  }
+
+  get currentHiddenLayers(): (Layer | CustomLayerInterface)[] {
+    return this.hiddenLayers;
+  }
+
+  /**
+   * ####################################
+   * Methods related to mapbox sources (see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/)
+   * ####################################
+   */
 
   // Add a geojson source, see https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson
   addNewGeojsonSource(
     tagName: string,
-    geojsonData?: string | Feature<Geometry, GeoJsonProperties> | FeatureCollection<Geometry, any>,
+    geojsonData?:
+      | string
+      | Feature<Geometry, GeoJsonProperties>
+      | FeatureCollection<Geometry, GeoJsonProperties>,
     clusteringEnabled = false
   ): void {
     let sourceOptions: mapboxgl.GeoJSONSourceOptions = {
@@ -85,6 +129,8 @@ class MapLayerManager {
     map.addSource(tagName, { type: "geojson", ...sourceOptions });
     //console.log("Source: ", map.getSource(sourceName));
 
+    this.updateLegend(tagName);
+
     if (clusteringEnabled) {
       const clusterManager = new ClusterManager(tagName);
 
@@ -97,19 +143,27 @@ class MapLayerManager {
     }
   }
 
-  removeSource(sourceName: string): void {
+  removeGeojsonSource(sourceName: string): void {
+    console.log("Removing source: ", sourceName);
     if (!map.getSource(sourceName)) {
       console.warn(`Couldn't remove source ${sourceName}`);
       return;
     }
     this.removeAllLayersForSource(sourceName);
     map.removeSource(sourceName);
+
+    //remove from legend
+    this.removeSourceFromLegend(sourceName);
   }
 
   /**
    * Update the data source of a given source layer. Only works for GeoJson layer.
    */
-  updateSource(id: string, data: FeatureCollection<GeometryObject, GeoJsonProperties>): boolean {
+  updateGeojsonSource(
+    id: string,
+    data: FeatureCollection<GeometryObject, GeoJsonProperties>
+  ): boolean {
+    console.log("Updating source: ", id);
     if (map.getSource(id)?.type !== "geojson") {
       return false;
     }
@@ -117,62 +171,183 @@ class MapLayerManager {
     return result ? true : false;
   }
 
+  addNewCanvasSource(sourceName: string, canvas: HTMLCanvasElement, bounds: number[][]): void {
+    const sourceOptions: mapboxgl.CanvasSourceOptions = {
+      canvas: canvas,
+      animate: false, //static canvas for better performance
+      coordinates: bounds,
+    };
+    map.addSource(sourceName, {
+      type: "canvas",
+      ...sourceOptions,
+    });
+  }
+
+  removeCanvasSource(sourceID: string): void {
+    if (!map.getSource(sourceID)) {
+      console.warn(`Source ${sourceID} doesnt exist!`);
+      return;
+    }
+    this.removeCanvasLayer();
+    map.removeSource(sourceID);
+  }
+
+  //TODO test this
+  updateCanvasSource(sourceId: string, newCanvas: HTMLCanvasElement, newCoords: number[][]): void {
+    const source = map.getSource(sourceId) as CanvasSource;
+    source.canvas = newCanvas;
+    source.coordinates = newCoords;
+  }
+
   /**
-   * Simple Util-Function to create a new layer that allows to specify if the new layer should be added on top
+   * ####################################
+   * Methods related to the legend (based on the sources above)
+   * ####################################
+   */
+
+  //add item to legend and show if it isn't shown already
+  private updateLegend(tagName: string): void {
+    //TODO test
+    //const tag = getTagForLayer(tagName);
+    console.log("tag", tagName);
+    const color = TagColors.get(tagName);
+    console.log("Color: ", color);
+
+    if (!color) {
+      console.warn("Couldn't get color for tag: ", tagName);
+      return;
+    }
+
+    if (!this.legendIsShown) {
+      this.legend.show([tagName], [color]);
+      this.legendIsShown = true;
+    } else {
+      this.legend.addItem(tagName, color);
+    }
+  }
+
+  private removeSourceFromLegend(sourceId: string): void {
+    console.log("remove source from legend: ", sourceId);
+
+    //const tag = getTagForLayer(layerId);
+    const tagColor = TagColors.get(sourceId);
+
+    if (tagColor) {
+      const wasLast = this.legend.removeItem(sourceId, tagColor);
+      if (wasLast) {
+        this.legend.hide();
+        this.legendIsShown = false;
+      }
+    } else {
+      console.warn(`Couldnt remove tag "${sourceId}" from legend!`);
+    }
+  }
+
+  /**
+   * ####################################
+   * Methods related to mapbox layers (see https://docs.mapbox.com/mapbox-gl-js/style-spec/layers/)
+   * ####################################
+   */
+
+  /**
+   * Util-Function to create a new layer that allows to specify if the new layer should be added on top
    * of the map (default, beforeSymbols = false) or below the map symbols (beforeSymbols = true).
    *! This method should always be called when adding a new layer to make sure the new layer gets added to the
    *! local "activeLayers" - Array.
    */
-  addNewLayer(layer: Layer | CustomLayerInterface, beforeSymbols = false): void {
-    this.activeLayers.push(layer);
-
+  addNewGeojsonLayer(layer: Layer | CustomLayerInterface, beforeSymbols = false): void {
+    console.log("add new layer: ", layer);
+    // show on map
     if (beforeSymbols) {
       map.addLayer(layer, "waterway-label");
     } else {
       map.addLayer(layer);
     }
+
+    // add to local list
+    this.visibleLayers.push(layer);
+
+    this.logState();
   }
 
-  hideLayer(layerId: string): void {
-    map.setLayoutProperty(layerId, "visibility", "none");
+  //TODO delete this
+  private logState(): void {
+    console.log("this.visibleLayers: ", this.visibleLayers);
+    console.log("this.hiddenLayers: ", this.hiddenLayers);
   }
 
-  removeLayerFromMap(layerId: string): void {
+  hideGeojsonLayer(layer: Layer | CustomLayerInterface): void {
+    console.log("hiding layer: ", layer);
+
+    //hide layer on map
+    map.setLayoutProperty(layer.id, "visibility", "none");
+
+    //switch layer to the local hidden layers list
+    this.visibleLayers = this.visibleLayers.filter((el) => el.id !== layer.id);
+    this.hiddenLayers.push(layer);
+
+    //TODO remove / hide from legend as well?
+    /*
+    //remove it from the legend
+    this.removeSourceFromLegend();
+    */
+
+    this.logState();
+  }
+
+  removeGeojsonLayerFromMap(layerId: string): void {
+    console.log("removing layer from map: ", layerId);
+    //remove it from the map
     map.removeLayer(layerId);
-    // filter the elements with the given layerid out
-    this.activeLayers = this.activeLayers.filter((el) => el.id !== layerId);
+
+    // remove it from the local lists
+    this.visibleLayers = this.visibleLayers.filter((el) => el.id !== layerId);
+    this.hiddenLayers = this.hiddenLayers.filter((el) => el.id !== layerId);
   }
 
   /**
    * Delete all layers for the source with the given ID.
    */
-  removeAllLayersForSource(sourceID: string): boolean {
+  removeAllLayersForSource(sourceID: string): void {
     // eslint-disable-next-line no-unused-expressions
     map.getStyle().layers?.forEach((layer) => {
       if (layer.source === sourceID) {
         console.log("deleting layer:" + JSON.stringify(layer));
-        map.removeLayer(layer.id);
 
+        this.removeGeojsonLayerFromMap(layer.id);
+        /*
+        map.removeLayer(layer.id);
         // remove it from the local active layers as well
-        const index = this.activeLayers.indexOf(layer, 0);
+        const index = this.visibleLayers.indexOf(layer, 0);
         if (index > -1) {
-          this.activeLayers.splice(index, 1);
+          this.visibleLayers.splice(index, 1);
         }
+        */
       }
     });
 
-    return false;
+    this.logState();
   }
 
-  addLayers(sourceName: string): void {
-    //! with ["has", "name"] it can be tested if something exists in the properties (and should be because errors
-    //! have an impact on the performance!)
+  removeCanvasLayer(): void {
+    map.removeLayer("overlay");
+
+    console.log("removing canvas layer");
+
+    // remove it from the local list
+    this.visibleLayers = this.visibleLayers.filter((el) => el.id !== "overlay");
+  }
+
+  addLayersForSource(sourceName: string): void {
+    const tagColor = TagColors.get(sourceName);
+
+    //! with ["has", "name"] it can be tested if something exists in the properties
     const pointLayer: Layer = {
       id: sourceName + "-l1",
       type: "circle",
       source: sourceName,
-      minzoom: 7,
-      maxzoom: 20,
+      minzoom: this.minZoom,
+      maxzoom: this.maxZoom,
       // 'all' checks 2 conditions:  on this layer show only points or multipoints and only if not clustered
       filter: [
         "all",
@@ -183,28 +358,19 @@ class MapLayerManager {
       paint: {
         //increase circle radius (in pixels) when zooming in
         // see https://docs.mapbox.com/help/tutorials/mapbox-gl-js-expressions/
-        
         "circle-radius": [
             "interpolate", ["linear"], ["zoom"],
-            8, 5.0, // 5px at zoom level 8
-            12, 15.0,
-            16, 25.0,
+            6, 1.0, // = 1px at zoom level 6
+            10, 5.0,
+            20, 12.0,
         ],
         // style color based on amenity type
-        "circle-color": [
-            "match",
-            //["get", "amenity", ["get", "tags"]],    //* wird automatisch "geflattened"!
-            ["get", "amenity"],
-            "bar", "#fbb03b",
-            "restaurant", "#223b53",
-            "supermarket", "#3bb2d0",
-            "#eeeeee", // fallback color for others
-        ],
+        "circle-color": tagColor,
         "circle-opacity": [
             "interpolate", ["linear"], ["zoom"], 
-            7, 0.0, 
-            12, 0.5, 
-            18, 1.0,
+            6, 0.0, 
+            10, 0.6, 
+            14, 1.0,
         ],
         //"circle-blur": 0.3,
       },
@@ -214,26 +380,24 @@ class MapLayerManager {
       id: sourceName + "-l2",
       type: "line",
       source: sourceName,
-      minzoom: 7,
-      maxzoom: 20,
+      minzoom: this.minZoom,
+      maxzoom: this.maxZoom,
       filter: ["match", ["geometry-type"], lineType, true, false],
       paint: {
-        "line-color": "rgba(255, 0, 0, 255)",
-        "line-width": 8,
+        "line-color": tagColor,
+        "line-width": 7,
       },
     };
 
     const polygonFillLayer: Layer = {
       id: sourceName + "-l3",
       type: "fill",
-      //TODO extract types as an enum
-      //TODO would "==" be more efficient than "match" ?
       filter: ["match", ["geometry-type"], polygonType, true, false],
       source: sourceName,
-      minzoom: 7,
-      maxzoom: 20,
+      minzoom: this.minZoom,
+      maxzoom: this.maxZoom,
       paint: {
-        "fill-color": "rgba(123,123,255,0.6)",
+        "fill-color": tagColor,
         "fill-opacity": 0.8,
       },
     };
@@ -256,11 +420,27 @@ class MapLayerManager {
     */
 
     //show points below the map symbols
-    this.addNewLayer(pointLayer, true);
+    this.addNewGeojsonLayer(pointLayer, true);
     //show lines
-    this.addNewLayer(lineLayer, true);
+    this.addNewGeojsonLayer(lineLayer, true);
     //show filled polygons
-    this.addNewLayer(polygonFillLayer, true);
+    this.addNewGeojsonLayer(polygonFillLayer, true);
+  }
+
+  addCanvasLayer(id: string, opacity: number): void {
+    const overlayLayer: Layer = {
+      id: "overlay",
+      source: id,
+      type: "raster",
+      paint: {
+        "raster-opacity": opacity,
+      },
+    };
+
+    map.addLayer(overlayLayer);
+
+    // add to local list
+    this.visibleLayers.push(overlayLayer);
   }
 
   /**
@@ -279,15 +459,54 @@ class MapLayerManager {
     return undefined;
   }
 
-  addWithinStyleLayer(): void {
-    //TODO
-    //"paint": {"fill-color": ["case", ["within", poylgonjson], "black", "red"]}
+  removeAllDataFromMap(): void {
+    console.log("Sources: ", map.getStyle().sources);
+
+    /*
+    // clear all layers from map (needs to be done before sources are cleared!)
+    for (let index = 0; index < this.visibleLayers.length; index++) {
+      const layer = this.visibleLayers[index];
+      map.removeLayer(layer.id);
+    }
+    for (let index = 0; index < this.hiddenLayers.length; index++) {
+      const layer = this.hiddenLayers[index];
+      map.removeLayer(layer.id);
+    }
+    */
+
+    //clear all sources on map
+    const allSources = map.getStyle().sources;
+    for (const source in allSources) {
+      // "composite" is the default vector layer of mapbox-streets; don't delete this!
+      if (source !== "composite") {
+        //TODO does this work?
+        if (source === "overlaySource") {
+          this.removeCanvasSource(source);
+        } else {
+          this.removeGeojsonSource(source);
+        }
+      }
+    }
+
+    //clear local lists
+    this.visibleLayers.length = 0;
+    this.hiddenLayers.length = 0;
+
+    //hide legend
+    if (this.legendIsShown) {
+      this.legend.hide();
+      this.legendIsShown = false;
+    }
+
+    this.logState();
   }
 
+  /*
   addHeatmapLayer(data?: string): void {
     const heatmap = new Heatmap(data);
     heatmap.show();
   }
+  */
 }
 
 export default new MapLayerManager();
