@@ -19,12 +19,9 @@ export function clearCanvasPart(
 const overlaySourceID = "overlaySource";
 const overlayLayerID = "overlay";
 
-/*
 export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): void {
   const viewportBounds = getViewportBounds();
 
-  console.log(`${overlaySourceID} is loll33332 !`);
-  //TODO nötig?
   //mapLayerManager.removeAllLayersForSource(overlaySourceID);
   //mapLayerManager.removeCanvasLayer(overlayLayerID);
 
@@ -36,33 +33,6 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): vo
   //show the source data on the map
   mapLayerManager.addCanvasLayer(overlaySourceID, overlayLayerID, opacity);
 }
-*/
-
-export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): void {
-  const viewportBounds = getViewportBounds();
-
-  mapLayerManager.removeAllLayersForSource("canvasSource");
-
-  if (map.getSource("canvasSource")) {
-    map.removeSource("canvasSource");
-  }
-
-  map.addSource("canvasSource", {
-    type: "canvas",
-    canvas: canvas,
-    animate: false,
-    coordinates: viewportBounds,
-  });
-
-  map.addLayer({
-    id: "overlay",
-    source: "canvasSource",
-    type: "raster",
-    paint: {
-      "raster-opacity": opacity,
-    },
-  });
-}
 
 export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {
   const image = new Image();
@@ -72,12 +42,6 @@ export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HT
       image.height = canvas.clientHeight;
 
       resolve(image);
-
-      //cleanup
-      /*
-      image.onload = null;
-      image = null;
-      */
     };
     image.onerror = (error): void => reject(error);
 
@@ -89,14 +53,12 @@ export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HT
 const overlayOpacity = 0.7;
 
 export function makeAlphaMask(canvas: HTMLCanvasElement): any {
-  console.warn("in make alpha mask");
-
   const c = document.createElement("canvas");
   c.width = map.getCanvas().clientWidth;
   c.height = map.getCanvas().clientHeight;
   const context = c.getContext("2d");
   if (!context) {
-    console.warn("no 2d context");
+    console.warn("no 2d context in make alpha mask");
     return;
   }
 

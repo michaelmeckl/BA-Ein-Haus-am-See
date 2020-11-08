@@ -3,7 +3,6 @@
  */
 import bbox from "@turf/bbox";
 import bboxPolygon from "@turf/bbox-polygon";
-import union from "@turf/union";
 import type {
   Feature,
   FeatureCollection,
@@ -14,13 +13,12 @@ import type {
   Point,
   Polygon,
 } from "geojson";
-import mapboxgl, { LngLat, LngLatLike } from "mapbox-gl";
+import type { LngLat, LngLatLike } from "mapbox-gl";
 import WebWorker from "worker-loader!../worker";
 import Benchmark from "../../shared/benchmarking";
-import { map } from "./mapboxConfig";
-import mapLayerManager from "../mapData/mapLayerManager";
-import { addBufferToFeature } from "./turfUtils";
 import type { FilterLayer } from "../mapData/filterLayer";
+import { map } from "./mapboxConfig";
+import { addBufferToFeature } from "./turfUtils";
 
 // formula based on https://wiki.openstreetmap.org/wiki/Zoom_levels
 export function metersInPixel(meters: number, latitude: number, zoomLevel: number): number {
@@ -70,117 +68,6 @@ export function getViewportBoundsString(additionalDistance?: number): string {
   }
 
   return `${southLat},${westLng},${northLat},${eastLng}`;
-}
-
-//TODO
-/*
-  getBBoxForBayern(): string {
-    const mittelpunktOberpfalz = point([12.136, 49.402]);
-    const radiusOberpfalz = 100; //km
-
-    const mittelpunktBayern = point([11.404, 48.946]);
-    const radiusBayern = 200; //km
-
-    //@ts-expect-error
-    const centerPoint = circle(mittelpunktOberpfalz, radiusOberpfalz, { units: "kilometers" });
-
-    const bboxExtent = bbox(centerPoint);
-    //console.log("Bbox: ", bboxExtent);
-
-    const bboxExtent2 = bbpolygon(bboxExtent);
-
-    return `${bboxExtent[1]},${bboxExtent[0]},${bboxExtent[3]},${bboxExtent[2]}`;
-  }
-
-  showCurrentViewportCircle(): void {
-    const { center, radius } = mapboxUtils.getRadiusAndCenterOfViewport();
-    //@ts-expect-error
-    const viewportCirclePolygon = circle([center.lng, center.lat], radius, { units: "meters" });
-
-    mapLayerManager.addNewGeojsonSource("viewportCircle", viewportCirclePolygon);
-    const newLayer: Layer = {
-      id: "viewportCircleLayer",
-      source: "viewportCircle",
-      type: "fill",
-      paint: {
-        "fill-color": "rgba(255, 255, 0, 0.15)",
-      },
-    };
-    mapLayerManager.addNewLayer(newLayer, true);
-  }
-  */
-
-export function getRadiusAndCenterOfViewport(): any {
-  const centerPoint = map.getCenter();
-  const northEastPoint = map.getBounds().getNorthEast();
-  const radius = centerPoint.distanceTo(northEastPoint); // in meters
-
-  return { center: centerPoint, radius: radius };
-}
-
-export function addPopupOnHover(): void {
-  // Create a popup, but don't add it to the map yet.
-  const popup = new mapboxgl.Popup({
-    closeButton: false,
-    closeOnClick: false,
-  });
-
-  map.on("mouseenter", "places", function (e) {
-    // Change the cursor style as a UI indicator.
-    map.getCanvas().style.cursor = "pointer";
-
-    // @ts-expect-error
-    const coordinates = e.features[0].geometry.coordinates.slice();
-    // @ts-expect-error
-    const description = e.features[0].properties.description;
-
-    // Ensure that if the map is zoomed out such that multiple
-    // copies of the feature are visible, the popup appears
-    // over the copy being pointed to.
-    while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-    }
-
-    // Populate the popup and set its coordinates
-    // based on the feature found.
-    popup.setLngLat(coordinates).setHTML(description).addTo(map);
-  });
-
-  map.on("mouseleave", "places", function () {
-    map.getCanvas().style.cursor = "";
-    popup.remove();
-  });
-}
-
-/**
- * Util - Function that returns the current viewport extent as a polygon.
- */
-//TODO vllt etwas mehr als den viewport gleich nehmen?
-//* not used right now
-export function getViewportAsPolygon(): Feature<Polygon, GeoJsonProperties> {
-  const bounds = map.getBounds();
-  const viewportBounds = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
-  return bboxPolygon(viewportBounds);
-}
-
-export function convertAllFeaturesToPolygons(
-  features: Feature<Point | LineString | Polygon, GeoJsonProperties>[],
-  bufferSize = 500
-): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
-  const polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
-
-  Benchmark.startMeasure("adding buffer to all features");
-
-  for (let index = 0; index < features.length; index++) {
-    const feature = features[index];
-    // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
-    polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
-
-    //TODO hier erst simplify?
-  }
-  Benchmark.stopMeasure("adding buffer to all features");
-
-  return polygonFeatures;
 }
 
 export function flattenMultiGeometry(
@@ -259,6 +146,173 @@ export function flattenMultiGeometry(
   return allFeatures;
 }
 
+let webWorker: Worker | undefined;
+
+function stopWorker(): void {
+  webWorker?.terminate();
+  // set to undefined so it can be used again afterwards
+  webWorker = undefined;
+}
+
+//TODO
+//perf results: 720 ms, 845 ms, 1030 ms, 980 ms, 760 ms => avg: 867 ms
+// with geobuf a little bit better, but not much (ca. 30-40 ms)
+function setupWebWorker(
+  features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
+): void {
+  if (typeof Worker !== "undefined") {
+    if (typeof webWorker === "undefined") {
+      //worker = new Worker("../worker.js", { type: "module" });
+      webWorker = new WebWorker();
+    }
+
+    Benchmark.startMeasure("showing mask data");
+    webWorker.postMessage(features);
+
+    webWorker.onmessage = (event) => {
+      console.log("worker result: ", event.data);
+
+      //showMask(event.data);
+      Benchmark.stopMeasure("showing mask data");
+      stopWorker();
+    };
+    webWorker.onerror = (ev) => {
+      console.error("Worker error: ", ev);
+      stopWorker();
+    };
+  } else {
+    console.warn("No Web Worker support!");
+  }
+}
+
+/**
+ * Util-Function to convert LngLat coordinates to pixel coordinates on the screen.
+ */
+export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
+  return map.project(coord);
+}
+
+/**
+ * Util-Function to convert pixel coordinates to LngLat coordinates.
+ */
+export function convertToLatLngCoord(point: mapboxgl.PointLike): LngLat {
+  return map.unproject(point);
+}
+
+export function convertPolygonCoordsToPixels(
+  polygon: Feature<Polygon | MultiPolygon, GeoJsonProperties>,
+  layer: FilterLayer
+): void {
+  const coords = polygon.geometry.coordinates;
+
+  // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
+  if (coords.length > 1) {
+    //console.log("Multipolygon: ", coords);
+
+    //const flattened: mapboxgl.Point[] = [];
+    for (const coordPart of coords) {
+      layer.Points.push(
+        //@ts-expect-error
+        coordPart.map((coord: number[]) => {
+          try {
+            return convertToPixelCoord(coord as LngLatLike);
+          } catch (error) {
+            console.log("Error in projecting coord: ", error);
+            return null;
+          }
+        })
+      );
+      //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+    }
+    // layer.Points.push(flattened);
+  } else {
+    //console.log("Polygon");
+
+    //@ts-expect-error
+    const pointData = coords[0].map((coord: number[]) => {
+      try {
+        return convertToPixelCoord(coord as LngLatLike);
+      } catch (error) {
+        console.log("Error in projecting coord: ", error);
+        return null;
+      }
+    });
+    layer.Points.push(pointData);
+  }
+}
+
+//! not used:
+
+/*
+
+export function getRadiusAndCenterOfViewport(): any {
+  const centerPoint = map.getCenter();
+  const northEastPoint = map.getBounds().getNorthEast();
+  const radius = centerPoint.distanceTo(northEastPoint); // in meters
+
+  return { center: centerPoint, radius: radius };
+}
+
+export function addPopupOnHover(): void {
+  // Create a popup, but don't add it to the map yet.
+  const popup = new mapboxgl.Popup({
+    closeButton: false,
+    closeOnClick: false,
+  });
+
+  map.on("mouseenter", "places", function (e) {
+    // Change the cursor style as a UI indicator.
+    map.getCanvas().style.cursor = "pointer";
+
+    // @ts-expect-error
+    const coordinates = e.features[0].geometry.coordinates.slice();
+    // @ts-expect-error
+    const description = e.features[0].properties.description;
+
+    // Ensure that if the map is zoomed out such that multiple
+    // copies of the feature are visible, the popup appears
+    // over the copy being pointed to.
+    while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+    }
+
+    // Populate the popup and set its coordinates
+    // based on the feature found.
+    popup.setLngLat(coordinates).setHTML(description).addTo(map);
+  });
+
+  map.on("mouseleave", "places", function () {
+    map.getCanvas().style.cursor = "";
+    popup.remove();
+  });
+}
+
+ //Util - Function that returns the current viewport extent as a polygon.
+export function getViewportAsPolygon(): Feature<Polygon, GeoJsonProperties> {
+  const bounds = map.getBounds();
+  const viewportBounds = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
+  return bboxPolygon(viewportBounds);
+}
+
+export function convertAllFeaturesToPolygons(
+  features: Feature<Point | LineString | Polygon, GeoJsonProperties>[],
+  bufferSize = 500
+): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
+  const polygonFeatures: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
+
+  Benchmark.startMeasure("adding buffer to all features");
+
+  for (let index = 0; index < features.length; index++) {
+    const feature = features[index];
+    // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
+    polygonFeatures.push(addBufferToFeature(feature, bufferSize, "meters"));
+
+  }
+  Benchmark.stopMeasure("adding buffer to all features");
+
+  return polygonFeatures;
+}
+
 function performUnion(features: any): Feature<any, GeoJsonProperties> {
   let unionResult: any = features[0];
   for (let index = 1; index < features.length; index++) {
@@ -326,8 +380,8 @@ export function showMask(mask: any): void {
         // this makes the line-width in meters stay relative to the current zoom level:
         "interpolate",
         ["exponential", 2], ["zoom"],
-        10, /*["*", 10, ["^", 2, -16]],*/ metersInPixel(20, currentLat, 10),
-        24, /*["*", 150, ["^", 2, 8]]*/ metersInPixel(100, currentLat, 24),
+        10, metersInPixel(20, currentLat, 10),
+        24, metersInPixel(100, currentLat, 24),
       ],
       //prettier-ignore
       "line-blur": ["interpolate", ["linear"], ["zoom"],
@@ -339,46 +393,6 @@ export function showMask(mask: any): void {
   });
 }
 
-let webWorker: Worker | undefined;
-
-function stopWorker(): void {
-  webWorker?.terminate();
-  // set to undefined so it can be used again afterwards
-  webWorker = undefined;
-}
-
-//perf results: 720 ms, 845 ms, 1030 ms, 980 ms, 760 ms => avg: 867 ms
-// with geobuf a little bit better, but not much (ca. 30-40 ms)
-function setupWebWorker(
-  features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
-): void {
-  if (typeof Worker !== "undefined") {
-    if (typeof webWorker === "undefined") {
-      //worker = new Worker("../worker.js", { type: "module" });
-      webWorker = new WebWorker();
-    }
-
-    Benchmark.startMeasure("showing mask data");
-    webWorker.postMessage(features);
-
-    webWorker.onmessage = (event) => {
-      console.log("worker result: ", event.data);
-
-      showMask(event.data);
-      Benchmark.stopMeasure("showing mask data");
-      stopWorker();
-    };
-    webWorker.onerror = (ev) => {
-      console.error("Worker error: ", ev);
-      stopWorker();
-    };
-  } else {
-    console.warn("No Web Worker support!");
-  }
-}
-
-//Idee: mit turf.bbpolygon die bounding box des viewports zu einem Polygon machen, dann mit turf.distance
-//den Unterschied vom Polygon und der Bounding Box nehmen und das dann einfärben mit fill-color!
 export async function showDifferenceBetweenViewportAndFeature(
   features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
 ): Promise<any> {
@@ -390,95 +404,12 @@ export async function showDifferenceBetweenViewportAndFeature(
   Benchmark.startMeasure("calculateMaskAndIntersections");
   const featureObject = await calculateMaskAndIntersections([...features]);
   Benchmark.stopMeasure("calculateMaskAndIntersections");
+  //const maske = featureObject.unionPolygons;
 
-  /*
-  const maske = featureObject.unionPolygons;
-
-  Benchmark.startMeasure("turf-mask-auto");
-  const result = mask(maske);
-  Benchmark.stopMeasure("turf-mask-auto");
+  //const result = mask(maske);
 
   showMask(result);
-  Benchmark.stopMeasure("showing mask data");
-  */
-}
 
-/**
- * Util-Function to convert LngLat coordinates to pixel coordinates on the screen.
- */
-export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
-  return map.project(coord);
-}
-
-/**
- * Util-Function to convert pixel coordinates to LngLat coordinates.
- */
-export function convertToLatLngCoord(point: mapboxgl.PointLike): LngLat {
-  return map.unproject(point);
-}
-
-export function convertPolygonCoordsToPixels(
-  polygon: Feature<Polygon | MultiPolygon, GeoJsonProperties>,
-  layer: FilterLayer
-): void {
-  const coords = polygon.geometry.coordinates;
-
-  // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
-  if (coords.length > 1) {
-    //console.log("Multipolygon: ", coords);
-
-    //const flattened: mapboxgl.Point[] = [];
-    for (const coordPart of coords) {
-      layer.Points.push(
-        coordPart.map((coord: number[]) => {
-          try {
-            return convertToPixelCoord(coord as LngLatLike);
-          } catch (error) {
-            console.log("Error in projecting coord: ", error);
-            return null;
-          }
-        })
-      );
-      //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
-    }
-    // layer.Points.push(flattened);
-  } else {
-    //console.log("Polygon");
-
-    const pointData = coords[0].map((coord: number[]) => {
-      try {
-        return convertToPixelCoord(coord as LngLatLike);
-      } catch (error) {
-        console.log("Error in projecting coord: ", error);
-        return null;
-      }
-    });
-    layer.Points.push(pointData);
-  }
-}
-
-export function getPixelCoordinates(
-  features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]
-): mapboxgl.Point[] {
-  const pixelCoords: mapboxgl.Point[] = [];
-
-  for (const feature of features) {
-    const coords = feature.geometry.coordinates;
-    for (const coord of coords) {
-      // check if this is a multidimensional array
-      if (Array.isArray(coords[0])) {
-        for (const coordPart of coord) {
-          pixelCoords.push(convertToPixelCoord(coordPart as LngLatLike));
-        }
-      } else {
-        pixelCoords.push(convertToPixelCoord((coord as unknown) as LngLatLike));
-      }
-    }
-  }
-
-  console.log("pixelCoords: ", pixelCoords);
-
-  return pixelCoords;
 }
 
 export function convertToMercatorCoordinates(arr: number[][]): number[] {
@@ -518,3 +449,4 @@ export function getMercatorCoordinates(
 
   return mercatorCoords;
 }
+*/

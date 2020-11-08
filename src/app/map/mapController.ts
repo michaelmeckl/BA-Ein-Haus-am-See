@@ -170,11 +170,11 @@ export default class MapController {
   async loadMapData(): Promise<void> {
     const allCurrentFilters = FilterManager.activeFilters;
     if (allCurrentFilters.size === 0) {
-      console.warn("no active filters! cant load anything!");
+      //console.warn("no active filters! cant load anything!");
       return;
     }
 
-    console.log("Performing osm query for active filters: ", allCurrentFilters);
+    //console.log("Performing osm query for active filters: ", allCurrentFilters);
     // give feedback to the user
     showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true);
 
@@ -188,11 +188,11 @@ export default class MapController {
         const query = OsmTagCollection.getQueryForCategory(tag);
 
         //TODO check if already locally loaded this tag; only fetch if not!
-        Benchmark.startMeasure("Fetching data from osm");
+        //Benchmark.startMeasure("Fetching data from osm");
         // request data from osm
         //const data = await fetchOsmDataFromClientVersion(bounds, query);
         const data = await fetchOsmDataFromServer(bounds, query);
-        Benchmark.stopMeasure("Fetching data from osm");
+        //Benchmark.stopMeasure("Fetching data from osm");
 
         if (data) {
           if (this.selectedVisualType === VisualType.NORMAL) {
@@ -235,6 +235,7 @@ export default class MapController {
     }
   }
 
+  //TODO
   removeData(sourceName: string): void {
     console.log("Removing source: ", sourceName);
     mapLayerManager.removeGeojsonSource(sourceName);
@@ -250,15 +251,13 @@ export default class MapController {
   }
 
   showDataOnMap(data: FeatureCollection<GeometryObject, any>, tagName: string): void {
-    //console.log("now adding to map...");
-    console.log("Tagname: ", tagName);
+    //console.log("Tagname: ", tagName);
 
-    //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(tagName);
 
     if (map.getSource(tagName)) {
       // the source already exists, only update the data
-      console.log(`Source ${tagName} is already used! Updating it!`);
+      //console.log(`Source ${tagName} is already used! Updating it!`);
       mapLayerManager.updateGeojsonSource(tagName, data);
     } else {
       // source doesn't exist yet, create a new one

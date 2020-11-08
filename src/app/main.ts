@@ -215,6 +215,19 @@ function onAddFilterBtnClick(): void {
     "input[name = 'polarity']:checked"
   ) as HTMLInputElement;
 
+  const distanceInMeters =
+    distanceUnit.value === "m" ? parseInt(distance.value) : parseInt(distance.value) * 1000;
+
+  //! bei zu großen werten hängt sich webgl im moment auf und die anwendung crasht!!!!!
+  if (distanceInMeters > 800) {
+    showSnackbar(
+      "Die Entfernung kann leider im Moment höchstens 800 m sein!",
+      SnackbarType.WARNING,
+      2000
+    );
+    return;
+  }
+
   addNewFilter(
     filterName.textContent || "",
     distance.value,
@@ -433,7 +446,7 @@ function setupUI(): void {
   //loadLocations();
 }
 
-function init(): void {
+export function init(): void {
   console.time("load map");
 
   mapController = new MapController();

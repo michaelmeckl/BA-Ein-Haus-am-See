@@ -4,7 +4,6 @@ import { map } from "./mapboxConfig";
 // colors to use for the categories
 const colors = ["#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c"];
 
-//TODO
 export default class ClusterManager {
   // objects for caching and keeping track of HTML marker objects (for performance)
   private markers: any = {};
