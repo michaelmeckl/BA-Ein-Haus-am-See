@@ -1,14 +1,7 @@
 /* eslint-env browser */
-import type {
-  Feature,
-  FeatureCollection,
-  GeoJsonProperties,
-  Geometry,
-  GeometryObject,
-  MultiPolygon,
-  Polygon,
-} from "geojson";
-import mapboxgl, { EventData, LngLat, MapMouseEvent } from "mapbox-gl";
+import truncate from "@turf/truncate";
+import type { FeatureCollection, Geometry, GeometryObject } from "geojson";
+import mapboxgl, { LngLat } from "mapbox-gl";
 import Benchmark from "../../shared/benchmarking";
 import type { FilterLayer } from "../mapData/filterLayer";
 import FilterManager from "../mapData/filterManager";
@@ -22,7 +15,6 @@ import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import { addBufferToFeature } from "./turfUtils";
-import truncate from "@turf/truncate";
 
 export const enum VisualType {
   NORMAL,
@@ -30,30 +22,21 @@ export const enum VisualType {
   //HEATMAP
 }
 
-//! add clear map data button or another option (or implement the removeMapData method correct) because atm
-//! a filter can be deleted while fetching data which still adds the data but makes it impossible to delete the data on the map!!
-
-const zoomTreshold = 2; // 2 zoom levels difference
-const moveTreshold = 1500; // map center difference in meters
+// tresholds to prevent reloading when small movements are made (performance optimization)
+const zoomTreshold = 0.5; // zoom level difference -> update if a map zoom changed more than half the zoom level
+const moveTreshold = 1000; // map center difference in meters
 
 /**
  * Main Controller Class for mapbox that handles all different aspects of the map.
  */
 export default class MapController {
+  private minRequiredZoomLevel = 7; //below this zoomlevel, nothing is shown (performance optimization)
   private currentZoom: number = initialZoomLevel;
   private currentMapCenter: LngLat = new LngLat(initialPosition[0], initialPosition[1]);
 
   private selectedVisualType: VisualType = VisualType.OVERLAY; //TODO wechseln!
   private showingOverlay = false;
   showOverlayActivated = true; //! im moment immer true
-
-  //prettier-ignore
-  private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
-
-  //TODO
-  private logControllerState(): void {
-    console.log("Controller: ", this);
-  }
 
   /**
    * Async init function that awaits the map load and resolves (or rejects) after the map has been fully loaded.
@@ -87,80 +70,6 @@ export default class MapController {
     this.setupMapEvents();
   }
 
-  setupMapEvents(): void {
-    //map.on("sourcedata", this.onSourceLoaded.bind(this));
-    //map.on("data", this.onDataLoaded.bind(this)); // fired when any map data begins loading or changing asynchronously.
-    map.on("click", this.onMapClick.bind(this));
-    map.on("zoomstart", this.onMapZoomStart.bind(this));
-    map.on("zoomend", this.onMapZoomEnd.bind(this));
-    map.on("dragstart", this.onMapDragStart.bind(this));
-    map.on("dragend", this.onMapDragEnd.bind(this));
-  }
-
-  onMapDragStart(): void {
-    this.currentMapCenter = map.getCenter();
-  }
-
-  onMapDragEnd(): void {
-    //* overlay needs to be updated all the time unfortunately :(
-    //TODO anstatt showing Overaly einfach auf den aktuellen VisualType prüfen ? === VisualType.Overlay
-
-    if (this.showingOverlay) {
-      FilterManager.recalculateScreenCoords();
-      this.addAreaOverlay();
-      return;
-    }
-
-    // Uses the Haversine Formula to calculate difference between tow latLng coords in meters
-    const distance = this.currentMapCenter.distanceTo(map.getCenter());
-    console.log("Distance", distance);
-    // this is a threshold to avoid firing events with small moves
-    if (distance < moveTreshold) {
-      return;
-    }
-    console.log("Distance greater than treshold - updating");
-    this.loadMapData();
-  }
-
-  onMapZoomStart(): void {
-    this.currentZoom = map.getZoom();
-  }
-
-  onMapZoomEnd(): void {
-    const newZoom = map.getZoom();
-
-    //TODO anstatt showing Overaly einfach auf den aktuellen VisualType prüfen ? === VisualType.Overlay
-    if (this.showingOverlay) {
-      FilterManager.recalculateScreenCoords();
-      this.addAreaOverlay();
-      //this.currentZoom = newZoom;
-      return;
-    }
-
-    // don't update data if the zoom level change is below the treshold
-    if (Math.abs(newZoom - this.currentZoom) <= zoomTreshold) {
-      return;
-    } else if (newZoom <= 8) {
-      // performance optimization - dont show/update overlay below a certain zoomlevel
-      //TODO snackbar nervt vllt wenn ständig angezeigt
-      showSnackbar(
-        "Die aktuelle Zoomstufe ist zu niedrig, um Daten zu aktualisieren!",
-        SnackbarType.WARNING,
-        2000
-      );
-      //this.currentZoom = newZoom;
-      return;
-    }
-    console.log("new zoom is different enough - updating ...");
-    this.loadMapData();
-
-    //this.currentZoom = newZoom;
-  }
-
-  async onMapClick(e: MapMouseEvent & EventData): Promise<void> {
-    //console.log("Click:", e);
-  }
-
   addMapControls(): void {
     // Add navigation controls to the map
     map.addControl(new mapboxgl.NavigationControl());
@@ -172,18 +81,100 @@ export default class MapController {
     map.addControl(Geocoder.geocoderControl, "bottom-left"); //TODO top-left
   }
 
+  setupMapEvents(): void {
+    //map.on("sourcedata", this.onSourceLoaded.bind(this));
+    //map.on("data", this.onDataLoaded.bind(this));
+    //map.on("click", this.onMapClick.bind(this));
+    map.on("zoomstart", this.onMapZoomStart.bind(this));
+    map.on("zoomend", this.onMapZoomEnd.bind(this));
+    map.on("dragstart", this.onMapDragStart.bind(this));
+    map.on("dragend", this.onMapDragEnd.bind(this));
+  }
+
+  onMapDragStart(): void {
+    this.currentMapCenter = map.getCenter();
+  }
+
+  onMapDragEnd(): void {
+    // Uses the Haversine Formula to calculate difference between tow latLng coords in meters
+    const distance = this.currentMapCenter.distanceTo(map.getCenter());
+    //console.log("Distance", distance);
+
+    //! overlay needs to be updated all the time unfortunately :(
+    if (this.selectedVisualType === VisualType.OVERLAY) {
+      FilterManager.recalculateScreenCoords();
+      // this is a threshold to avoid firing events with small moves
+      if (distance < moveTreshold) {
+        // if below the treshold only update overlay
+        this.addAreaOverlay();
+      } else {
+        // if greater than the treshold load new data from the internet as well
+        this.loadMapData();
+      }
+    } else {
+      if (distance < moveTreshold) {
+        return;
+      }
+      //console.log("Distance greater than treshold - updating");
+      this.loadMapData();
+    }
+  }
+
+  onMapZoomStart(): void {
+    this.currentZoom = map.getZoom();
+  }
+
+  onMapZoomEnd(): void {
+    const newZoom = map.getZoom();
+
+    if (this.selectedVisualType === VisualType.OVERLAY) {
+      FilterManager.recalculateScreenCoords();
+
+      if (newZoom <= this.minRequiredZoomLevel) {
+        // performance optimization - dont show/update overlay below a certain zoomlevel
+        //? show it all the time below this zoomlevel?
+        showSnackbar(
+          "Die aktuelle Zoomstufe ist zu niedrig, um Daten zu aktualisieren!",
+          SnackbarType.WARNING,
+          2000
+        );
+        return;
+      } else if (Math.abs(newZoom - this.currentZoom) <= zoomTreshold) {
+        this.addAreaOverlay();
+        return;
+      }
+
+      this.loadMapData();
+    } else {
+      if (newZoom <= this.minRequiredZoomLevel) {
+        showSnackbar(
+          "Die aktuelle Zoomstufe ist zu niedrig, um Daten zu aktualisieren!",
+          SnackbarType.WARNING,
+          2000
+        );
+        return;
+      } else if (Math.abs(newZoom - this.currentZoom) <= zoomTreshold) {
+        // don't update data if the zoom level change is below the treshold
+        return;
+      }
+      //console.log("new zoom is different enough - updating ...");
+      this.loadMapData();
+    }
+  }
+
+  /*
+  async onMapClick(e: MapMouseEvent & EventData): Promise<void> {
+    console.log("Click:", e);
+  }*/
+
   async loadMapData(): Promise<void> {
     const allCurrentFilters = FilterManager.activeFilters;
-
     if (allCurrentFilters.size === 0) {
-      console.log("keine aktiven Filter, es kann nichts geladen werden");
+      console.warn("no active filters! cant load anything!");
       return;
     }
 
-    this.logControllerState();
-
     console.log("Performing osm query for active filters: ", allCurrentFilters);
-
     // give feedback to the user
     showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true);
 
@@ -191,7 +182,6 @@ export default class MapController {
     const bounds = mapboxUtils.getViewportBoundsString(500);
 
     Benchmark.startMeasure("Performing osm query for active filters");
-
     const allResults = await Promise.allSettled(
       Array.from(allCurrentFilters).map(async (tag) => {
         // get overpass query for each tag
@@ -206,7 +196,6 @@ export default class MapController {
 
         if (data) {
           if (this.selectedVisualType === VisualType.NORMAL) {
-            //console.log("showing normal data");
             this.showDataOnMap(data, tag);
           } else {
             //const filterLayer = this.preprocessGeoData(data, tag);
@@ -216,7 +205,9 @@ export default class MapController {
       })
     );
 
-    console.log("Finished adding data to map!");
+    Benchmark.stopMeasure("Performing osm query for active filters");
+
+    //console.log("Finished adding data to map!");
 
     let success = true;
     for (const res of allResults) {
@@ -234,12 +225,11 @@ export default class MapController {
     // hide the snackbar after data has finished loading
     hideSnackbar();
 
-    Benchmark.stopMeasure("Performing osm query for active filters");
-
+    //update the overlay if it is activated
     if (this.showOverlayActivated) {
       //TODO remove legend and other map layers // ==  mapLayerManager.removeAllDataFromMap();
       //TODO oder nur geojson layer?
-      console.log("updating overlay...\n", FilterManager.allFilterLayers);
+      //console.log("updating overlay...\n", FilterManager.allFilterLayers);
       this.showingOverlay = true;
       this.addAreaOverlay();
     }
@@ -279,7 +269,7 @@ export default class MapController {
     mapLayerManager.addLayersForSource(tagName);
   }
 
-  //! Data preprocessing could (and probably should) already happen on the server!
+  //! most of the data preprocessing could (and probably should) already happen on the server!
   preprocessGeoData(
     data: FeatureCollection<GeometryObject, any>,
     dataName: string
@@ -307,28 +297,11 @@ export default class MapController {
 
       layer.Features.push(bufferedPoly);
 
-      const coords = bufferedPoly.geometry.coordinates;
-
-      // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
-      if (coords.length > 1) {
-        console.log("Multipolygon: ", coords);
-        //const flattened: mapboxgl.Point[] = [];
-        for (const coordPart of coords) {
-          //prettier-ignore
-          layer.Points.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
-          //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
-        }
-        // layer.Points.push(flattened);
-      } else {
-        console.log("Polygon");
-
-        //prettier-ignore
-        const pointData = coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord));
-        layer.Points.push(pointData);
-      }
+      mapboxUtils.convertPolygonCoordsToPixels(bufferedPoly, layer);
     }
-    console.log("allPoints in layer:", layer.Points);
-    console.log("allfeatures in layer:", layer.Features);
+
+    //console.log("allPoints in layer:", layer.Points);
+    //console.log("allfeatures in layer:", layer.Features);
 
     return layer;
   }
@@ -342,7 +315,7 @@ export default class MapController {
    *      [{x: 49.1287; y: 12.3591}, ...],
    *      ...,
    *    ]
-   *    features: [ {Feature}, [...], ...],
+   *    features: [ {Feature}, {Feature}, ...],
    *    distance: 500,
    *    relevance: 0.8,  //="very important"
    *    name: "Park",
@@ -355,7 +328,7 @@ export default class MapController {
    * ]
    */
   addAreaOverlay(): void {
-    console.log("FilterManager in addAreaOverlay: ", FilterManager);
+    //console.log("FilterManager in addAreaOverlay: ", FilterManager);
 
     // check that there is data to create an overlay for the map
     if (FilterManager.allFilterLayers.length > 0) {

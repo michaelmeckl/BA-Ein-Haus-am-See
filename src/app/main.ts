@@ -2,8 +2,7 @@
 import { Config } from "../shared/config";
 import MapController from "./map/mapController";
 import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
-import { default as FilterManager, default as filterManager } from "./mapData/filterManager";
-import mapLayerManager from "./mapData/mapLayerManager";
+import FilterManager from "./mapData/filterManager";
 import { showSnackbar, SnackbarType } from "./utils";
 
 // * const enum instead of enum as this inlines the elements at runtime
@@ -87,7 +86,7 @@ async function performOsmQuery(): Promise<void> {
 function onFilterRemoved(filterName: string, ev: Event): void {
   const listElement = (ev.target as HTMLButtonElement).parentElement as Node; // cast to node to remove it with removeChild()
   list.removeChild(listElement);
-  FilterManager.removeFilter(filterName);
+  //FilterManager.removeFilter(filterName); //TODO eher über mapController damit auch legende und karten daten
 
   // remove data from the map as well
   const textContent = listElement.firstChild?.textContent?.trim(); //TODO oder einfach filtername nehmen hier??
@@ -152,7 +151,7 @@ function addNewFilter(
   }
   //if (importance in FilterRelevance) relevance = FilterRelevance[importance]; //not working!
   const newFilter = new FilterLayer(filterName, distanceInMeters, relevance, wanted);
-  FilterManager.addFilter(newFilter);
+  FilterManager.addFilter(newFilter); //TODO wirklich hier oder in controller erst?
 
   const containerElement = document.createElement("div");
   containerElement.innerHTML = FILTER_LIST_TEMPLATE as string;
@@ -378,7 +377,7 @@ function setupUI(): void {
 
   showLocationsButtton.addEventListener("click", () => {
     // check if there are active filters, if not show snackbar warning
-    if (filterManager.activeFilters.size > 0) {
+    if (FilterManager.activeFilters.size > 0) {
       showLocationsPanel();
     } else {
       showSnackbar(

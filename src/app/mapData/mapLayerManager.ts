@@ -192,6 +192,7 @@ class MapLayerManager {
     map.removeSource(sourceID);
   }
 
+  /*
   updateCanvasSource(sourceId: string, newCanvas: HTMLCanvasElement, newCoords: number[][]): void {
     const source = map.getSource(sourceId) as CanvasSource;
     source.coordinates = newCoords;
@@ -202,7 +203,7 @@ class MapLayerManager {
     } else {
       console.warn("Error no ctx");
     }
-  }
+  }*/
 
   /**
    * ####################################

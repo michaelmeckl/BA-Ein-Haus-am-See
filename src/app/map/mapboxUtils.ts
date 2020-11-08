@@ -20,6 +20,7 @@ import Benchmark from "../../shared/benchmarking";
 import { map } from "./mapboxConfig";
 import mapLayerManager from "../mapData/mapLayerManager";
 import { addBufferToFeature } from "./turfUtils";
+import type { FilterLayer } from "../mapData/filterLayer";
 
 // formula based on https://wiki.openstreetmap.org/wiki/Zoom_levels
 export function metersInPixel(meters: number, latitude: number, zoomLevel: number): number {
@@ -414,6 +415,46 @@ export function convertToPixelCoord(coord: LngLatLike): mapboxgl.Point {
  */
 export function convertToLatLngCoord(point: mapboxgl.PointLike): LngLat {
   return map.unproject(point);
+}
+
+export function convertPolygonCoordsToPixels(
+  polygon: Feature<Polygon | MultiPolygon, GeoJsonProperties>,
+  layer: FilterLayer
+): void {
+  const coords = polygon.geometry.coordinates;
+
+  // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
+  if (coords.length > 1) {
+    //console.log("Multipolygon: ", coords);
+
+    //const flattened: mapboxgl.Point[] = [];
+    for (const coordPart of coords) {
+      layer.Points.push(
+        coordPart.map((coord: number[]) => {
+          try {
+            return convertToPixelCoord(coord as LngLatLike);
+          } catch (error) {
+            console.log("Error in projecting coord: ", error);
+            return null;
+          }
+        })
+      );
+      //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+    }
+    // layer.Points.push(flattened);
+  } else {
+    //console.log("Polygon");
+
+    const pointData = coords[0].map((coord: number[]) => {
+      try {
+        return convertToPixelCoord(coord as LngLatLike);
+      } catch (error) {
+        console.log("Error in projecting coord: ", error);
+        return null;
+      }
+    });
+    layer.Points.push(pointData);
+  }
 }
 
 export function getPixelCoordinates(

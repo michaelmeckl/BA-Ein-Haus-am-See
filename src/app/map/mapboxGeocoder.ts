@@ -44,7 +44,7 @@ class Geocoder {
     // Fired when the geocoder returns a result
     this.geocoder.on("result", async (data: any) => {
       const point = data.result.center; // capture the result coordinates
-      marker.setLngLat(point).addTo(map); // Add the marker to the map at the result coordinates
+      // marker.setLngLat(point).addTo(map); // Add the marker to the map at the result coordinates
     });
 
     /*

@@ -1,6 +1,6 @@
 /* eslint-disable no-magic-numbers */
-import type { Feature, GeoJsonProperties, Geometry, MultiPolygon, Polygon } from "geojson";
-import { convertToPixelCoord } from "../map/mapboxUtils";
+import type { Feature, GeoJsonProperties, MultiPolygon, Polygon } from "geojson";
+import { convertPolygonCoordsToPixels } from "../map/mapboxUtils";
 
 // every relevance has a specific weight
 export enum FilterRelevance {
@@ -75,25 +75,8 @@ export class FilterLayer {
 
     for (let index = 0; index < this.features.length; index++) {
       const feature = this.features[index];
-      const coords = feature.geometry.coordinates;
 
-      // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
-      if (coords.length > 1) {
-        console.log("Multipolygon: ", coords);
-        //const flattened: mapboxgl.Point[] = [];
-        for (const coordPart of coords) {
-          //prettier-ignore
-          this.Points.push(coordPart.map((coord: number[]) => convertToPixelCoord(coord)));
-          //flattened.push(coordPart.map((coord: number[]) => convertToPixelCoord(coord)));
-        }
-        // this.Points.push(flattened);
-      } else {
-        console.log("Polygon");
-
-        //prettier-ignore
-        const pointData = coords[0].map((coord: number[]) => convertToPixelCoord(coord));
-        this.Points.push(pointData);
-      }
+      convertPolygonCoordsToPixels(feature, this);
     }
   }
 }

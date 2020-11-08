@@ -80,6 +80,10 @@ class CanvasRenderer {
 
     for (const polygon of mapLayer.Points) {
       const startPoint = polygon[0];
+      if (!startPoint) {
+        continue;
+      }
+
       this.ctx.beginPath();
       this.ctx.moveTo(startPoint.x, startPoint.y);
 
