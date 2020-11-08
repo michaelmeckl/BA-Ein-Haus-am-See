@@ -27,24 +27,14 @@ function parseOsmScoutResponse(response: any): FeatureCollection<GeometryObject,
   return featureCollection(allLocations);
 }
 
-/*
-export async function getStyle(url: string) {
-  const response = await axios.get(url);
-  console.log(response);
-  return response.data;
-}
-*/
-
-//TODO mögliches Perf-Problem: man kann immer nur einen poitype gleichzeitig suchen, d.h. es müssen mehrere
-//TODO  hintereinander ausgeführt werden; keine Parallelisierung wie bei Overpass API möglich!
+//! mögliches Perf-Problem: man kann immer nur einen poitype gleichzeitig suchen, d.h. es müssen mehrere
+//! hintereinander ausgeführt werden; keine Parallelisierung wie bei Overpass API möglich!
+//! außerdem erhalte ich nur point data (flüsse scheinen nicht zu gehen?)
 export async function testGuide(poiType: string): Promise<any> {
   try {
     Benchmark.startMeasure("Request client side");
     const url = `http://192.168.178.45:8553/v1/guide?radius=${100000}&limit=${100000}&poitype=${poiType}&lng=${12.136}&lat=${49.402}`;
     //* limit ist nötig, sonst ist default 50
-
-    //* search bringt eher nichts
-    //http://localhost:8553/v1/search?limit=100&search=park
 
     //* gibt offenbar keine, z.B. radius 500km und limit 30000 geht, aber es dauert relativ lange (ca. 16s)
 
@@ -70,10 +60,6 @@ export async function testGuide(poiType: string): Promise<any> {
 /**
  * Overpass Requests
  */
-
-//TODO:
-//- Laden von Daten über die Overpass API dem Anwender anzeigen, z.B. mit einem Ladebalken oder einer snackbar
-
 function buildOverpassQuery(bounds: string, userQuery: string): string {
   // output-format json, runtime of max. 25 seconds (needs to be higher for more complex queries) and global bounding box
   const querySettings = `[out:json][timeout:25][bbox:${bounds}];`;
@@ -83,7 +69,6 @@ function buildOverpassQuery(bounds: string, userQuery: string): string {
   return query;
 }
 
-//TODO: use a webworker instead to load data async? better ux?
 export async function fetchOsmDataFromClientVersion(
   mapBounds: string,
   query: string
@@ -104,7 +89,7 @@ export async function fetchOsmDataFromClientVersion(
     const response = await axios.get(url);
     console.log(Benchmark.stopMeasure("Request client side"));
 
-    //console.log(response);
+    console.log(response);
     // * measure time over 50 trials with this:
     //console.log(await Benchmark.getAverageTime(osmtogeojson, [response.data]));
 
@@ -132,6 +117,8 @@ export async function fetchOsmDataFromServer(
     const url = "/osmRequestCache?" + params;
 
     Benchmark.startMeasure("Request client side");
+    /*
+    //retry 3 times on failure
     const response = await axios({
       url: url,
       //responseType: "arraybuffer", // default is json,
@@ -146,6 +133,8 @@ export async function fetchOsmDataFromServer(
         },
       },
     });
+    */
+    const response = await axios.get(url);
     console.log(Benchmark.stopMeasure("Request client side"));
 
     //console.log(response);

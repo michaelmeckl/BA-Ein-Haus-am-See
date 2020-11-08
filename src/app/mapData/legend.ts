@@ -11,7 +11,6 @@ export default class Legend {
 
   constructor() {
     this.legendElement = document.querySelector("#legend") as HTMLDivElement;
-    console.log(this.legendElement);
   }
 
   private renderLegendItem(layer: string, color: string): void {

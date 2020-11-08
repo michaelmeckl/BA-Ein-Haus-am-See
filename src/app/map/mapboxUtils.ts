@@ -4,7 +4,16 @@
 import bbox from "@turf/bbox";
 import bboxPolygon from "@turf/bbox-polygon";
 import union from "@turf/union";
-import type { Feature, GeoJsonProperties, LineString, MultiPolygon, Point, Polygon } from "geojson";
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonProperties,
+  GeometryObject,
+  LineString,
+  MultiPolygon,
+  Point,
+  Polygon,
+} from "geojson";
 import mapboxgl, { LngLat, LngLatLike } from "mapbox-gl";
 import WebWorker from "worker-loader!../worker";
 import Benchmark from "../../shared/benchmarking";
@@ -171,6 +180,82 @@ export function convertAllFeaturesToPolygons(
   Benchmark.stopMeasure("adding buffer to all features");
 
   return polygonFeatures;
+}
+
+export function flattenMultiGeometry(
+  data: FeatureCollection<GeometryObject, any>
+): (
+  | Feature<Point, GeoJsonProperties>
+  | Feature<LineString, GeoJsonProperties>
+  | Feature<Polygon, GeoJsonProperties>
+)[] {
+  const currentPoints: Set<Feature<Point, GeoJsonProperties>> = new Set();
+  const currentWays: Set<Feature<LineString, GeoJsonProperties>> = new Set();
+  const currentPolygons: Set<Feature<Polygon, GeoJsonProperties>> = new Set();
+
+  for (let index = 0; index < data.features.length; index++) {
+    const element = data.features[index];
+
+    switch (element.geometry.type) {
+      case "Point":
+        currentPoints.add(element as Feature<Point, GeoJsonProperties>);
+        break;
+
+      case "MultiPoint":
+        for (const coordinate of element.geometry.coordinates) {
+          const point = {
+            geometry: { type: "Point", coordinates: coordinate },
+            properties: { ...element.properties },
+            type: "Feature",
+          } as Feature<Point, GeoJsonProperties>;
+
+          currentPoints.add(point);
+        }
+        break;
+
+      case "LineString": {
+        currentWays.add(element as Feature<LineString, GeoJsonProperties>);
+        break;
+      }
+      case "MultiLineString":
+        for (const coordinate of element.geometry.coordinates) {
+          const way = {
+            geometry: { type: "LineString", coordinates: coordinate },
+            properties: { ...element.properties },
+            type: "Feature",
+          } as Feature<LineString, GeoJsonProperties>;
+
+          currentWays.add(way);
+        }
+        break;
+
+      case "Polygon": {
+        currentPolygons.add(element as Feature<Polygon, GeoJsonProperties>);
+        break;
+      }
+      case "MultiPolygon":
+        for (const coordinate of element.geometry.coordinates) {
+          // construct a new polygon for every coordinate array in the multipolygon
+          const polygon = {
+            geometry: { type: "Polygon", coordinates: coordinate },
+            properties: { ...element.properties },
+            type: "Feature",
+          } as Feature<Polygon, GeoJsonProperties>;
+
+          currentPolygons.add(polygon);
+        }
+        break;
+      case "GeometryCollection":
+        break;
+
+      default:
+        throw new Error("Unknown geojson geometry type in data!");
+    }
+  }
+
+  const allFeatures = [...currentPoints, ...currentWays, ...currentPolygons];
+  //console.log("allFeatures: ", allFeatures);
+  return allFeatures;
 }
 
 function performUnion(features: any): Feature<any, GeoJsonProperties> {

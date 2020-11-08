@@ -188,15 +188,20 @@ class MapLayerManager {
       console.warn(`Source ${sourceID} doesnt exist!`);
       return;
     }
-    this.removeCanvasLayer();
+    this.removeCanvasLayer("overlay");
     map.removeSource(sourceID);
   }
 
-  //TODO test this
   updateCanvasSource(sourceId: string, newCanvas: HTMLCanvasElement, newCoords: number[][]): void {
     const source = map.getSource(sourceId) as CanvasSource;
-    source.canvas = newCanvas;
     source.coordinates = newCoords;
+    const oldCanvas = source.getCanvas();
+    const ctx = oldCanvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(newCanvas, 0, 0);
+    } else {
+      console.warn("Error no ctx");
+    }
   }
 
   /**
@@ -329,13 +334,15 @@ class MapLayerManager {
     this.logState();
   }
 
-  removeCanvasLayer(): void {
-    map.removeLayer("overlay");
+  removeCanvasLayer(layerID: string): void {
+    map.removeLayer(layerID);
 
     console.log("removing canvas layer");
 
+    console.log("before remove overlay", this.visibleLayers[0]);
     // remove it from the local list
-    this.visibleLayers = this.visibleLayers.filter((el) => el.id !== "overlay");
+    this.visibleLayers = this.visibleLayers.filter((el) => el.id !== layerID);
+    console.log("after remove overlay", this.visibleLayers[0]);
   }
 
   addLayersForSource(sourceName: string): void {
@@ -427,9 +434,9 @@ class MapLayerManager {
     this.addNewGeojsonLayer(polygonFillLayer, true);
   }
 
-  addCanvasLayer(id: string, opacity: number): void {
+  addCanvasLayer(id: string, layerId: string, opacity: number): void {
     const overlayLayer: Layer = {
-      id: "overlay",
+      id: layerId,
       source: id,
       type: "raster",
       paint: {

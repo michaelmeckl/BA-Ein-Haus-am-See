@@ -3,10 +3,9 @@ import type {
   Feature,
   FeatureCollection,
   GeoJsonProperties,
+  Geometry,
   GeometryObject,
-  LineString,
   MultiPolygon,
-  Point,
   Polygon,
 } from "geojson";
 import mapboxgl, { EventData, LngLat, MapMouseEvent } from "mapbox-gl";
@@ -16,13 +15,14 @@ import FilterManager from "../mapData/filterManager";
 import mapLayerManager from "../mapData/mapLayerManager";
 import OsmTagCollection from "../mapData/osmTagCollection";
 import { fetchOsmDataFromServer } from "../network/networkUtils";
+import { createOverlay } from "../overlayCreation/canvasRenderer";
 import { PerformanceMeasurer } from "../performanceMeasurer";
 import { hideSnackbar, showSnackbar, SnackbarType } from "../utils";
-import { createOverlay } from "../overlayCreation/canvasRenderer";
 import { initialPosition, initialZoomLevel, map } from "./mapboxConfig";
 import Geocoder from "./mapboxGeocoder";
 import * as mapboxUtils from "./mapboxUtils";
 import { addBufferToFeature } from "./turfUtils";
+import truncate from "@turf/truncate";
 
 export const enum VisualType {
   NORMAL,
@@ -43,9 +43,12 @@ export default class MapController {
   private currentZoom: number = initialZoomLevel;
   private currentMapCenter: LngLat = new LngLat(initialPosition[0], initialPosition[1]);
 
-  private selectedVisualType: VisualType = VisualType.NORMAL; //TODO wechseln!
+  private selectedVisualType: VisualType = VisualType.OVERLAY; //TODO wechseln!
   private showingOverlay = false;
   showOverlayActivated = true; //! im moment immer true
+
+  //prettier-ignore
+  private allPolygonFeatures: Map<string, Feature<Polygon | MultiPolygon, GeoJsonProperties>[]> = new Map();
 
   //TODO
   private logControllerState(): void {
@@ -100,8 +103,11 @@ export default class MapController {
 
   onMapDragEnd(): void {
     //* overlay needs to be updated all the time unfortunately :(
+    //TODO anstatt showing Overaly einfach auf den aktuellen VisualType prüfen ? === VisualType.Overlay
+
     if (this.showingOverlay) {
-      createOverlay(FilterManager.allFilterLayers);
+      FilterManager.recalculateScreenCoords();
+      this.addAreaOverlay();
       return;
     }
 
@@ -123,8 +129,10 @@ export default class MapController {
   onMapZoomEnd(): void {
     const newZoom = map.getZoom();
 
+    //TODO anstatt showing Overaly einfach auf den aktuellen VisualType prüfen ? === VisualType.Overlay
     if (this.showingOverlay) {
-      createOverlay(FilterManager.allFilterLayers);
+      FilterManager.recalculateScreenCoords();
+      this.addAreaOverlay();
       //this.currentZoom = newZoom;
       return;
     }
@@ -177,7 +185,7 @@ export default class MapController {
     console.log("Performing osm query for active filters: ", allCurrentFilters);
 
     // give feedback to the user
-    showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true); //TODO doch zeitdauer?
+    showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true);
 
     //get screen viewport and 500 meter around to compensate for the move treshold for new data
     const bounds = mapboxUtils.getViewportBoundsString(500);
@@ -189,6 +197,7 @@ export default class MapController {
         // get overpass query for each tag
         const query = OsmTagCollection.getQueryForCategory(tag);
 
+        //TODO check if already locally loaded this tag; only fetch if not!
         Benchmark.startMeasure("Fetching data from osm");
         // request data from osm
         //const data = await fetchOsmDataFromClientVersion(bounds, query);
@@ -196,17 +205,12 @@ export default class MapController {
         Benchmark.stopMeasure("Fetching data from osm");
 
         if (data) {
-          //TODO das ist eigentlich nicht nötig hier sondern nur das filterlayer befüllen und dafür reichen die daten hier oder?
-          const filterLayer = this.preprocessGeoData(data, tag);
-
           if (this.selectedVisualType === VisualType.NORMAL) {
-            console.log("showing normal data");
+            //console.log("showing normal data");
             this.showDataOnMap(data, tag);
           } else {
-            console.log("showing overlay data");
-            if (filterLayer) {
-              this.prepareDataForOverlay(filterLayer);
-            }
+            //const filterLayer = this.preprocessGeoData(data, tag);
+            this.preprocessGeoData(data, tag);
           }
         }
       })
@@ -228,18 +232,16 @@ export default class MapController {
     }
 
     // hide the snackbar after data has finished loading
-    //TODO funktioniert nicht richtig im moment!
     hideSnackbar();
 
     Benchmark.stopMeasure("Performing osm query for active filters");
 
-    console.log("before showOverlayAutomatically...");
-
-    if (this.showOverlayActivated && FilterManager.allFilterLayers.length > 0) {
-      //TODO remove legend and other map layers
-      //console.log("updating overlay...\n", FilterManager.allFilterLayers);
-      //this.showingOverlay = true;
-      //createOverlay(FilterManager.allFilterLayers);
+    if (this.showOverlayActivated) {
+      //TODO remove legend and other map layers // ==  mapLayerManager.removeAllDataFromMap();
+      //TODO oder nur geojson layer?
+      console.log("updating overlay...\n", FilterManager.allFilterLayers);
+      this.showingOverlay = true;
+      this.addAreaOverlay();
     }
   }
 
@@ -257,154 +259,9 @@ export default class MapController {
     mapLayerManager.removeAllDataFromMap();
   }
 
-  //TODO use geojson merge (https://github.com/mapbox/geojson-merge) to merge existing and new features?
-  //! or use filterlayer.features.push(...newData.features) !! ("features": [... GeoJSON1.features, ... GeoJSON2.features])
-
-  //! Data preprocessing could (and probably should) already happen on the server!
-
-  //! am besten gleich hier truncate und simplify von  turf anwenden!
-  preprocessGeoData(
-    data: FeatureCollection<GeometryObject, any>,
-    dataName: string
-  ): FilterLayer | null {
-    const currentPoints: Set<Feature<Point, GeoJsonProperties>> = new Set();
-    const currentWays: Set<Feature<LineString, GeoJsonProperties>> = new Set();
-    const currentPolygons: Set<Feature<Polygon, GeoJsonProperties>> = new Set();
-
-    // TODO simplify
-    /*
-    const options = { tolerance: 0.01, highQuality: false };
-    const simplifiedPolygon = simplify(polygon, options);
-    const options2 = { precision: 3, coordinates: 2, mutate: true};
-    const truncated = truncate(point, options2);
-    */
-
-    //TODO jedem als property "type" den tag übergeben für legende?
-    // oder besser gleich das filterlayer und dann dessen id and add/update geojsonsource
-
-    //TODO kann da gleich etwas von später mit rein? z.B. der buffer?
-    //TODO macht das überhaupt sinn multipolys zu flatten ? aber dann müsst ich mir später keine sorgen mehr machen
-    //!alternativ könnte auch ausprobiert werden gleich data.features an das layer zu übergeben!
-    for (let index = 0; index < data.features.length; index++) {
-      const element = data.features[index];
-
-      switch (element.geometry.type) {
-        case "Point":
-          currentPoints.add(element as Feature<Point, GeoJsonProperties>);
-          break;
-
-        case "MultiPoint":
-          for (const coordinate of element.geometry.coordinates) {
-            const point = {
-              geometry: { type: "Point", coordinates: coordinate },
-              properties: { ...element.properties },
-              type: "Feature",
-            } as Feature<Point, GeoJsonProperties>;
-
-            currentPoints.add(point);
-          }
-          break;
-
-        case "LineString": {
-          currentWays.add(element as Feature<LineString, GeoJsonProperties>);
-          break;
-        }
-        case "MultiLineString":
-          for (const coordinate of element.geometry.coordinates) {
-            const way = {
-              geometry: { type: "LineString", coordinates: coordinate },
-              properties: { ...element.properties },
-              type: "Feature",
-            } as Feature<LineString, GeoJsonProperties>;
-
-            currentWays.add(way);
-          }
-          break;
-
-        case "Polygon": {
-          currentPolygons.add(element as Feature<Polygon, GeoJsonProperties>);
-          break;
-        }
-        case "MultiPolygon":
-          for (const coordinate of element.geometry.coordinates) {
-            // construct a new polygon for every coordinate array in the multipolygon
-            const polygon = {
-              geometry: { type: "Polygon", coordinates: coordinate },
-              properties: { ...element.properties },
-              type: "Feature",
-            } as Feature<Polygon, GeoJsonProperties>;
-
-            currentPolygons.add(polygon);
-          }
-          break;
-        case "GeometryCollection":
-          break;
-
-        default:
-          throw new Error("Unknown geojson geometry type in data!");
-      }
-    }
-
-    const allFeatures = [...currentPoints, ...currentWays, ...currentPolygons];
-    console.log("allFeatures: ", allFeatures);
-
-    this.logControllerState();
-
-    const layer = FilterManager.getFilterLayer(dataName);
-    if (layer) {
-      layer.Features = allFeatures; //TODO push or = ?
-    }
-    //TODO what to do in else? create new? it should already exist at this point!
-
-    return layer;
-  }
-
-  prepareDataForOverlay(data: FilterLayer): void {
-    //const polyFeatures = mapboxUtils.convertAllFeaturesToPolygons(data.Features, 250);
-
-    this.logControllerState();
-
-    Benchmark.startMeasure("adding buffer to all features and converting to points");
-
-    const bufferSize = data.Distance;
-    for (let index = 0; index < data.Features.length; index++) {
-      // add a buffer to all points, lines and polygons; this operation returns only polygons / multipolygons
-      const bufferedPolygon = addBufferToFeature(data.Features[index], bufferSize, "meters");
-
-      //TODO hier erst simplify?
-
-      this.convertToPixels(data, bufferedPolygon);
-    }
-
-    /**
-     * Result in FilterManager.allFilterLayers looks like this:
-     *[
-     *  { ### Park
-     *    points: [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...,
-     *    radius: 500,
-     *    relevance: 0.8,  //="very important"
-     *    name: "Park"
-     *  },
-     *  { ### Restaurant
-     *    points: [{x: 49.1287; y: 12.3591}, ...], [{x: 49.1287; y: 12.3591}, ...], ...,
-     *    radius: 250,
-     *    relevance: 0.2, // ="not very important"
-     *    name: "Restaurant"
-     *  },
-     *  ...
-     * ]
-     */
-
-    Benchmark.stopMeasure("adding buffer to all features and converting to points");
-  }
-
   showDataOnMap(data: FeatureCollection<GeometryObject, any>, tagName: string): void {
-    console.log("filter Data:", data);
-    console.log("now adding to map...");
+    //console.log("now adding to map...");
     console.log("Tagname: ", tagName);
-
-    this.logControllerState();
-    //TODO falls das auf den server ausgelagert wird, muss später nur noch die features und points nachträglich gefüllt werden (mit settern am besten!)
 
     //TODO macht das Sinn alle Layer zu löschen???? oder sollten alle angezeigt bleiben, zumindest solange sie noch in dem Viewport sind?
     mapLayerManager.removeAllLayersForSource(tagName);
@@ -422,41 +279,87 @@ export default class MapController {
     mapLayerManager.addLayersForSource(tagName);
   }
 
-  convertToPixels(
-    layer: FilterLayer,
-    polygon: Feature<Polygon | MultiPolygon, GeoJsonProperties>
-  ): void {
-    const coords = polygon.geometry.coordinates;
+  //! Data preprocessing could (and probably should) already happen on the server!
+  preprocessGeoData(
+    data: FeatureCollection<GeometryObject, any>,
+    dataName: string
+  ): FilterLayer | null {
+    //const flattenedData = mapboxUtils.flattenMultiGeometry(data);
 
-    // check if this is a multidimensional array (i.e. a multipolygon)
-    if (coords.length > 1) {
-      //TODO oder will ich hier das das zu einem array "flatten" und nur dieses pushen??
-      console.log("Multipolygon: ", coords);
-      //const flattened: mapboxgl.Point[] = [];
-      for (const coordPart of coords) {
-        layer.Points.push(
-          //@ts-expect-error
-          coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord))
-        );
-        //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
-      }
-      // layer.Points.push(flattened);
-      // or: layer.Points.push(...flattened);
-    } else {
-      console.log("Polygon");
-      //@ts-expect-error
-      //prettier-ignore
-      const pointData = coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord));
-      layer.Points.push(pointData);
+    // truncate geojson precision to 4 decimals;
+    // this increases performance and the perfectly exact coords aren't necessary for the area overlay
+    const options = { precision: 4, coordinates: 2, mutate: true };
+    const truncatedData: FeatureCollection<Geometry, any> = truncate(data, options);
+
+    const layer = FilterManager.getFilterLayer(dataName);
+    if (!layer) {
+      return null;
     }
+
+    //! reset array
+    layer.Points.length = 0;
+    layer.Features.length = 0;
+
+    // convert to pixels and add these to filterlayer
+    for (let index = 0; index < truncatedData.features.length; index++) {
+      const feature = truncatedData.features[index];
+      const bufferedPoly = addBufferToFeature(feature, layer.Distance, "meters");
+
+      layer.Features.push(bufferedPoly);
+
+      const coords = bufferedPoly.geometry.coordinates;
+
+      // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
+      if (coords.length > 1) {
+        console.log("Multipolygon: ", coords);
+        //const flattened: mapboxgl.Point[] = [];
+        for (const coordPart of coords) {
+          //prettier-ignore
+          layer.Points.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+          //flattened.push(coordPart.map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord)));
+        }
+        // layer.Points.push(flattened);
+      } else {
+        console.log("Polygon");
+
+        //prettier-ignore
+        const pointData = coords[0].map((coord: number[]) => mapboxUtils.convertToPixelCoord(coord));
+        layer.Points.push(pointData);
+      }
+    }
+    console.log("allPoints in layer:", layer.Points);
+    console.log("allfeatures in layer:", layer.Features);
+
+    return layer;
   }
 
-  addAreaOverlay(overlayData: any): void {
-    console.log("FilterManager: ", FilterManager);
+  /**
+   * FilterManager.allFilterLayers looks like this:
+   *[
+   *  { ### FilterLayer - Park
+   *    points: [
+   *      [{x: 49.1287; y: 12.3591}, ...],
+   *      [{x: 49.1287; y: 12.3591}, ...],
+   *      ...,
+   *    ]
+   *    features: [ {Feature}, [...], ...],
+   *    distance: 500,
+   *    relevance: 0.8,  //="very important"
+   *    name: "Park",
+   *    wanted: true,
+   *  },
+   *  { ### FilterLayer - Restaurant
+   *    ...
+   *  },
+   *  ...
+   * ]
+   */
+  addAreaOverlay(): void {
+    console.log("FilterManager in addAreaOverlay: ", FilterManager);
 
     // check that there is data to create an overlay for the map
-    if (overlayData.length > 0) {
-      createOverlay(overlayData);
+    if (FilterManager.allFilterLayers.length > 0) {
+      createOverlay(FilterManager.allFilterLayers);
     } else {
       console.warn("Creating an overlay is not possible because overlayData is empty!");
     }

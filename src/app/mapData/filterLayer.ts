@@ -1,5 +1,6 @@
 /* eslint-disable no-magic-numbers */
-import type { Feature, GeoJsonProperties, Geometry } from "geojson";
+import type { Feature, GeoJsonProperties, Geometry, MultiPolygon, Polygon } from "geojson";
+import { convertToPixelCoord } from "../map/mapboxUtils";
 
 // every relevance has a specific weight
 export enum FilterRelevance {
@@ -19,9 +20,8 @@ export class FilterLayer {
   private relevanceValue: number;
   private wanted: boolean;
 
-  //TODO use sets instead?
-  private points: mapboxgl.Point[] = [];
-  private features: Feature<Geometry, GeoJsonProperties>[] = [];
+  private points: mapboxgl.Point[][] = [];
+  private features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
 
   constructor(name?: string, distance?: number, relevance?: FilterRelevance, wanted?: boolean) {
     this.layerName = name || "";
@@ -56,17 +56,44 @@ export class FilterLayer {
     return this.wanted;
   }
 
-  set Points(pointCoords: mapboxgl.Point[]) {
+  set Points(pointCoords: mapboxgl.Point[][]) {
     this.points = pointCoords;
   }
-  get Points(): mapboxgl.Point[] {
+  get Points(): mapboxgl.Point[][] {
     return this.points;
   }
 
-  set Features(features: Feature<Geometry, GeoJsonProperties>[]) {
+  set Features(features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[]) {
     this.features = features;
   }
-  get Features(): Feature<Geometry, GeoJsonProperties>[] {
+  get Features(): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
     return this.features;
+  }
+
+  calculatePointCoordsForFeatures(): void {
+    this.points.length = 0;
+
+    for (let index = 0; index < this.features.length; index++) {
+      const feature = this.features[index];
+      const coords = feature.geometry.coordinates;
+
+      // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
+      if (coords.length > 1) {
+        console.log("Multipolygon: ", coords);
+        //const flattened: mapboxgl.Point[] = [];
+        for (const coordPart of coords) {
+          //prettier-ignore
+          this.Points.push(coordPart.map((coord: number[]) => convertToPixelCoord(coord)));
+          //flattened.push(coordPart.map((coord: number[]) => convertToPixelCoord(coord)));
+        }
+        // this.Points.push(flattened);
+      } else {
+        console.log("Polygon");
+
+        //prettier-ignore
+        const pointData = coords[0].map((coord: number[]) => convertToPixelCoord(coord));
+        this.Points.push(pointData);
+      }
+    }
   }
 }

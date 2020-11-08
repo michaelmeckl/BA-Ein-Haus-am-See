@@ -18,7 +18,6 @@ class FilterManager {
     this.activeFilters.add(filterLayer.LayerName);
   }
 
-  //TODO remove map data in here? so everything is in one place?
   removeFilter(filter: string): void {
     this.removeFilterLayer(filter);
     this.activeFilters.delete(filter);
@@ -42,6 +41,16 @@ class FilterManager {
         this.allFilterLayers.splice(index, 1);
       }
     }
+  }
+
+  /**
+   * ! Has to be called on every overlay update to recalculate the geojson polygons in point/screen coords.
+   * ! Otherwise they would not be in sync with the map!!
+   */
+  recalculateScreenCoords(): void {
+    this.allFilterLayers.forEach((filterLayer) => {
+      filterLayer.calculatePointCoordsForFeatures();
+    });
   }
 
   /**

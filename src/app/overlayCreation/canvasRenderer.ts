@@ -96,8 +96,6 @@ class CanvasRenderer {
 
     const img = await readImageFromCanvas(this.overlayCanvas);
 
-    //TODO: give user the option to specify if he wants blur and set in at the beginning of each renderOverlay
-    //if(this.shouldShowAreas) { do blur ]
     Benchmark.startMeasure("blur Image in Webgl");
     const blurredCanvas = applyGaussianBlur(img, pixelDist);
     Benchmark.stopMeasure("blur Image in Webgl");
@@ -108,6 +106,20 @@ class CanvasRenderer {
     const blurredImage = await readImageFromCanvas(this.overlayCanvas);
     // save the blurred image for this layer
     this.allTextures.push(blurredImage);
+  }
+
+  normalizeWeights(textureCount: number): void {
+    let sum = 0;
+    for (let i = 0; i < textureCount; i++) {
+      sum += this.weights[i];
+    }
+    // calculate a normalizer value so that all values will eventually sum up to 1
+    const normalizer = 1 / sum;
+    // normalize all values
+    for (let index = 0; index < this.weights.length; index++) {
+      this.weights[index] *= normalizer;
+    }
+    console.log("Normalized Weights:", this.weights);
   }
 
   combineOverlays(textureLayers: HTMLImageElement[]): any {
@@ -184,23 +196,8 @@ class CanvasRenderer {
 
     // set the resolution
     gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
-    // TODO set the weights or get it from this.weights
-    const ws: number[] = [];
-    textureLayers.forEach(() => {
-      ws.push(1 / textureLayers.length);
-    });
 
-    console.log("Weights:", this.weights);
-    let sum = 0;
-    for (let i = 0; i < textureLayers.length; i++) {
-      sum += this.weights[i];
-    }
-    // calculate a normalizer value so that all values will eventually sum up to 1
-    const normalizer = 1 / sum;
-    // normalize all values
-    this.weights.map((w) => w * normalizer);
-
-    console.log("Normalized Weights:", this.weights);
+    this.normalizeWeights(textureLayers.length);
     gl.uniform1fv(weightsLoc, this.weights);
 
     // Tell the shader to use texture units 0 to textureCount - 1
@@ -254,6 +251,9 @@ class CanvasRenderer {
 
   reset(): void {
     this.weights = [];
+    this.allTextures.forEach((texture) => {
+      texture.remove();
+    });
     // clear images by setting its length to 0
     this.allTextures.length = 0;
   }
@@ -265,7 +265,6 @@ export async function createOverlay(data: FilterLayer[]): Promise<void> {
   console.log("Creating canvas overlay now...");
 
   Benchmark.startMeasure("creating canvas overlay");
-  //renderer = new CanvasRenderer(); //TODO nur einmal am Anfang oder jedes mal neu??
 
   Benchmark.startMeasure("render all Polygons");
   const allRenderProcesses = data.map((layer: FilterLayer) => renderer.renderPolygons(layer));

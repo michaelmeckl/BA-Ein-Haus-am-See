@@ -17,25 +17,51 @@ export function clearCanvasPart(
 }
 
 const overlaySourceID = "overlaySource";
+const overlayLayerID = "overlay";
+
+/*
+export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): void {
+  const viewportBounds = getViewportBounds();
+
+  console.log(`${overlaySourceID} is loll33332 !`);
+  //TODO nötig?
+  //mapLayerManager.removeAllLayersForSource(overlaySourceID);
+  //mapLayerManager.removeCanvasLayer(overlayLayerID);
+
+  if (map.getSource(overlaySourceID)) {
+    mapLayerManager.removeCanvasSource(overlaySourceID);
+  }
+  mapLayerManager.addNewCanvasSource(overlaySourceID, canvas, viewportBounds);
+
+  //show the source data on the map
+  mapLayerManager.addCanvasLayer(overlaySourceID, overlayLayerID, opacity);
+}
+*/
 
 export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): void {
   const viewportBounds = getViewportBounds();
 
-  //TODO nötig?
-  // mapLayerManager.removeAllLayersForSource(overlaySourceID);
-  //mapLayerManager.removeCanvasLayer();
+  mapLayerManager.removeAllLayersForSource("canvasSource");
 
-  if (map.getSource(overlaySourceID)) {
-    //mapLayerManager.removeCanvasSource(overlaySourceID);
-    //TODO test
-    console.log(`${overlaySourceID} is already used! Updating it!`);
-    mapLayerManager.updateCanvasSource(overlaySourceID, canvas, viewportBounds);
-  } else {
-    mapLayerManager.addNewCanvasSource(overlaySourceID, canvas, viewportBounds);
+  if (map.getSource("canvasSource")) {
+    map.removeSource("canvasSource");
   }
 
-  //show the source data on the map
-  mapLayerManager.addCanvasLayer(overlaySourceID, opacity);
+  map.addSource("canvasSource", {
+    type: "canvas",
+    canvas: canvas,
+    animate: false,
+    coordinates: viewportBounds,
+  });
+
+  map.addLayer({
+    id: "overlay",
+    source: "canvasSource",
+    type: "raster",
+    paint: {
+      "raster-opacity": opacity,
+    },
+  });
 }
 
 export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {
