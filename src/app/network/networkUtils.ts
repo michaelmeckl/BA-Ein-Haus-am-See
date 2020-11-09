@@ -2,6 +2,7 @@ import type { FeatureCollection, GeometryObject } from "geojson";
 import osmtogeojson from "osmtogeojson";
 //import * as rax from "retry-axios";
 import Benchmark from "../../shared/benchmarking";
+import { showSnackbar, SnackbarType } from "../utils";
 //import axios from "axios";
 import axios from "./axiosInterceptor";
 
@@ -59,11 +60,13 @@ export async function testGuide(poiType: string): Promise<any> {
 }
 */
 
-export function uploadLogs(logs: any): void {
+export async function uploadLogs(logs: any): Promise<void> {
   try {
     //const url = "http://pro.mi.ur.de:8000/logs";
     const url = "/logs";
-    axios.post(url, logs);
+    const response = await axios.post(url, logs);
+    //console.log(response);
+    showSnackbar(`Uploading logs: ${response.data}`, SnackbarType.INFO, 3000);
   } catch (error) {
     //console.log(error);
   }

@@ -1,4 +1,5 @@
 import * as twgl from "twgl.js";
+import { showSnackbar, SnackbarType } from "../utils";
 import { getGaussianBlurFS, getVSForGaussBlur } from "./shaders";
 //import { computeKernelWeight, getBlurFilterKernel } from "./webglUtils";
 
@@ -18,6 +19,28 @@ let renderImageTexureCoordinatesBuffer: WebGLBuffer | null;
 let gl: WebGL2RenderingContext | WebGLRenderingContext;
 
 export function setupGaussianBlurFilter(): void {
+  //handle webgl context loss
+  renderCanvas.addEventListener(
+    "webglcontextlost",
+    (event) => {
+      console.log("Webgl Context lost");
+      event.preventDefault();
+      showSnackbar(
+        "Webgl Context Lost! Restarting application necessary!",
+        SnackbarType.ERROR,
+        4000
+      );
+    },
+    false
+  );
+  renderCanvas.addEventListener(
+    "webglcontextrestored",
+    () => {
+      setupGaussianBlurFilter();
+    },
+    false
+  );
+
   const glCtx = renderCanvas.getContext("webgl2");
   if (!glCtx) {
     throw new Error("Couldn't get a webgl context for combining the overlays!");

@@ -42,14 +42,18 @@ export default class OsmRouter {
       }
 
       const date = new Date();
-      fs.writeFile(`./public/logs/log_${date.getDate()}_${date.getHours()}`, logs, (err) => {
-        if (err) {
-          console.error(err);
-          return res.send("saving log failed!");
-        }
+      fs.writeFile(
+        `./public/logs/log_${date.getDate()}_${date.getHours()}_${date.getMinutes()}.txt`,
+        logs,
+        (err) => {
+          if (err) {
+            console.error(err);
+            return res.send("saving log failed!");
+          }
 
-        return res.send("saved log successfully!");
-      });
+          return res.send("saved log successfully!");
+        }
+      );
     });
 
     /**

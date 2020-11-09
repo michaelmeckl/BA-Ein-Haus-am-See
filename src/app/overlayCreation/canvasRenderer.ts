@@ -7,6 +7,7 @@ import * as webglUtils from "../webgl/webglUtils";
 import { makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
 import { map } from "../map/mapboxConfig";
 import { metersInPixel } from "../map/mapboxUtils";
+import { showSnackbar, SnackbarType } from "../utils";
 //import WebWorker from "worker-loader!../worker";
 
 // the number of textures to combine
@@ -138,6 +139,11 @@ class CanvasRenderer {
       (event) => {
         console.log("Webgl Context lost");
         event.preventDefault();
+        showSnackbar(
+          "Webgl Context Lost! Restarting application necessary!",
+          SnackbarType.ERROR,
+          4000
+        );
       },
       false
     );
