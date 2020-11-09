@@ -143,7 +143,7 @@ class MapLayerManager {
 
   removeGeojsonSource(sourceName: string): void {
     if (!map.getSource(sourceName)) {
-      console.warn(`Couldn't remove source ${sourceName}`);
+      console.log(`Couldn't remove source ${sourceName}`);
       return;
     }
     this.removeAllLayersForSource(sourceName);
@@ -181,7 +181,7 @@ class MapLayerManager {
 
   removeCanvasSource(sourceID: string): void {
     if (!map.getSource(sourceID)) {
-      console.warn(`Source ${sourceID} doesnt exist!`);
+      console.log(`Source ${sourceID} doesnt exist!`);
       return;
     }
     this.removeCanvasLayer("overlay");

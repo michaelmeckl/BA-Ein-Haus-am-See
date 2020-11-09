@@ -1,5 +1,6 @@
 import axios from "axios";
 import express, { NextFunction, Request, Response, Router } from "express";
+import fs from "fs";
 import { OK } from "http-status-codes";
 import querystring from "querystring";
 import Benchmark from "../shared/benchmarking";
@@ -9,6 +10,7 @@ import * as ServerUtils from "./serverUtils";
 //@ts-expect-error
 import osmium from "osmium";
 */
+const logDir = "./public/logs";
 
 export default class OsmRouter {
   private readonly osmRouter: Router;
@@ -31,6 +33,25 @@ export default class OsmRouter {
    * Init the express router and setup routes.
    */
   setupRoutes(): void {
+    this.osmRouter.post("/logs", async (req: Request, res: Response, next: NextFunction) => {
+      const logs = req.body;
+      //console.log(logs);
+
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir);
+      }
+
+      const date = new Date();
+      fs.writeFile(`./public/logs/log_${date.getDate()}_${date.getHours()}`, logs, (err) => {
+        if (err) {
+          console.error(err);
+          return res.send("saving log failed!");
+        }
+
+        return res.send("saved log successfully!");
+      });
+    });
+
     /**
      * * Forwards the query and the bounds to the overpass api and returns and caches the result.
      * * Also checks the redis cache first before sending requerst to overpass api to prevent unnecessary requests.

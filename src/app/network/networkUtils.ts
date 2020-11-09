@@ -59,6 +59,16 @@ export async function testGuide(poiType: string): Promise<any> {
 }
 */
 
+export function uploadLogs(logs: any): void {
+  try {
+    //const url = "http://pro.mi.ur.de:8000/logs";
+    const url = "/logs";
+    axios.post(url, logs);
+  } catch (error) {
+    //console.log(error);
+  }
+}
+
 /**
  * Overpass Requests
  */

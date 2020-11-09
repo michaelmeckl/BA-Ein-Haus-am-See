@@ -178,7 +178,7 @@ export default class MapController {
 
   async loadMapData(): Promise<void> {
     const allCurrentFilters = FilterManager.activeFilters;
-    console.log("allcurrentfilters", allCurrentFilters);
+    //console.log("allcurrentfilters", allCurrentFilters);
 
     if (allCurrentFilters.size === 0) {
       //console.warn("no active filters! cant load anything!");
@@ -352,7 +352,7 @@ export default class MapController {
     if (FilterManager.allFilterLayers.length > 0) {
       createOverlay(FilterManager.allFilterLayers);
     } else {
-      console.warn("Creating an overlay is not possible because overlayData is empty!");
+      console.log("Creating an overlay is not possible because overlayData is empty!");
     }
   }
 }

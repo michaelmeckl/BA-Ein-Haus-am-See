@@ -1,8 +1,10 @@
 /* eslint-env browser */
 import { Config } from "../shared/config";
+import { getLogs, clearLogs } from "./Logger";
 import MapController, { VisualType } from "./map/mapController";
 import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
 import FilterManager from "./mapData/filterManager";
+import { uploadLogs } from "./network/networkUtils";
 import { showSnackbar, SnackbarType } from "./utils";
 
 // * const enum instead of enum as this inlines the elements at runtime
@@ -404,6 +406,12 @@ function setupUI(): void {
   //setup house side panel
   //! not possible performance-wise at the moment
   //loadLocations();
+
+  const logButton = document.querySelector("#uploadLogsButton") as HTMLButtonElement;
+  logButton.addEventListener("click", () => {
+    uploadLogs(getLogs());
+    clearLogs();
+  });
 }
 
 export function init(): void {

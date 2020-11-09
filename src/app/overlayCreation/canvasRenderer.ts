@@ -123,7 +123,7 @@ class CanvasRenderer {
 
   combineOverlays(textureLayers: HTMLImageElement[]): any {
     if (textureLayers.length === 0) {
-      console.warn("TextureLayers are empty! Overlay can't be created!");
+      console.log("TextureLayers are empty! Overlay can't be created!");
       return;
     }
 
@@ -136,7 +136,7 @@ class CanvasRenderer {
     canvas.addEventListener(
       "webglcontextlost",
       (event) => {
-        console.error("Webgl Context lost");
+        console.log("Webgl Context lost");
         event.preventDefault();
       },
       false
