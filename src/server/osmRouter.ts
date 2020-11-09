@@ -80,6 +80,11 @@ export default class OsmRouter {
             );
             //Benchmark.stopMeasure("Getting data from osm total");
 
+            //remove tags as we don't need them
+            geoData.data.elements.forEach((el: any) => {
+              el.tags = {};
+            });
+
             //TODO redis spatial features genauer anschauen, die könnten das hier um einiges verbessern vllt
 
             //Benchmark.startMeasure("Caching data");
