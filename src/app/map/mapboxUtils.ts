@@ -14,7 +14,6 @@ import type {
   Polygon,
 } from "geojson";
 import type { LngLat, LngLatLike } from "mapbox-gl";
-import WebWorker from "worker-loader!../worker";
 import Benchmark from "../../shared/benchmarking";
 import type { FilterLayer } from "../mapData/filterLayer";
 import { map } from "./mapboxConfig";
@@ -144,45 +143,6 @@ export function flattenMultiGeometry(
   const allFeatures = [...currentPoints, ...currentWays, ...currentPolygons];
   //console.log("allFeatures: ", allFeatures);
   return allFeatures;
-}
-
-let webWorker: Worker | undefined;
-
-function stopWorker(): void {
-  webWorker?.terminate();
-  // set to undefined so it can be used again afterwards
-  webWorker = undefined;
-}
-
-//TODO
-//perf results: 720 ms, 845 ms, 1030 ms, 980 ms, 760 ms => avg: 867 ms
-// with geobuf a little bit better, but not much (ca. 30-40 ms)
-function setupWebWorker(
-  features: Feature<Point | LineString | Polygon, GeoJsonProperties>[]
-): void {
-  if (typeof Worker !== "undefined") {
-    if (typeof webWorker === "undefined") {
-      //worker = new Worker("../worker.js", { type: "module" });
-      webWorker = new WebWorker();
-    }
-
-    Benchmark.startMeasure("showing mask data");
-    webWorker.postMessage(features);
-
-    webWorker.onmessage = (event) => {
-      console.log("worker result: ", event.data);
-
-      //showMask(event.data);
-      Benchmark.stopMeasure("showing mask data");
-      stopWorker();
-    };
-    webWorker.onerror = (ev) => {
-      console.error("Worker error: ", ev);
-      stopWorker();
-    };
-  } else {
-    console.warn("No Web Worker support!");
-  }
 }
 
 /**

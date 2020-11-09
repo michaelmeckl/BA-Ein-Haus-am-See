@@ -7,12 +7,38 @@ import * as webglUtils from "../webgl/webglUtils";
 import { makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
 import { map } from "../map/mapboxConfig";
 import { metersInPixel } from "../map/mapboxUtils";
+import WebWorker from "worker-loader!../worker";
 
 // the number of textures to combine
 let textureCount;
 
 //! to improve performance everything that doesn't change can be rendered to an offscreen canvas (in a web worker)
 //! and on next render simply blitted onto the main canvas with c.getContext('2d').drawImage(offScreenCanvas, 0, 0);
+
+let webWorker: Worker | undefined;
+
+let webWorkerSupported = true;
+
+function stopWorker(): void {
+  webWorker?.terminate();
+  // set to undefined so it can be used again afterwards
+  webWorker = undefined;
+}
+
+function setupWebWorker(): void {
+  if (typeof Worker !== "undefined") {
+    if (typeof webWorker === "undefined") {
+      //worker = new Worker("../worker.js", { type: "module" });
+      webWorker = new WebWorker();
+    }
+
+    webWorkerSupported = true;
+  } else {
+    console.warn("No Web Worker support!");
+
+    webWorkerSupported = false;
+  }
+}
 
 class CanvasRenderer {
   //2D canvas api
@@ -129,112 +155,138 @@ class CanvasRenderer {
       return;
     }
 
-    // set the number of texture to use
-    textureCount = textureLayers.length;
-    //* Add the textureCount to the top of the fragment shader so it can dynamically use the
-    //* correct number of textures. The shader MUST be created (or updated) AFTER the textureCount
-    //* variable has been set as js/ts won't update the string itself when textureCount changes later.
-    const fragmentSource =
-      `#define NUM_TEXTURES ${textureCount}\n` + combineOverlayFragmentShader();
-    const vertexSource = defaultVertexShader();
-
     // create an in-memory canvas and set width and height to fill the whole map on screen
     const canvas = document.createElement("canvas");
     canvas.width = map.getCanvas().clientWidth;
     canvas.height = map.getCanvas().clientHeight;
 
-    //handle webgl context loss
-    canvas.addEventListener(
-      "webglcontextlost",
-      (event) => {
-        console.error("Webgl Context lost");
-        event.preventDefault();
-      },
-      false
-    );
-    canvas.addEventListener(
-      "webglcontextrestored",
-      () => {
-        //this.combineOverlays(textureLayers);
-      },
-      false
-    );
+    if (webWorkerSupported) {
+      if (!webWorker) {
+        console.error("Webworker does not exist!");
+        return;
+      }
 
-    //options: {stencil: true, antialias: true, premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: false});
-    const gl = canvas.getContext("webgl2");
-    if (!gl) {
-      throw new Error("Couldn't get a webgl context for combining the overlays!");
+      webWorker.postMessage([
+        map.getCanvas().clientWidth,
+        map.getCanvas().clientHeight,
+        this.weights,
+        textureLayers,
+      ]);
+
+      webWorker.onmessage = (event) => {
+        console.log("worker result: ", event.data);
+
+        const resultCanvas = event.data;
+        this.ctx.drawImage(resultCanvas, 0, 0);
+      };
+      webWorker.onerror = (ev) => {
+        console.error("Worker error: ", ev);
+        stopWorker();
+        setupWebWorker(); //TODO
+      };
+    } else {
+      //handle webgl context loss
+      canvas.addEventListener(
+        "webglcontextlost",
+        (event) => {
+          console.error("Webgl Context lost");
+          event.preventDefault();
+        },
+        false
+      );
+      canvas.addEventListener(
+        "webglcontextrestored",
+        () => {
+          //this.combineOverlays(textureLayers);
+        },
+        false
+      );
+
+      //options: {stencil: true, antialias: true, premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: false});
+      const gl = canvas.getContext("webgl2");
+      if (!gl) {
+        throw new Error("Couldn't get a webgl context for combining the overlays!");
+      }
+      this.glCtx = gl;
+
+      // set the number of texture to use
+      textureCount = textureLayers.length;
+      //* Add the textureCount to the top of the fragment shader so it can dynamically use the
+      //* correct number of textures. The shader MUST be created (or updated) AFTER the textureCount
+      //* variable has been set as js/ts won't update the string itself when textureCount changes later.
+      const fragmentSource =
+        `#define NUM_TEXTURES ${textureCount}\n` + combineOverlayFragmentShader();
+      const vertexSource = defaultVertexShader();
+
+      // create and link program
+      const program = twgl.createProgramFromSources(gl, [vertexSource, fragmentSource]);
+
+      // lookup attributes
+      const positionLocation = gl.getAttribLocation(program, "a_position");
+      const texcoordLocation = gl.getAttribLocation(program, "a_texCoord");
+
+      // lookup uniforms
+      const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+      const weightsLoc = gl.getUniformLocation(program, "u_weights[0]");
+      // lookup the location for the textures
+      const textureLoc = gl.getUniformLocation(program, "u_textures[0]");
+
+      // setup buffers
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      //* this works only because all images have the same size!
+      webglUtils.setRectangle(gl, 0, 0, textureLayers[0].width, textureLayers[0].height);
+
+      // texture coordinates are always in the space between 0.0 and 1.0
+      const texcoordBuffer = webglUtils.createBuffer(
+        gl,
+        new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0])
+      );
+
+      // setup textures
+      const textures = [];
+      for (let ii = 0; ii < textureLayers.length; ++ii) {
+        const texture = webglUtils.createTexture(gl, textureLayers[ii], ii, gl.NEAREST);
+        textures.push(texture);
+      }
+
+      // ##### drawing code: #####
+
+      webglUtils.setupCanvasForDrawing(gl, [0.0, 0.0, 0.0, 0.0]);
+
+      gl.useProgram(program);
+
+      //gl.disable(gl.DEPTH_TEST);
+
+      // Turn on the position attribute
+      webglUtils.bindAttribute(gl, positionBuffer, positionLocation);
+      // Turn on the texcoord attribute
+      webglUtils.bindAttribute(gl, texcoordBuffer, texcoordLocation);
+
+      // set the resolution
+      gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
+
+      this.normalizeWeights(textureLayers.length);
+      gl.uniform1fv(weightsLoc, this.weights);
+
+      // Tell the shader to use texture units 0 to textureCount - 1
+      gl.uniform1iv(textureLoc, Array.from(Array(textureCount).keys())); //uniform variable location and texture Index (or array of indices)
+
+      // see https://stackoverflow.com/questions/39341564/webgl-how-to-correctly-blend-alpha-channel-png/
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for pre-multiplied alpha
+      //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for un-premultiplied alpha
+
+      const vertexCount = 6; // 2 triangles for a rectangle
+      gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+
+      gl.disable(gl.BLEND);
+
+      this.ctx.drawImage(canvas, 0, 0);
+
+      //cleanup and delete webgl resources
+      this.cleanupResources();
     }
-    this.glCtx = gl;
-
-    // create and link program
-    const program = twgl.createProgramFromSources(gl, [vertexSource, fragmentSource]);
-
-    // lookup attributes
-    const positionLocation = gl.getAttribLocation(program, "a_position");
-    const texcoordLocation = gl.getAttribLocation(program, "a_texCoord");
-
-    // lookup uniforms
-    const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
-    const weightsLoc = gl.getUniformLocation(program, "u_weights[0]");
-    // lookup the location for the textures
-    const textureLoc = gl.getUniformLocation(program, "u_textures[0]");
-
-    // setup buffers
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    //* this works only because all images have the same size!
-    webglUtils.setRectangle(gl, 0, 0, textureLayers[0].width, textureLayers[0].height);
-
-    // texture coordinates are always in the space between 0.0 and 1.0
-    const texcoordBuffer = webglUtils.createBuffer(
-      gl,
-      new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0])
-    );
-
-    // setup textures
-    const textures = [];
-    for (let ii = 0; ii < textureLayers.length; ++ii) {
-      const texture = webglUtils.createTexture(gl, textureLayers[ii], ii, gl.NEAREST);
-      textures.push(texture);
-    }
-
-    // ##### drawing code: #####
-
-    webglUtils.setupCanvasForDrawing(gl, [0.0, 0.0, 0.0, 0.0]);
-
-    gl.useProgram(program);
-
-    //gl.disable(gl.DEPTH_TEST);
-
-    // Turn on the position attribute
-    webglUtils.bindAttribute(gl, positionBuffer, positionLocation);
-    // Turn on the texcoord attribute
-    webglUtils.bindAttribute(gl, texcoordBuffer, texcoordLocation);
-
-    // set the resolution
-    gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
-
-    this.normalizeWeights(textureLayers.length);
-    gl.uniform1fv(weightsLoc, this.weights);
-
-    // Tell the shader to use texture units 0 to textureCount - 1
-    gl.uniform1iv(textureLoc, Array.from(Array(textureCount).keys())); //uniform variable location and texture Index (or array of indices)
-
-    // see https://stackoverflow.com/questions/39341564/webgl-how-to-correctly-blend-alpha-channel-png/
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for pre-multiplied alpha
-    //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); //* this is the correct one for un-premultiplied alpha
-
-    const vertexCount = 6; // 2 triangles for a rectangle
-    gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
-
-    gl.disable(gl.BLEND);
-
-    this.ctx.drawImage(canvas, 0, 0);
-
-    //cleanup and delete webgl resources
-    this.cleanupResources();
   }
 
   createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
@@ -276,6 +328,8 @@ class CanvasRenderer {
     this.allTextures.length = 0;
   }
 }
+
+setupWebWorker();
 
 const renderer = new CanvasRenderer();
 
