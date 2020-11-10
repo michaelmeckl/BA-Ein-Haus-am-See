@@ -7,7 +7,8 @@ import * as webglUtils from "../webgl/webglUtils";
 import { makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
 import { map } from "../map/mapboxConfig";
 import { metersInPixel } from "../map/mapboxUtils";
-import { showSnackbar, SnackbarType } from "../utils";
+import { handleWebglInitError, showSnackbar, SnackbarType } from "../utils";
+import { init } from "../main";
 //import WebWorker from "worker-loader!../worker";
 
 // the number of textures to combine
@@ -144,6 +145,7 @@ class CanvasRenderer {
           SnackbarType.ERROR,
           4000
         );
+        init();
       },
       false
     );
@@ -151,6 +153,8 @@ class CanvasRenderer {
       "webglcontextrestored",
       () => {
         //this.combineOverlays(textureLayers);
+        console.log("context restored! reloadin application...");
+        init();
       },
       false
     );
@@ -158,8 +162,10 @@ class CanvasRenderer {
     //options: {stencil: true, antialias: true, premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: false});
     const gl = canvas.getContext("webgl2");
     if (!gl) {
-      throw new Error("Couldn't get a webgl context for combining the overlays!");
+      handleWebglInitError();
+      return;
     }
+
     this.glCtx = gl;
 
     // set the number of texture to use

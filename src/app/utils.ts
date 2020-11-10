@@ -38,3 +38,16 @@ export function getTagForLayer(layerID: string): string {
   //const regex = /[=~]/;
   return layerID.split("-")[0]; //the first part of the layer id is the tag name (e.g. "Restaurant")
 }
+
+export function handleWebglInitError(): void {
+  if (!window.WebGLRenderingContext) {
+    // the browser doesn't even know what WebGL is
+    showSnackbar("Your browser does not support webgl!", SnackbarType.ERROR, undefined, true);
+  } else {
+    showSnackbar("Couldn't get a webgl context for combining the overlays!", SnackbarType.ERROR);
+    /*
+  throw new Error(
+    "Couldn't get a webgl context for combining the overlays!"
+  );*/
+  }
+}

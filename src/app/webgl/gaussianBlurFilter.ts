@@ -1,5 +1,6 @@
 import * as twgl from "twgl.js";
-import { showSnackbar, SnackbarType } from "../utils";
+import { init } from "../main";
+import { handleWebglInitError, showSnackbar, SnackbarType } from "../utils";
 import { getGaussianBlurFS, getVSForGaussBlur } from "./shaders";
 //import { computeKernelWeight, getBlurFilterKernel } from "./webglUtils";
 
@@ -19,31 +20,11 @@ let renderImageTexureCoordinatesBuffer: WebGLBuffer | null;
 let gl: WebGL2RenderingContext | WebGLRenderingContext;
 
 export function setupGaussianBlurFilter(): void {
-  //handle webgl context loss
-  renderCanvas.addEventListener(
-    "webglcontextlost",
-    (event) => {
-      console.log("Webgl Context lost");
-      event.preventDefault();
-      showSnackbar(
-        "Webgl Context Lost! Restarting application necessary!",
-        SnackbarType.ERROR,
-        4000
-      );
-    },
-    false
-  );
-  renderCanvas.addEventListener(
-    "webglcontextrestored",
-    () => {
-      setupGaussianBlurFilter();
-    },
-    false
-  );
-
   const glCtx = renderCanvas.getContext("webgl2");
   if (!glCtx) {
-    throw new Error("Couldn't get a webgl context for combining the overlays!");
+    handleWebglInitError();
+    //throw new Error("Couldn't get a webgl context for combining the overlays!");
+    return;
   }
   gl = glCtx;
 
@@ -62,6 +43,27 @@ export function setupGaussianBlurFilter(): void {
   gl.bindBuffer(gl.ARRAY_BUFFER, renderImageTexureCoordinatesBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(renderImageTextureCoordinates), gl.STATIC_DRAW);
 }
+
+//handle webgl context loss
+renderCanvas.addEventListener(
+  "webglcontextlost",
+  (event) => {
+    //console.log("Webgl Context lost");
+    event.preventDefault();
+    showSnackbar("Webgl Context Lost! Restarting application necessary!", SnackbarType.ERROR, 4000);
+    init();
+  },
+  false
+);
+renderCanvas.addEventListener(
+  "webglcontextrestored",
+  () => {
+    console.log("context restored! reloadin application...");
+    init();
+    //setupGaussianBlurFilter();
+  },
+  false
+);
 
 function setupProgram(blurStrength: number): void {
   let blurSize = Math.floor(blurStrength / 2); // divide by 2 to make it look a bit sharper
