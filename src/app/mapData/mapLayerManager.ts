@@ -217,7 +217,7 @@ class MapLayerManager {
     }
 
     if (!this.legendIsShown) {
-      this.legend.show([tagName], [color]);
+      this.legend.show(tagName, color);
       this.legendIsShown = true;
     } else {
       this.legend.addItem(tagName, color);

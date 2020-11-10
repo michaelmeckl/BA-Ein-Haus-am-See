@@ -6,8 +6,7 @@ import { Config } from "../../shared/config";
 export default class Legend {
   private legendElement: HTMLDivElement;
 
-  private layers: string[] = [];
-  private colors: string[] = [];
+  private legendContent = new Map<string, string>();
 
   constructor() {
     this.legendElement = document.querySelector("#legend") as HTMLDivElement;
@@ -32,35 +31,37 @@ export default class Legend {
   /**
    * Call this method to show the legend initially or after it was hidden.
    */
-  show(layerList: string[], colorList: string[]): void {
+  show(layer: string, color: string): void {
+    /*
     if (layerList.length !== colorList.length) {
       console.warn("Legend can't be shown! Layer and Color list must have equal length!");
       return;
     }
+    */
 
-    this.layers = layerList;
-    this.colors = colorList;
+    this.legendContent.set(layer, color);
 
     this.legendElement.classList.remove(Config.CSS_HIDDEN);
 
+    this.renderLegendItem(layer, color);
+    /*
     for (let i = 0; i < layerList.length; i++) {
       const layer = layerList[i];
       const color = colorList[i];
       this.renderLegendItem(layer, color);
     }
+    */
   }
 
   hide(): void {
     this.legendElement.classList.add(Config.CSS_HIDDEN);
 
     //clear layers and colors
-    this.layers = [];
-    this.colors = [];
+    this.legendContent.clear();
   }
 
   addItem(layer: string, color: string): void {
-    this.layers.push(layer);
-    this.colors.push(color);
+    this.legendContent.set(layer, color);
     this.renderLegendItem(layer, color);
   }
 
@@ -81,15 +82,16 @@ export default class Legend {
   */
 
   removeItem(layer: string, color: string): boolean {
-    this.layers = this.layers.filter((l) => l !== layer);
-    this.colors = this.colors.filter((c) => c !== color);
+    //this.layers = this.layers.filter((l) => l !== layer);
+    //this.colors = this.colors.filter((c) => c !== color);
+    this.legendContent.delete(layer);
 
     const id = layer;
     const el = document.querySelector(`#${id}`);
     el?.remove();
     //this.legendElement.removeChild(el);
 
-    if (this.layers.length === 0) {
+    if (this.legendContent.size === 0) {
       //this was the only/last item in the legend
       return true;
     }
