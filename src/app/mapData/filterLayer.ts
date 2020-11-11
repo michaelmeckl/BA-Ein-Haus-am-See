@@ -1,5 +1,12 @@
 /* eslint-disable no-magic-numbers */
-import type { Feature, GeoJsonProperties, MultiPolygon, Polygon } from "geojson";
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonProperties,
+  Geometry,
+  MultiPolygon,
+  Polygon,
+} from "geojson";
 import { convertPolygonCoordsToPixels } from "../map/mapboxUtils";
 
 // every relevance has a specific weight
@@ -22,6 +29,7 @@ export class FilterLayer {
 
   private points: mapboxgl.Point[][] = [];
   private features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
+  private originalData: FeatureCollection<Geometry, any> | null = null;
 
   constructor(name?: string, distance?: number, relevance?: FilterRelevance, wanted?: boolean) {
     this.layerName = name || "";
@@ -68,6 +76,13 @@ export class FilterLayer {
   }
   get Features(): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
     return this.features;
+  }
+
+  set OriginalData(featureColl: FeatureCollection<Geometry, any> | null) {
+    this.originalData = featureColl;
+  }
+  get OriginalData(): FeatureCollection<Geometry, any> | null {
+    return this.originalData;
   }
 
   calculatePointCoordsForFeatures(): void {

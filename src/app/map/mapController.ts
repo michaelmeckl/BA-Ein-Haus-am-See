@@ -1,4 +1,5 @@
 /* eslint-env browser */
+import { featureCollection } from "@turf/helpers";
 import truncate from "@turf/truncate";
 import type { FeatureCollection, Geometry, GeometryObject } from "geojson";
 import mapboxgl, { LngLat } from "mapbox-gl";
@@ -43,7 +44,20 @@ export default class MapController {
     //reload if type changed
     if (changedOverlay) {
       //console.log("reloading");
-      this.loadMapData();
+      if (FilterManager.activeFilters.size > 0) {
+        if (this.selectedVisualType === VisualType.OVERLAY) {
+          this.showAreasOnMap();
+        } else {
+          this.showPOILocations();
+        }
+      } else {
+        // no filters are active so the user wont see any change; inform him about this!
+        showSnackbar(
+          "Aktive Filter müssen vorhanden sein für Darstellung!",
+          SnackbarType.WARNING,
+          2000
+        );
+      }
     }
   }
 
@@ -185,6 +199,8 @@ export default class MapController {
       return;
     }
 
+    console.log("after return", allCurrentFilters);
+
     //console.log("Performing osm query for active filters: ", allCurrentFilters);
     // give feedback to the user
     showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true);
@@ -197,19 +213,41 @@ export default class MapController {
       Array.from(allCurrentFilters).map(async (tag) => {
         // get overpass query for each tag
         const query = OsmTagCollection.getQueryForCategory(tag);
+        console.log("query", query);
 
         //TODO check if already locally loaded this tag; only fetch if not!
+
+        //TODO also check that bounds are nearly the same!
+        //! doesnt work like this because filterlayer is created before in main!
+        /*
+        if (FilterManager.activeFilters.has(tag)) {
+          console.log("loadin locally");
+          const layer = FilterManager.getFilterLayer(tag);
+          console.log("tag", tag);
+          console.log(layer);
+          this.showDataOnMap(layer?.Features, tag);
+          return;
+        }*/
+
         //Benchmark.startMeasure("Fetching data from osm");
         // request data from osm
         //const data = await fetchOsmDataFromClientVersion(bounds, query);
+        console.log("loading from server");
         const data = await fetchOsmDataFromServer(bounds, query);
         //Benchmark.stopMeasure("Fetching data from osm");
 
+        console.log("data from server:", data);
         if (data) {
+          //const filterLayer = this.preprocessGeoData(data, tag);
+          const layer = FilterManager.getFilterLayer(tag);
+          if (layer) {
+            layer.OriginalData = data;
+          }
+
+          console.log(this.selectedVisualType);
           if (this.selectedVisualType === VisualType.NORMAL) {
             this.showDataOnMap(data, tag);
           } else {
-            //const filterLayer = this.preprocessGeoData(data, tag);
             this.preprocessGeoData(data, tag);
           }
         }
@@ -236,7 +274,11 @@ export default class MapController {
     // hide the snackbar after data has finished loading
     hideSnackbar();
 
-    //update the overlay if it is activated
+    this.showAreasOnMap();
+  }
+
+  showAreasOnMap(): void {
+    //update / show the overlay if this visual type is activated
     if (this.selectedVisualType === VisualType.OVERLAY) {
       if (mapLayerManager.geojsonSourceActive) {
         mapLayerManager.removeAllDataFromMap();
@@ -244,6 +286,13 @@ export default class MapController {
 
       //console.log("updating overlay...\n", FilterManager.allFilterLayers);
       this.addAreaOverlay();
+    }
+  }
+
+  showPOILocations(): void {
+    for (let index = 0; index < FilterManager.allFilterLayers.length; index++) {
+      const layer = FilterManager.allFilterLayers[index];
+      this.showDataOnMap(layer.OriginalData, layer.LayerName);
     }
   }
 
@@ -259,13 +308,15 @@ export default class MapController {
   }
 
   resetMapData(): void {
-    //? sollten die filter wirklich gelöscht werden???
-    //filterManager.clearAllFilters();
+    FilterManager.clearAllFilters();
     mapLayerManager.removeAllDataFromMap();
   }
 
-  showDataOnMap(data: FeatureCollection<GeometryObject, any>, tagName: string): void {
+  showDataOnMap(data: any, tagName: string): void {
     //console.log("Tagname: ", tagName);
+
+    //TODO
+    //const ftCollection = featureCollection(data);
 
     //remove area overlay if it exists
     if (map.getSource("overlaySource")) {
