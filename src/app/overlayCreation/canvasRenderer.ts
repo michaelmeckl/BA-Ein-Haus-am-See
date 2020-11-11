@@ -43,7 +43,7 @@ class CanvasRenderer {
     this.ctx = context;
 
     // setup the webgl code for the gaussian blur filter
-    setupGaussianBlurFilter();
+    //setupGaussianBlurFilter();
   }
 
   async renderPolygons(mapLayer: FilterLayer): Promise<any> {
@@ -53,9 +53,11 @@ class CanvasRenderer {
     this.weights.push(mapLayer.Relevance);
 
     const pixelDist = metersInPixel(mapLayer.Distance, map.getCenter().lat, map.getZoom());
+    console.log("PixelDist: ", pixelDist);
 
     // apply a "feather"/blur - effect to everything that is drawn on the canvas from now on
-    //ctx.filter = "blur(32px)";
+    //this.ctx.filter = `blur(${blurStrength}px)`;
+    this.ctx.filter = `blur(7px)`;
 
     if (mapLayer.Wanted) {
       //fill canvas black initially
@@ -95,14 +97,14 @@ class CanvasRenderer {
 
     //Benchmark.stopMeasure("render all polygons of one layer");
 
-    const img = await readImageFromCanvas(this.overlayCanvas);
+    //const img = await readImageFromCanvas(this.overlayCanvas);
 
     //Benchmark.startMeasure("blur Image in Webgl");
-    const blurredCanvas = applyGaussianBlur(img, pixelDist);
+    //const blurredCanvas = applyGaussianBlur(img, pixelDist);
     //Benchmark.stopMeasure("blur Image in Webgl");
 
     // draw blurred canvas on the overlayCanvas
-    this.ctx.drawImage(blurredCanvas, 0, 0);
+    //this.ctx.drawImage(blurredCanvas, 0, 0);
 
     const blurredImage = await readImageFromCanvas(this.overlayCanvas);
     // save the blurred image for this layer
@@ -160,7 +162,7 @@ class CanvasRenderer {
     );
 
     //options: {stencil: true, antialias: true, premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: false});
-    const gl = canvas.getContext("webgl2");
+    const gl = canvas.getContext("webgl");
     if (!gl) {
       handleWebglInitError();
       return;

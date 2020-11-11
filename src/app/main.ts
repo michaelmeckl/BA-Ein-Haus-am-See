@@ -1,6 +1,6 @@
 /* eslint-env browser */
 import { Config } from "../shared/config";
-import { getLogs, clearLogs } from "./Logger";
+//import { getLogs, clearLogs } from "./Logger";
 import MapController, { VisualType } from "./map/mapController";
 import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
 import FilterManager from "./mapData/filterManager";
@@ -198,7 +198,7 @@ function resetModalContent(): void {
 
   //reset error message
 
-  errormessage.classList.add(Config.CSS_HIDDEN);
+  //errormessage.classList.add(Config.CSS_HIDDEN);
 }
 
 function showFilterDetailModal(filterName: string | null): void {
@@ -229,12 +229,14 @@ function onAddFilterBtnClick(): void {
     distanceUnit.value === "m" ? parseInt(distance.value) : parseInt(distance.value) * 1000;
 
   //! bei zu großen werten hängt sich webgl im moment auf und die anwendung crasht!!!!!
+  /*
   if (distanceInMeters > 700) {
     errormessage.classList.remove(Config.CSS_HIDDEN);
     return;
   }
 
   errormessage.classList.add(Config.CSS_HIDDEN);
+  */
 
   addNewFilter(
     filterName.textContent || "",
@@ -275,7 +277,8 @@ function openSidebar(sidebarType: SidebarType): void {
   }
   
   //! use width = 30% für mehr responsitivität
-  const sidebarWidth = "350px";
+  //const sidebarWidth = "350px";
+  const sidebarWidth = "30%";
   sidebarContainer.style.width = sidebarWidth;
   mapConatiner.style.marginLeft = sidebarWidth;
   mapElement.style.width = `calc(100% - ${sidebarWidth})`;
@@ -364,6 +367,10 @@ function setupUI(): void {
 
   resetButtton.addEventListener("click", () => {
     mapController.resetMapData();
+
+    const elements = document.querySelectorAll("#active-filters > li");
+    elements.forEach((el) => el.remove());
+    noFilterText?.classList.remove(Config.CSS_HIDDEN);
   });
 
   manualLoadButton.addEventListener("click", performOsmQuery);
@@ -407,11 +414,13 @@ function setupUI(): void {
   //! not possible performance-wise at the moment
   //loadLocations();
 
+  /*
   const logButton = document.querySelector("#uploadLogsButton") as HTMLButtonElement;
   logButton.addEventListener("click", () => {
     uploadLogs(getLogs());
     clearLogs();
   });
+  */
 }
 
 export function init(): void {

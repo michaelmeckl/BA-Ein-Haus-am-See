@@ -1,6 +1,7 @@
 //@ts-nocheck
 /* eslint-disable */
 
+/*
 console.defaultLog = console.log.bind(console);
 console.logs = [];
 console.log = function () {
@@ -37,3 +38,4 @@ export function clearLogs(): any {
   console.errors.length = 0;
   console.warns.length = 0;
 }
+*/
