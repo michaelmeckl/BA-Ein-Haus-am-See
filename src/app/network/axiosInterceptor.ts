@@ -1,8 +1,8 @@
 import axios from "axios";
 
 // code taken from https://gist.github.com/matthewsuan/2bdc9e7f459d5b073d58d1ebc0613169
-// only allow 7 concurrent requests
-const MAX_REQUESTS_COUNT = 7;
+// only allow 5 concurrent requests
+const MAX_REQUESTS_COUNT = 5;
 const INTERVAL_MS = 10;
 let PENDING_REQUESTS = 0;
 

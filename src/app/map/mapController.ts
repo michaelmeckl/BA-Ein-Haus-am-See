@@ -1,5 +1,4 @@
 /* eslint-env browser */
-import { featureCollection } from "@turf/helpers";
 import truncate from "@turf/truncate";
 import type { FeatureCollection, Geometry, GeometryObject } from "geojson";
 import mapboxgl, { LngLat } from "mapbox-gl";
@@ -24,7 +23,7 @@ export const enum VisualType {
 }
 
 // tresholds to prevent reloading when small movements are made (performance optimization)
-const zoomTreshold = 0.5; // zoom level difference -> update if a map zoom changed more than half the zoom level
+const zoomTreshold = 0.7; // zoom level difference -> update if a map zoom event changed more than this
 const moveTreshold = 1000; // map center difference in meters
 
 /**
@@ -123,7 +122,8 @@ export default class MapController {
     const distance = this.currentMapCenter.distanceTo(map.getCenter());
     //console.log("Distance", distance);
 
-    //! overlay needs to be updated all the time unfortunately :(
+    //! overlay needs to be updated all the time unfortunately as long as there is no way to draw the canvas
+    //! bigger than the screen and retain correct world corrdinates :( -> would probably require view matrix transformation
     if (this.selectedVisualType === VisualType.OVERLAY) {
       FilterManager.recalculateScreenCoords();
       // this is a threshold to avoid firing events with small moves
@@ -155,7 +155,6 @@ export default class MapController {
 
       if (newZoom <= this.minRequiredZoomLevel) {
         // performance optimization - dont show/update overlay below a certain zoomlevel
-        //? show it all the time below this zoomlevel?
         showSnackbar(
           "Die aktuelle Zoomstufe ist zu niedrig, um Daten zu aktualisieren!",
           SnackbarType.WARNING,
@@ -198,10 +197,8 @@ export default class MapController {
       //console.warn("no active filters! cant load anything!");
       return;
     }
-
-    console.log("after return", allCurrentFilters);
-
     //console.log("Performing osm query for active filters: ", allCurrentFilters);
+
     // give feedback to the user
     showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true);
 
@@ -213,10 +210,8 @@ export default class MapController {
       Array.from(allCurrentFilters).map(async (tag) => {
         // get overpass query for each tag
         const query = OsmTagCollection.getQueryForCategory(tag);
-        console.log("query", query);
 
         //TODO check if already locally loaded this tag; only fetch if not!
-
         //TODO also check that bounds are nearly the same!
         //! doesnt work like this because filterlayer is created before in main!
         /*
@@ -239,12 +234,14 @@ export default class MapController {
         console.log("data from server:", data);
         if (data) {
           //const filterLayer = this.preprocessGeoData(data, tag);
+
+          // get the filterlayer for this tag that has already been created at this point
           const layer = FilterManager.getFilterLayer(tag);
           if (layer) {
             layer.OriginalData = data;
           }
 
-          console.log(this.selectedVisualType);
+          //console.log(this.selectedVisualType);
           if (this.selectedVisualType === VisualType.NORMAL) {
             this.showDataOnMap(data, tag);
           } else {
@@ -308,14 +305,15 @@ export default class MapController {
   }
 
   resetMapData(): void {
+    //clear all filters (and filterlayers)
     FilterManager.clearAllFilters();
+    // clear all mapbox sources and layers that were added and the corresponding legened elements
     mapLayerManager.removeAllDataFromMap();
   }
 
   showDataOnMap(data: any, tagName: string): void {
     //console.log("Tagname: ", tagName);
 
-    //TODO
     //const ftCollection = featureCollection(data);
 
     //remove area overlay if it exists
@@ -339,6 +337,7 @@ export default class MapController {
   }
 
   //! most of the data preprocessing could (and probably should) already happen on the server!
+  //! (after the data has been fetched and before being saved in Redis)
   preprocessGeoData(
     data: FeatureCollection<GeometryObject, any>,
     dataName: string
@@ -355,7 +354,8 @@ export default class MapController {
       return null;
     }
 
-    //! reset array
+    //! reset arrays for this layer
+    //! the new and the old information (if any) could probably be merged somehow to improve this
     layer.Points.length = 0;
     layer.Features.length = 0;
 
@@ -375,29 +375,30 @@ export default class MapController {
     return layer;
   }
 
-  /**
-   * FilterManager.allFilterLayers looks like this:
-   *[
-   *  { ### FilterLayer - Park
-   *    points: [
-   *      [{x: 49.1287; y: 12.3591}, ...],
-   *      [{x: 49.1287; y: 12.3591}, ...],
-   *      ...,
-   *    ]
-   *    features: [ {Feature}, {Feature}, ...],
-   *    distance: 500,
-   *    relevance: 0.8,  //="very important"
-   *    name: "Park",
-   *    wanted: true,
-   *  },
-   *  { ### FilterLayer - Restaurant
-   *    ...
-   *  },
-   *  ...
-   * ]
-   */
   addAreaOverlay(): void {
     //console.log("FilterManager in addAreaOverlay: ", FilterManager);
+
+    /**
+     * FilterManager.allFilterLayers should look like this at this point:
+     *[
+     *  { ### FilterLayer - Park
+     *    points: [
+     *      [{x: 49.1287; y: 12.3591}, ...],
+     *      [{x: 49.1287; y: 12.3591}, ...],
+     *      ...,
+     *    ]
+     *    features: [ {Feature}, {Feature}, ...],
+     *    distance: 500,
+     *    relevance: 0.8,  //="very important"
+     *    name: "Park",
+     *    wanted: true,
+     *  },
+     *  { ### FilterLayer - Restaurant
+     *    ...
+     *  },
+     *  ...
+     * ]
+     */
 
     // check that there is data to create an overlay for the map
     if (FilterManager.allFilterLayers.length > 0) {

@@ -225,18 +225,12 @@ class MapLayerManager {
   }
 
   private removeSourceFromLegend(sourceId: string): void {
-    //const tag = getTagForLayer(layerId);
-    const tagColor = TagColors.get(sourceId);
-
-    if (tagColor) {
-      const wasLast = this.legend.removeItem(sourceId, tagColor);
-      if (wasLast) {
-        this.legend.hide();
-        this.legendIsShown = false;
-        this.geojsonSourceActive = false;
-      }
-    } else {
-      //console.warn(`Couldnt remove tag "${sourceId}" from legend!`);
+    const wasLast = this.legend.removeItem(sourceId);
+    if (wasLast) {
+      // if this was the only legend item, hide the legend
+      this.legend.hide();
+      this.legendIsShown = false;
+      this.geojsonSourceActive = false;
     }
   }
 

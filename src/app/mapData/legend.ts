@@ -1,5 +1,7 @@
 import { Config } from "../../shared/config";
 
+const legendItemClassName = "legend-key";
+
 /**
  * Legend with the current layers on the map and their corresponding colors.
  */
@@ -14,10 +16,17 @@ export default class Legend {
 
   private renderLegendItem(layer: string, color: string): void {
     const item = document.createElement("div");
-    item.id = layer;
+
+    const firstWordIdx = layer.indexOf(" ");
+    if (firstWordIdx !== -1) {
+      //layer name has more than one word so it can't be used as an id; only take the first word
+      item.id = layer.substr(0, firstWordIdx);
+    } else {
+      item.id = layer;
+    }
 
     const key = document.createElement("span");
-    key.className = "legend-key";
+    key.className = legendItemClassName;
     key.style.backgroundColor = color;
 
     const value = document.createElement("span");
@@ -38,19 +47,11 @@ export default class Legend {
       return;
     }
     */
-
     this.legendContent.set(layer, color);
 
     this.legendElement.classList.remove(Config.CSS_HIDDEN);
 
     this.renderLegendItem(layer, color);
-    /*
-    for (let i = 0; i < layerList.length; i++) {
-      const layer = layerList[i];
-      const color = colorList[i];
-      this.renderLegendItem(layer, color);
-    }
-    */
   }
 
   hide(): void {
@@ -76,19 +77,17 @@ export default class Legend {
     const id = layer;
     const el = document.querySelector(`#${id}`);
     el?.classList.add(Config.CSS_HIDDEN);
-
-    //TODO hide legend if this was the only one?
   }
   */
 
-  removeItem(layer: string, color: string): boolean {
-    //this.layers = this.layers.filter((l) => l !== layer);
-    //this.colors = this.colors.filter((c) => c !== color);
+  removeItem(layer: string): boolean {
     this.legendContent.delete(layer);
 
-    const id = layer;
-    const el = document.querySelector(`#${id}`);
-    el?.remove();
+    const firstWordIdx = layer.indexOf(" ");
+    const id = firstWordIdx !== -1 ? layer.substr(0, firstWordIdx) : layer;
+
+    const el = document.querySelector(`#${id}`) as HTMLDivElement;
+    el.remove();
     //this.legendElement.removeChild(el);
 
     if (this.legendContent.size === 0) {
