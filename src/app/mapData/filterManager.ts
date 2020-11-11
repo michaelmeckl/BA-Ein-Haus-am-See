@@ -6,10 +6,11 @@ class FilterManager {
   activeFilters: Set<string> = new Set();
 
   constructor() {
-    //! remove later
+    /*
     console.warn(
       "DEVELOPMENT: You should only see this warning once at the beginning. If this shows up more than once there's a problem!"
     );
+    */
   }
 
   addFilter(filterLayer: FilterLayer): void {
@@ -17,7 +18,6 @@ class FilterManager {
     this.activeFilters.add(filterLayer.LayerName);
   }
 
-  //TODO remove map data in here? so everything is in one place?
   removeFilter(filter: string): void {
     this.removeFilterLayer(filter);
     this.activeFilters.delete(filter);
@@ -34,13 +34,31 @@ class FilterManager {
   }
 
   //TODO for schleife umdrehen?
-  removeFilterLayer(name: string): void {
+  private removeFilterLayer(name: string): void {
     for (let index = 0; index < this.allFilterLayers.length; index++) {
       const layer = this.allFilterLayers[index];
       if (layer.LayerName === name) {
         this.allFilterLayers.splice(index, 1);
       }
     }
+  }
+
+  /**
+   * ! Has to be called on every overlay update to recalculate the geojson polygons in point/screen coords.
+   * ! Otherwise they would not be in sync with the map!!
+   */
+  recalculateScreenCoords(): void {
+    this.allFilterLayers.forEach((filterLayer) => {
+      filterLayer.calculatePointCoordsForFeatures();
+    });
+  }
+
+  /**
+   * Reset all Filter layers.
+   */
+  clearAllFilters(): void {
+    this.allFilterLayers.length = 0;
+    this.activeFilters.clear();
   }
 }
 

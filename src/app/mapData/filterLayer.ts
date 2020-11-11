@@ -1,4 +1,13 @@
-import type { Feature, GeoJsonProperties, MultiPolygon, Polygon } from "geojson";
+/* eslint-disable no-magic-numbers */
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJsonProperties,
+  Geometry,
+  MultiPolygon,
+  Polygon,
+} from "geojson";
+import { convertPolygonCoordsToPixels } from "../map/mapboxUtils";
 
 // every relevance has a specific weight
 export enum FilterRelevance {
@@ -6,31 +15,27 @@ export enum FilterRelevance {
   important = 0.5,
   veryImportant = 0.8,
 }
-/*
-//alternativ:
-export const FilterRelevance = {
-  notVeryImportant: 0.2, //= optional,
-  important: 0.5,
-  veryImportant: 0.8,
-};
-*/
 
 const defaultDistance = 300;
 
+/**
+ * This class holds all necessary information for one layer (= one specific osm filter).
+ */
 export class FilterLayer {
   private layerName: string;
   private distance: number;
   private relevanceValue: number;
   private wanted: boolean;
 
-  private points: mapboxgl.Point[] = [];
+  private points: mapboxgl.Point[][] = [];
   private features: Feature<Polygon | MultiPolygon, GeoJsonProperties>[] = [];
+  private originalData: FeatureCollection<Geometry, any> | null = null;
 
   constructor(name?: string, distance?: number, relevance?: FilterRelevance, wanted?: boolean) {
     this.layerName = name || "";
     this.distance = distance || defaultDistance;
     this.relevanceValue = relevance || FilterRelevance.important;
-    //* || true is not possible because if wanted were false this would always evaluate to true!
+    //* using || true is not possible here because if wanted were false this would always evaluate to true!
     this.wanted = wanted !== undefined ? wanted : true;
   }
 
@@ -59,10 +64,10 @@ export class FilterLayer {
     return this.wanted;
   }
 
-  set Points(pointCoords: mapboxgl.Point[]) {
+  set Points(pointCoords: mapboxgl.Point[][]) {
     this.points = pointCoords;
   }
-  get Points(): mapboxgl.Point[] {
+  get Points(): mapboxgl.Point[][] {
     return this.points;
   }
 
@@ -71,5 +76,22 @@ export class FilterLayer {
   }
   get Features(): Feature<Polygon | MultiPolygon, GeoJsonProperties>[] {
     return this.features;
+  }
+
+  set OriginalData(featureColl: FeatureCollection<Geometry, any> | null) {
+    this.originalData = featureColl;
+  }
+  get OriginalData(): FeatureCollection<Geometry, any> | null {
+    return this.originalData;
+  }
+
+  calculatePointCoordsForFeatures(): void {
+    this.points.length = 0;
+
+    for (let index = 0; index < this.features.length; index++) {
+      const feature = this.features[index];
+
+      convertPolygonCoordsToPixels(feature, this);
+    }
   }
 }

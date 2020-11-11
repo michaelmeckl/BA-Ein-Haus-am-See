@@ -9,8 +9,6 @@
     <title>Ein Haus am See</title>
     <link rel="icon" href="./favicon.ico">
 
-    <!-- Styles -->
-
     <!-- Mapbox GL style -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v1.11.0/mapbox-gl.css" rel="stylesheet" />
     <!-- Mapbox Geocoder style -->
@@ -19,15 +17,8 @@
     <!-- own stylesheet at the end so mapbox styles can't override these! -->
     <link href="./css/style.css" type="text/css" rel="stylesheet">
 
-    <!-- TODO preload some resources for better performance ?
-    <link rel="preload" href="./css/style.css" as="style">
-    <link rel="preload" href="./dist/bundle.js" as="script crossorigin="anonymous"" />
-    -->
-
-    <!-- Scripts -->
-
     <!-- for async & defer, see https://developer.mozilla.org/en-US/docs/Glossary/Perceived_performance-->
-    <script type="module" src="./dist/bundle.js" async defer></script>
+    <script type="module" src="./dist/client.js" async defer></script>
 </head>
 
 <body>
@@ -40,58 +31,42 @@
 
     <header class="heading">
         <h1>Ein Haus am See</h1>
-        <button type="button" id="deckglButton">Add Deckgl Layer</button>
-        <button type="button" id="lumaButton">Add Luma Layer</button>
-        <button type="button" id="showLocations">Zeige geeignete Orte</button>
-        <button type="button" id="showFilters">Zeige Filter</button>
-        <button type="button" id="showCustomData">Add WebGL custom data</button>
-        <button type="button" id="blurButton">Test Blur</button>
+        <button type="button" id="showFilters" class="head-btn">Wähle Filter</button>
+
+        <div id="visualMode-dropdown">
+            <label class="mode-label">
+                Darstellungsart:
+            </label>
+            <select id="mode-select" class="select-box">
+                <option value="Overlay" selected>Gebiete</option>
+                <option value="Normal">Orte</option>
+            </select>
+            <!-- <i class="caret-down"></i> -->
+        </div>
+
+        <button type="button" id="manualLoadButton" class="button-disabled head-btn" disabled>Lade Daten
+            manuell</button>
+        <!--<button type="button" id="showLocations" class="button-disabled head-btn" disabled>Zeige geeignete Orte</button>-->
+
+        <button type="button" id="resetMapButton" class="head-btn">Karte zurücksetzen</button>
     </header>
 
 
     <div id="mapContainer">
-        <div id="overpass-api-controls">
-            <div class="dropdown">
-                <button type="button" class="dropbtn">
-                    Wähle den OSM-Tag aus:
-                    <i class="caret-down"></i>
-                </button>
-                <div class="dropdown-content">
-                    <!-- # scrolls to the top -->
-                    <a href="#">Restaurant</a>
-                    <a href="#">Cafe</a>
-                    <a href="#">Supermarkt</a>
-                    <a href="#">Bar</a>
-                    <a href="#">Park</a>
-                    <a href="#">Fluss</a>
-                    <a href="#">Autobahn</a>
-                    <a href="#">Bushaltestelle</a>
-                    <a href="#">Bahnhof</a>
-                    <a href="#">Universität / OTH</a>
-                    <a href="#">Wald</a>
-                </div>
-            </div>
-
-            <input id="query-input" placeholder="amenity=bar" type="text" size="40">
-            <input id="query-button" type="button" value="Filter anwenden">
-
-            <div class="selection-box hidden">
-                <ul id="selection-list"></ul>
-            </div>
-        </div>
 
         <div id="map"></div>
 
-        <!-- TODO -->
-        <canvas id="test_canvas"></canvas>
-        <canvas id="deck_canvas"></canvas>
+        <!-- ! only used for the study! -->
+        <!--<button type="button" id="uploadLogsButton">Upload</button>-->
+
+        <!-- offscreen canvas used for the overlay creation -->
         <canvas id="texture_canvas">Your browser does not seem to support HTML5 canvas.</canvas>
     </div>
 
-    <div class="map-overlay" id="legend"></div>
+    <!-- fill with map data -->
+    <div class="map-overlay hidden" id="legend"></div>
 
     <div id="snackbar"></div>
-
 
     <!-- Modal for filter details -->
     <div id="filterModal" class="modal">
@@ -100,7 +75,7 @@
 
             <div class="modal-body">
 
-                <form id="modal-form">
+                <form id="modal-form" action="javascript:void(0);">
                     <div class="distance-container">
                         <p class="settings-label">Entfernung: </p>
 
@@ -113,6 +88,11 @@
                                 <option value="km">km</option>
                             </select>
                         </div>
+
+                    </div>
+
+                    <div id="errormessage" class="hidden">
+                        Die Entfernung kann leider im Moment höchstens 700 m sein!
                     </div>
 
                     <div class="importance-container">
@@ -151,11 +131,6 @@
         </div>
     </div>
 
-
-    <!-- TODO bei resizing der map stimmen manchmal die breiten von sidebar und map nicht mehr ganz! 
-        * map.resize(); könnte das lösen vllt
-    -->
-
     <!-- sidebar container -->
     <div class="sidebar">
 
@@ -175,9 +150,9 @@
                     <i class="caret-down"></i>
                 </button>
                 <div class="filter-entries">
-                    <a href="#">Park</a>
+                    <a href="#">Parks und Grünflächen</a>
                     <a href="#">Wald</a>
-                    <a href="#">Fluss</a>
+                    <!--<a href="#">Fluss</a>-->
                 </div>
 
                 <button class="filter-categories">Gastronomie
@@ -209,11 +184,10 @@
                     <i class="caret-down"></i>
                 </button>
                 <div class="filter-entries">
-                    <a href="#">Universität / OTH</a>
+                    <a href="#">Universität und OTH</a>
                     <a href="#">Schule</a>
                 </div>
 
-                <!-- TODO -->
                 <button class="filter-categories">Sonstiges
                     <i class="caret-down"></i>
                 </button>
@@ -240,32 +214,26 @@
 
         </div>
 
-        <!-- Locations Sidebar -->
+        <!-- Locations Sidebar 
         <div id="loc-sidebar" class="hidden">
             <div class="sideHeading">
                 <a href="javascript:void(0)" class="closeSidebar">&larr;</a>
                 <h2>Gefundene Häuser</h2>
             </div>
 
-            <!-- List with locations -->
             <div id="location-listings" class="location-listings"></div>
         </div>
+        -->
 
     </div>
-
-
-    <template id="li-template">
-        <li>
-            <button id="close-btn" class="close">&times;</button>
-        </li>
-    </template>
 
 
     <!-- TODO erstellte Filter sollten nachträglich auch noch geupdated werden können (wenn Zeit noch implementieren!) -->
     <template id="filter-li-template">
         <li>
-            <!-- TODO add a checkbox at the left to allow the user to show and hide filters without completely removing them -->
             <button id="remove-filter-button" type="button">Löschen</button>
+            <!-- TODO add a checkbox at the left to allow the user to show and hide filters without completely removing them -->
+
             <!--
             <div class="li-content">
                 <button id="remove-filter-button" type="button">Löschen</button>

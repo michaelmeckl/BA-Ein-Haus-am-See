@@ -6,10 +6,9 @@ import express, { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import { INTERNAL_SERVER_ERROR, NOT_FOUND } from "http-status-codes";
 import path from "path";
-import LoggingRouter from "./loggingRouter";
 import OsmRouter from "./osmRouter";
 
-//TODO handle crashes better than killing the process?
+// handle crashes
 process.on("uncaughtException", (e) => {
   console.log(e);
   process.exit(1);
@@ -31,7 +30,6 @@ export default class Server {
     this.setupExpressApp();
 
     // serve front-end content
-    //TODO actually it would be better for performance not to send it from the node server as it is single-threaded (maybe use nginx instead?)
     this.app.use(express.static(publicDir));
     this.app.use(express.static(staticDir));
 
@@ -67,15 +65,12 @@ export default class Server {
     // mount the routes with the prefix "osm"
     //this.app.use("/osm", osmRouter);
     this.app.use(osmRouter.instance);
-
-    const logRouter = new LoggingRouter(publicDir);
-    this.app.use(logRouter.instance);
   }
 
   setupErrorHandling(): void {
     this.app.use(this.errorHandler);
 
-    // catch 404; this must be at the end!
+    // catch 404; this must be the last handler this.app uses!
     this.app.use(function (req, res, next) {
       res.status(NOT_FOUND);
       // respond with json
