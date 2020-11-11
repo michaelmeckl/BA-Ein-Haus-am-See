@@ -19,8 +19,9 @@ let renderImageTexureCoordinatesBuffer: WebGLBuffer | null;
 
 let gl: WebGL2RenderingContext | WebGLRenderingContext;
 
+//TODO try webgl 1 überall
 export function setupGaussianBlurFilter(): void {
-  const glCtx = renderCanvas.getContext("webgl2");
+  const glCtx = renderCanvas.getContext("webgl");
   if (!glCtx) {
     handleWebglInitError();
     //throw new Error("Couldn't get a webgl context for combining the overlays!");
@@ -55,15 +56,7 @@ renderCanvas.addEventListener(
   },
   false
 );
-renderCanvas.addEventListener(
-  "webglcontextrestored",
-  () => {
-    console.log("context restored! reloadin application...");
-    init();
-    //setupGaussianBlurFilter();
-  },
-  false
-);
+renderCanvas.addEventListener("webglcontextrestored", init, false);
 
 function setupProgram(blurStrength: number): void {
   let blurSize = Math.floor(blurStrength / 2); // divide by 2 to make it look a bit sharper
@@ -73,7 +66,8 @@ function setupProgram(blurStrength: number): void {
   }
 
   //! the blur size needs to be defined as a constant so it can be used as an array index in the shader!
-  const blurShaderSource = `#version 300 es\n#define MSIZE ${blurSize}` + getGaussianBlurFS();
+  //const blurShaderSource = `#version 300 es\n#define MSIZE ${blurSize}` + getGaussianBlurFS();
+  const blurShaderSource = `#define MSIZE ${blurSize}` + getGaussianBlurFS();
   //console.log(blurShaderSource);
 
   // create and link program
