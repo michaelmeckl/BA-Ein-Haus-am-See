@@ -35,18 +35,27 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): vo
 }
 
 export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {
-  const image = new Image();
   return new Promise((resolve, reject) => {
-    image.onload = (): void => {
-      image.width = canvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
-      image.height = canvas.clientHeight;
+    //! toBlob() is way more performant than toDataUrl (because the latter is synchronous) and needs less memory
+    canvas.toBlob(function (blob) {
+      let newImg = document.createElement("img");
+      const url = URL.createObjectURL(blob);
 
-      resolve(image);
-    };
-    image.onerror = (error): void => reject(error);
+      newImg.onload = () => {
+        resolve(newImg);
+        // no longer need to read the blob so it's revoked
+        URL.revokeObjectURL(url);
 
-    //* setting the source should ALWAYS be done after setting the event listener!
-    image.src = canvas.toDataURL();
+        newImg.remove(); //remove from dom so it can be garbage-collected
+        newImg.onload = null;
+        //@ts-expect-error
+        newImg = null;
+      };
+      newImg.onerror = (error): void => reject(error);
+
+      //* setting the source should ALWAYS be done after setting the event listener!
+      newImg.src = url;
+    });
   });
 }
 
