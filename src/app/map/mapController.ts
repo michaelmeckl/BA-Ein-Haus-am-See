@@ -195,6 +195,10 @@ export default class MapController {
 
     if (allCurrentFilters.size === 0) {
       //console.warn("no active filters! cant load anything!");
+      showSnackbar(
+        "Es können keine Daten geladen werden, da keine Filter aktiv sind!",
+        SnackbarType.WARNING
+      );
       return;
     }
     //console.log("Performing osm query for active filters: ", allCurrentFilters);
@@ -309,6 +313,7 @@ export default class MapController {
     FilterManager.clearAllFilters();
     // clear all mapbox sources and layers that were added and the corresponding legened elements
     mapLayerManager.removeAllDataFromMap();
+    showSnackbar("Filter wurden vollständig zurückgesetzt!", SnackbarType.DEFAULT);
   }
 
   showDataOnMap(data: any, tagName: string): void {
