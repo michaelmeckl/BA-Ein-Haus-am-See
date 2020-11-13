@@ -29,7 +29,7 @@ export const TagColors = new Map([
   ["Cafe", "#38a3a5"],
   ["Schule", "#aa998f"],
   ["Parks und Grünflächen", "#90be6d"],
-  ["Universität und OTH", "#cb997e"],
+  ["Universität und Hochschule", "#cb997e"],
   ["Supermarkt", "#fe7f2d"],
   ["Einkaufszentrum", "#f20089"],
   ["Bahnhof", "#a44a3f"],
