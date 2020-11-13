@@ -19,7 +19,6 @@ let renderImageTexureCoordinatesBuffer: WebGLBuffer | null;
 
 let gl: WebGL2RenderingContext | WebGLRenderingContext;
 
-//TODO try webgl 1 überall
 export function setupGaussianBlurFilter(): void {
   const glCtx = renderCanvas.getContext("webgl");
   if (!glCtx) {
@@ -68,7 +67,7 @@ function setupProgram(blurStrength: number): void {
   //! the blur size needs to be defined as a constant so it can be used as an array index in the shader!
   //const blurShaderSource = `#version 300 es\n#define MSIZE ${blurSize}` + getGaussianBlurFS();
   const blurShaderSource = `#define MSIZE ${blurSize}` + getGaussianBlurFS();
-  //console.log(blurShaderSource);
+  //const blurShaderSource = `#define MSIZE 25` + getGaussianBlurFS();
 
   // create and link program
   glProgram = twgl.createProgramFromSources(gl, [getVSForGaussBlur(), blurShaderSource]);

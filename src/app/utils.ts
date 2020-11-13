@@ -14,6 +14,15 @@ export function hideSnackbar(): void {
   snackbar.className = snackbar.className.replace("show", "");
 }
 
+export function logMemoryUsage(): void {
+  //@ts-expect-error
+  console.log(performance.memory.jsHeapSizeLimit / (8 * 1024 * 1024) + " mb"); // will give you the JS heap size maximum
+  //@ts-expect-error
+  console.log(performance.memory.totalJSHeapSize / (8 * 1024 * 1024) + " mb"); // The total allocated heap size, in bytes.
+  //@ts-expect-error
+  console.log(performance.memory.usedJSHeapSize / (8 * 1024 * 1024) + " mb"); // how much you're currently using
+}
+
 export function showSnackbar(
   message: string,
   type: SnackbarType = SnackbarType.DEFAULT,

@@ -43,7 +43,7 @@ class CanvasRenderer {
     this.ctx = context;
 
     // setup the webgl code for the gaussian blur filter
-    setupGaussianBlurFilter();
+    //setupGaussianBlurFilter();
   }
 
   async renderPolygons(mapLayer: FilterLayer): Promise<any> {
@@ -52,12 +52,11 @@ class CanvasRenderer {
 
     this.weights.push(mapLayer.Relevance);
 
+    /*
     const pixelDist = metersInPixel(mapLayer.Distance, map.getCenter().lat, map.getZoom());
     console.log("PixelDist: ", pixelDist);
 
-    /*
     let blurStrength;
-    //TODO braucht sinnvolle Funktion!
     if (pixelDist > 100) {
       blurStrength = pixelDist / 10;
     } else if (pixelDist > 20) {
@@ -66,11 +65,11 @@ class CanvasRenderer {
       blurStrength = 7;
     }
     console.warn("blurStrength: ", blurStrength);
-    */
 
     // apply a "feather"/blur - effect to everything that is drawn on the canvas from now on
-    //this.ctx.filter = `blur(${blurStrength}px)`;
-    //this.ctx.filter = `blur(7px)`;
+    this.ctx.filter = `blur(${blurStrength}px)`;
+    */
+    this.ctx.filter = "blur(7px)";
 
     if (mapLayer.Wanted) {
       //fill canvas black initially
@@ -110,14 +109,16 @@ class CanvasRenderer {
 
     //Benchmark.stopMeasure("render all polygons of one layer");
 
+    /*
     const img = await readImageFromCanvas(this.overlayCanvas);
 
-    //Benchmark.startMeasure("blur Image in Webgl");
+    Benchmark.startMeasure("blur Image in Webgl");
     const blurredCanvas = applyGaussianBlur(img, pixelDist);
-    //Benchmark.stopMeasure("blur Image in Webgl");
+    Benchmark.stopMeasure("blur Image in Webgl");
 
     // draw blurred canvas on the overlayCanvas
     this.ctx.drawImage(blurredCanvas, 0, 0);
+    */
 
     const blurredImage = await readImageFromCanvas(this.overlayCanvas);
     // save the blurred image for this layer
@@ -321,7 +322,6 @@ export async function createOverlay(data: FilterLayer[]): Promise<void> {
 
   //Reset state for next rendering
   renderer.reset();
-
   //console.log("finished blurring and compositing");
 }
 

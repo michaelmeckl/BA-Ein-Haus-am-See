@@ -83,6 +83,13 @@ const errormessage = document.querySelector("#errormessage") as HTMLDivElement;
 // ####### Logic starts here: ########
 
 async function performOsmQuery(): Promise<void> {
+  if (FilterManager.activeFilters.size === 0) {
+    showSnackbar(
+      "Es können keine Daten geladen werden, da keine Filter aktiv sind!",
+      SnackbarType.WARNING
+    );
+    return;
+  }
   mapController.loadMapData(); //? await this and activate location button only after this has finished?
   /*
   const data = await testGuide("restaurant");
