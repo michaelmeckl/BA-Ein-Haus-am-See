@@ -1,14 +1,18 @@
 import Redis from "ioredis";
+import JSONCache from "redis-json";
 import { Config } from "../shared/config";
 
 class RedisCache {
   private readonly redisClient: Redis.Redis;
+  private jsonCache: JSONCache;
 
   constructor() {
     this.redisClient = new Redis({
       port: Config.REDIS_PORT,
       host: "127.0.0.1",
     });
+
+    this.jsonCache = new JSONCache(this.redisClient, { prefix: "cache: " });
 
     //? use this as the this.redisClient instead ot the one above?
     // see https://github.com/arjunmehta/node-georedis for more infos
@@ -29,18 +33,20 @@ class RedisCache {
     });
   }
 
-  async fetchDataFromCache(key: string): Promise<string | null> {
+  async fetchDataFromCache(key: string): Promise<Partial<any> | undefined> {
     try {
-      const result = await this.redisClient.get(key);
+      //const result = await this.redisClient.get(key);
+      const result = await this.jsonCache.get(key);
       return result;
     } catch (error) {
       console.log(error);
-      return null;
+      return undefined;
     }
   }
 
   cacheData(key: string, value: string, expiryTime: number): void {
-    this.redisClient.setex(key, expiryTime, value);
+    //this.redisClient.setex(key, expiryTime, value);
+    this.jsonCache.set(key, value, { expire: expiryTime });
   }
 }
 

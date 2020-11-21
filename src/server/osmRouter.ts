@@ -158,8 +158,8 @@ export default class OsmRouter {
     //Benchmark.stopMeasure("Getting data from redis cache");
 
     if (result) {
-      //console.log("Found in cache!");
-      res.status(OK).send(result);
+      //console.log("Found in cache: \n", result);
+      res.status(OK).json(result);
     } else {
       //if not in cache proceed to next middleware function
       next();
