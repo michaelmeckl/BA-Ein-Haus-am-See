@@ -1,4 +1,5 @@
 import mapboxgl from "mapbox-gl";
+import { Config } from "../../shared/config";
 
 // make sure that MapboxGl (and WebGL) are supported in the browser
 if (!mapboxgl.supported()) {
@@ -6,10 +7,16 @@ if (!mapboxgl.supported()) {
 }
 
 // provide Mapbox accessToken
+//! the mapbox token should be loaded from an .env - file in the root directory for security reasons!
+//! this can be done with the webpack dotenv - plugin like so:
+/*
 if (!process.env.MapboxToken) {
   throw new Error("No valid Mapbox Token was provided!");
 }
 mapboxgl.accessToken = process.env.MapboxToken;
+*/
+//! Here the mapbox token is provided so it is easier to test this application (without having to create an own mapbox account)
+mapboxgl.accessToken = Config.PUBLIC_MAPBOX_TOKEN;
 
 const lat = 49.008;
 const lng = 12.1;

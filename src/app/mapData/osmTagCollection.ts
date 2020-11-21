@@ -1,10 +1,11 @@
 /* eslint-disable quotes */
 
+//TODO merge these two to reduce duplicate code
 export const enum TagNames {
   Bar = "Bar",
   Restaurant = "Restaurant",
   Cafe = "Cafe",
-  University = "Universität und OTH",
+  University = "Universität und Hochschule",
   School = "Schule",
   Supermarket = "Supermarkt",
   Mall = "Einkaufszentrum",
@@ -16,6 +17,22 @@ export const enum TagNames {
   Forest = "Wald",
   River = "Fluss",
 }
+export const TagColors = new Map([
+  ["Bar", "#7209b7"],
+  ["Restaurant", "#e63946"],
+  ["Cafe", "#38a3a5"],
+  ["Schule", "#aa998f"],
+  ["Parks und Grünflächen", "#90be6d"],
+  ["Universität und Hochschule", "#cb997e"],
+  ["Supermarkt", "#fe7f2d"],
+  ["Einkaufszentrum", "#f20089"],
+  ["Bahnhof", "#a44a3f"],
+  ["Bushaltestelle", "#00b4d8"],
+  ["Parkplatz", "#de9e36"],
+  ["Autobahn", "#f4a261"],
+  ["Fluss", "#1d3557"],
+  ["Wald", "#386641"],
+]);
 
 class TagCollection {
   getQueryForCategory(categoryName: string): string {
@@ -52,14 +69,13 @@ class TagCollection {
       case TagNames.RailwayStation:
         return 'nwr["public_transport"="stop_position"]["railway"="stop"];';
 
-      //TODO auch bundesstraßen hier nehmen?
+      //? auch bundesstraßen hier nehmen?
       case TagNames.Highway:
         //return 'nwr["highway"~"^motorway|trunk|motorway_link$"];';  // Autobahn und größere Straßen / trunks
         return 'nwr["highway"~"^motorway|motorway_link$"];';
 
       case TagNames.Parks:
-        //return 'nwr["leisure"~"^park|nature_reserve|village_green|recreation_ground$"];';
-        return 'nwr["leisure"~"^park|nature_reserve|village_green$"];';
+        return 'nwr["leisure"~"^park|nature_reserve$"]; nwr["landuse"~"^village_green|recreation_ground$"];';
 
       // landuse=meadow für Wiesen auch verwenden ?
 
@@ -77,19 +93,12 @@ class TagCollection {
     }
   }
 
-  //TODO: fetch everything that is marked as a building or apartment
+  //TODO fetch everything that is marked as a building or apartment
   /* * apartments / houses:
     vllt landuse=residential mit name=* oder addr:flats ???
    */
-  //TODO run this query only at a certain zoom level (e.g. > 14) to improve performance??
+  //TODO run this query only at a certain zoom level (e.g. > 14) to make it feasible??
   getAllHousesQuery(): string {
-    /*waysWithTagYes = mI.getAllHouses("building", "yes");
-    waysWithTagApartment = mI.getAllHouses("building", "apartments");
-    waysWithTagHouse = mI.getAllHouses("building", "house");
-    waysWithTagTerrace = mI.getAllHouses("building", "terrace");
-    waysWithHouseNumbers = mI.getAllHouses("addr:housenumber", ".*");
-    */
-
     return 'nwr["building"~"^apartments|dormitory|terrace|house$"];';
   }
 }

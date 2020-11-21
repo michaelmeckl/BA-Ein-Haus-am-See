@@ -4,7 +4,8 @@
 import { map } from "../map/mapboxConfig";
 import mapLayerManager from "../mapData/mapLayerManager";
 import { getViewportBounds } from "../map/mapboxUtils";
-//import "../vendors/fast-gauss-blur.js";
+import Benchmark from "../../shared/benchmarking";
+import "../vendors/fast-gauss-blur.js";
 
 export function clearCanvasPart(
   ctx: CanvasRenderingContext2D,
@@ -35,18 +36,27 @@ export function addCanvasOverlay(canvas: HTMLCanvasElement, opacity: number): vo
 }
 
 export async function readImageFromCanvas(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {
-  const image = new Image();
   return new Promise((resolve, reject) => {
-    image.onload = (): void => {
-      image.width = canvas.clientWidth; //use clientWidth and Height so the image fits the current screen size
-      image.height = canvas.clientHeight;
+    //! toBlob() is way more performant than toDataUrl (because the latter is synchronous) and needs less memory
+    canvas.toBlob(function (blob) {
+      let newImg = document.createElement("img");
+      const url = URL.createObjectURL(blob);
 
-      resolve(image);
-    };
-    image.onerror = (error): void => reject(error);
+      newImg.onload = () => {
+        resolve(newImg);
+        // no longer need to read the blob so it's revoked
+        URL.revokeObjectURL(url);
 
-    //* setting the source should ALWAYS be done after setting the event listener!
-    image.src = canvas.toDataURL();
+        newImg.remove(); //remove from dom so it can be garbage-collected
+        newImg.onload = null;
+        //@ts-expect-error
+        newImg = null;
+      };
+      newImg.onerror = (error): void => reject(error);
+
+      //* setting the source should ALWAYS be done after setting the event listener!
+      newImg.src = url;
+    });
   });
 }
 
@@ -61,6 +71,8 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
     console.warn("no 2d context in make alpha mask");
     return;
   }
+
+  Benchmark.startMeasure("create alpha mask");
 
   context.drawImage(canvas, 0, 0);
 
@@ -90,15 +102,21 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
   }
 
   context.putImageData(imageData, 0, 0);
+  Benchmark.stopMeasure("create alpha mask");
 
+  Benchmark.startMeasure("add canvas layer to map");
   //* add canvas with opacity 0.7 (i.e. 70% overlay, 30% map background) which makes the overlay clearly visible
   //* even for lighter grey but still allows the user to see the map background everywhere
   addCanvasOverlay(c, overlayOpacity);
+  Benchmark.stopMeasure("add canvas layer to map");
 }
 
 // function taken from previous bachelor thesis from Julien Wachter
-/*
-export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+export function applyFastGaußBlur(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  size: number
+): void {
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
   const redChannel = [];
@@ -109,11 +127,8 @@ export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
 
   const blurredRedChannel: any[] = [];
 
-  const size = 25;
-  console.time("fastgaussblur");
-  //@ts-expect-error
+  //@ts-expect-error - the global fast gauß blur is not recognized here
   FastGaussBlur.apply(redChannel, blurredRedChannel, canvas.width, canvas.height, size);
-  console.timeEnd("fastgaussblur");
 
   for (let i = 0; i < imgData.data.length; i += 4) {
     const colorValue = blurredRedChannel[i / 4];
@@ -124,4 +139,3 @@ export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
 
   ctx.putImageData(imgData, 0, 0);
 }
-*/

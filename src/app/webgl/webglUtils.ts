@@ -1,6 +1,9 @@
 /* eslint-disable no-magic-numbers */
 
-// Util-Functions for abstracting some of WebGL's Boilerplate Code.
+/**
+ * Util-Functions for abstracting some of WebGL's Boilerplate Code.
+ */
+
 // Some functions use a small WebGL Helper library called TWGL (see https://www.npmjs.com/package/twgl.js)
 // import * as twgl from "twgl.js";
 
@@ -141,9 +144,9 @@ export function setupCanvasForDrawing(
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
-//! not used
-/*
+//////////////////! not used ////////////////////
 
+/*
 type shaderType =
   | WebGL2RenderingContext["VERTEX_SHADER"]
   | WebGL2RenderingContext["FRAGMENT_SHADER"];

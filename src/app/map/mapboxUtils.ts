@@ -19,17 +19,20 @@ import type { FilterLayer } from "../mapData/filterLayer";
 import { map } from "./mapboxConfig";
 import { addBufferToFeature } from "./turfUtils";
 
-// formula based on https://wiki.openstreetmap.org/wiki/Zoom_levels
+// convert meter to screen pixel, formula based on https://wiki.openstreetmap.org/wiki/Zoom_levels
 export function metersInPixel(meters: number, latitude: number, zoomLevel: number): number {
   const earthCircumference = 40075016.686;
   const latitudeRadians = latitude * (Math.PI / 180);
-  // zoomlevel + 9 instead of +8 because mapbox uses 512*512 tiles, see https://docs.mapbox.com/help/glossary/zoom-level/
+  //* zoomlevel + 9 instead of + 8 because mapbox uses 512*512 tiles, see https://docs.mapbox.com/help/glossary/zoom-level/
   const metersPerPixel =
     (earthCircumference * Math.cos(latitudeRadians)) / Math.pow(2, zoomLevel + 9);
 
   return meters / metersPerPixel;
 }
 
+/**
+ * Get the current bounding box as an array
+ */
 export function getViewportBounds(): number[][] {
   const bounds = map.getBounds();
   const viewportBounds = [
@@ -52,13 +55,11 @@ export function getViewportBoundsString(additionalDistance?: number): string {
   let westLng = currBounds.getWest();
   let northLat = currBounds.getNorth();
   let eastLng = currBounds.getEast();
-  //console.log(currBounds);
 
   if (additionalDistance) {
     const bufferedBBox = bbox(
       addBufferToFeature(bboxPolygon([westLng, southLat, eastLng, northLat]), additionalDistance)
     );
-    //console.log(bufferedBBox);
 
     southLat = bufferedBBox[1];
     westLng = bufferedBBox[0];
@@ -159,7 +160,7 @@ export function convertToLatLngCoord(point: mapboxgl.PointLike): LngLat {
   return map.unproject(point);
 }
 
-export function convertPolygonCoordsToPixels(
+export function convertPolygonCoordsToPixelCoords(
   polygon: Feature<Polygon | MultiPolygon, GeoJsonProperties>,
   layer: FilterLayer
 ): void {
@@ -186,8 +187,6 @@ export function convertPolygonCoordsToPixels(
     }
     // layer.Points.push(flattened);
   } else {
-    //console.log("Polygon");
-
     //@ts-expect-error
     const pointData = coords[0].map((coord: number[]) => {
       try {
@@ -201,10 +200,9 @@ export function convertPolygonCoordsToPixels(
   }
 }
 
-//! not used:
+//////////////////! not used (only kept as reference): /////////////////////////
 
 /*
-
 export function getRadiusAndCenterOfViewport(): any {
   const centerPoint = map.getCenter();
   const northEastPoint = map.getBounds().getNorthEast();

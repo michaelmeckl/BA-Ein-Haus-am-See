@@ -3,7 +3,7 @@ import mapboxgl, { Layer, LngLatLike } from "mapbox-gl";
 import { map } from "./mapboxConfig";
 import mapLayerManager from "../mapData/mapLayerManager";
 
-//! not used at the moment
+//! not used at the moment but does work quite well right now
 export default class Heatmap {
   private sourceName: string;
 

@@ -7,11 +7,11 @@ import type {
   MultiPolygon,
   Polygon,
 } from "geojson";
-import { convertPolygonCoordsToPixels } from "../map/mapboxUtils";
+import { convertPolygonCoordsToPixelCoords } from "../map/mapboxUtils";
 
 // every relevance has a specific weight
 export enum FilterRelevance {
-  notVeryImportant = 0.2, //= optional,
+  notVeryImportant = 0.2,
   important = 0.5,
   veryImportant = 0.8,
 }
@@ -91,7 +91,7 @@ export class FilterLayer {
     for (let index = 0; index < this.features.length; index++) {
       const feature = this.features[index];
 
-      convertPolygonCoordsToPixels(feature, this);
+      convertPolygonCoordsToPixelCoords(feature, this);
     }
   }
 }

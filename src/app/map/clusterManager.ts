@@ -1,3 +1,8 @@
+/**
+ * ! This file contains a class to control clustering of point layers.
+ * ! Not used yet as it still needs some improvement!
+ */
+
 import mapboxgl from "mapbox-gl";
 import { map } from "./mapboxConfig";
 

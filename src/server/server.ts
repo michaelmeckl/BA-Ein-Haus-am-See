@@ -25,8 +25,11 @@ const publicDir = path.join(__dirname, "../../", "public"); // folder with stati
 export default class Server {
   // Init express
   private readonly app: express.Application = express();
+  private port: number;
 
-  constructor() {
+  constructor(serverPort: number) {
+    this.port = serverPort;
+
     this.setupExpressApp();
 
     // serve front-end content
@@ -47,7 +50,7 @@ export default class Server {
     this.app.use(helmet());
 
     // use an application-level middleware to add the CORS HTTP header to every request by default.
-    const localhostAddress = "http://localhost:8000";
+    const localhostAddress = `http://localhost:${this.port}`;
     const corsOptions = {
       origin: localhostAddress,
       optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
@@ -101,9 +104,9 @@ export default class Server {
   /**
    * Start the express server on the given port.
    */
-  start(port: number): void {
-    const server = this.app.listen(port, () => {
-      console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
+  start(): void {
+    const server = this.app.listen(this.port, () => {
+      console.log(`⚡️[server]: Server is running at http://localhost:${this.port}`);
     });
   }
 }

@@ -4,7 +4,11 @@ import type { FilterLayer } from "../mapData/filterLayer";
 import { applyGaussianBlur, setupGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
 import { combineOverlayFragmentShader, defaultVertexShader } from "../webgl/shaders";
 import * as webglUtils from "../webgl/webglUtils";
-import { makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
+import {
+  applyFastGaußBlur,
+  makeAlphaMask as applyAlphaMask,
+  readImageFromCanvas,
+} from "./canvasUtils";
 import { map } from "../map/mapboxConfig";
 import { metersInPixel } from "../map/mapboxUtils";
 import { handleWebglInitError, showSnackbar, SnackbarType } from "../utils";
@@ -29,6 +33,8 @@ class CanvasRenderer {
   private weights: number[] = [];
   allTextures: HTMLImageElement[] = [];
 
+  private currentBlurSize = 0;
+
   constructor() {
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     canvas.width = map.getCanvas().clientWidth;
@@ -43,21 +49,25 @@ class CanvasRenderer {
     this.ctx = context;
 
     // setup the webgl code for the gaussian blur filter
-    //setupGaussianBlurFilter();
+    setupGaussianBlurFilter();
   }
 
+  /**
+   * Draws all polygons for the given filter on a canvas and applies a blur effect.
+   * @param mapLayer the current filter layer, e.g. one for park, restaurant, etc.
+   */
   async renderPolygons(mapLayer: FilterLayer): Promise<any> {
     // clear the canvas
     this.ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-
     this.weights.push(mapLayer.Relevance);
 
-    const pixelDist = metersInPixel(mapLayer.Distance, map.getCenter().lat, map.getZoom());
-    console.log("PixelDist: ", pixelDist);
+    // calculate the blur size for this layer based on the distance the user specified
+    this.calculateBlurSize(mapLayer.Distance);
+
+    Benchmark.startMeasure("render polygons of this layer");
 
     // apply a "feather"/blur - effect to everything that is drawn on the canvas from now on
-    //this.ctx.filter = `blur(${blurStrength}px)`;
-    this.ctx.filter = `blur(7px)`;
+    //this.ctx.filter = `blur(${this.currentBlurSize}px)`;
 
     if (mapLayer.Wanted) {
       //fill canvas black initially
@@ -74,8 +84,6 @@ class CanvasRenderer {
       // fill polygons black, fully opaque
       this.ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
     }
-
-    //Benchmark.startMeasure("render all polygons of one layer");
 
     for (const polygon of mapLayer.Points) {
       const startPoint = polygon[0];
@@ -95,22 +103,62 @@ class CanvasRenderer {
       this.ctx.fill("evenodd");
     }
 
-    //Benchmark.stopMeasure("render all polygons of one layer");
+    Benchmark.stopMeasure("render polygons of this layer");
 
-    //const img = await readImageFromCanvas(this.overlayCanvas);
+    /*
+    Benchmark.startMeasure("fastgaussblur");
+    applyFastGaußBlur(this.ctx, this.overlayCanvas, this.currentBlurSize);
+    Benchmark.stopMeasure("fastgaussblur");
+    */
 
-    //Benchmark.startMeasure("blur Image in Webgl");
-    //const blurredCanvas = applyGaussianBlur(img, pixelDist);
-    //Benchmark.stopMeasure("blur Image in Webgl");
+    await this.applyGaussianBlur();
 
-    // draw blurred canvas on the overlayCanvas
-    //this.ctx.drawImage(blurredCanvas, 0, 0);
-
+    Benchmark.startMeasure("read and save final layer image from canvas");
     const blurredImage = await readImageFromCanvas(this.overlayCanvas);
     // save the blurred image for this layer
     this.allTextures.push(blurredImage);
+    Benchmark.stopMeasure("read and save final layer image from canvas");
+
+    //console.warn("webgl blur is currently used!");
   }
 
+  //TODO a better function to bring the pixelDistance in relation to the blur size is still needed!
+  //TODO -> should probably rise quite slow (upper bound maybe not even necessary?)
+  calculateBlurSize(layerDistance: number): void {
+    const pixelDist = metersInPixel(layerDistance, map.getCenter().lat, map.getZoom());
+
+    // divide by 2 to make it look a bit sharper
+    // floor is needed for glsl to provide an integer which can be used as the matrix size
+    let blurStrength = Math.floor(pixelDist / 2);
+
+    //! define upper and lower bounds to prevent dividing by zero in glsl or getting a too big matrix
+    //! these bounds are not really necessary for the canvas blur and the faßtgaußblur
+    if (blurStrength <= 5) {
+      blurStrength = 5;
+    } else if (blurStrength >= 80) {
+      blurStrength = 80;
+    }
+
+    this.currentBlurSize = blurStrength;
+  }
+
+  async applyGaussianBlur(): Promise<void> {
+    Benchmark.startMeasure("get image from canvas to blur");
+    const img = await readImageFromCanvas(this.overlayCanvas);
+    Benchmark.stopMeasure("get image from canvas to blur");
+
+    Benchmark.startMeasure("blur Image in Webgl");
+    const blurredCanvas = applyGaussianBlur(img, this.currentBlurSize);
+    Benchmark.stopMeasure("blur Image in Webgl");
+
+    // draw the blurred canvas on the overlayCanvas
+    this.ctx.drawImage(blurredCanvas, 0, 0);
+  }
+
+  /**
+   * * Utility-Function to normalize all importance scores for all textures so they add up to 1
+   * * but at the same time keep their relative importance to the other layers
+   */
   normalizeWeights(textureCount: number): void {
     let sum = 0;
     for (let i = 0; i < textureCount; i++) {
@@ -122,9 +170,12 @@ class CanvasRenderer {
     for (let index = 0; index < this.weights.length; index++) {
       this.weights[index] *= normalizer;
     }
-    //console.log("Normalized Weights:", this.weights);
   }
 
+  /**
+   * Combines the given image textures into one overlay canvas that can be used as a canvas layer for mapbox.
+   * @param textureLayers the image elements that need to be comined for the final overlay
+   */
   combineOverlays(textureLayers: HTMLImageElement[]): any {
     if (textureLayers.length === 0) {
       console.log("TextureLayers are empty! Overlay can't be created!");
@@ -250,12 +301,17 @@ class CanvasRenderer {
   }
 
   createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
+    Benchmark.startMeasure("combining textures");
     this.combineOverlays(textures);
+    Benchmark.stopMeasure("combining textures");
 
     return this.overlayCanvas;
   }
 
-  // see https://stackoverflow.com/questions/23598471/how-do-i-clean-up-and-unload-a-webgl-canvas-context-from-gpu-after-use
+  /**
+   * Cleanup webgl resources to prevent memory leaks,
+   * see https://stackoverflow.com/questions/23598471/how-do-i-clean-up-and-unload-a-webgl-canvas-context-from-gpu-after-use
+   */
   cleanupResources(): void {
     // desallocate memory and free resources to avoid memory leak issues
     const numTextureUnits = this.glCtx.getParameter(this.glCtx.MAX_TEXTURE_IMAGE_UNITS);
@@ -279,6 +335,9 @@ class CanvasRenderer {
     //this.glCtx.getExtension("WEBGL_lose_context")?.restoreContext();
   }
 
+  /**
+   * Reset weights and textures for next draw.
+   */
   reset(): void {
     this.weights = [];
     this.allTextures.forEach((texture) => {
@@ -292,30 +351,21 @@ class CanvasRenderer {
 const renderer = new CanvasRenderer();
 
 export async function createOverlay(data: FilterLayer[]): Promise<void> {
-  Benchmark.startMeasure("creating canvas overlay");
+  Benchmark.startMeasure("creating canvas overlay overall");
 
-  //Benchmark.startMeasure("render all Polygons");
+  Benchmark.startMeasure("render all Polygons");
   const allRenderProcesses = data.map((layer: FilterLayer) => renderer.renderPolygons(layer));
   await Promise.all(allRenderProcesses);
-  //Benchmark.startMeasure("render all Polygons");
+  Benchmark.stopMeasure("render all Polygons");
 
   //console.log("Current number of saved textures in canvasRenderer: ", renderer.allTextures.length);
 
   const resultCanvas = renderer.createOverlay(renderer.allTextures);
-  Benchmark.stopMeasure("creating canvas overlay");
+  Benchmark.stopMeasure("creating canvas overlay overall");
 
   applyAlphaMask(resultCanvas);
 
   //Reset state for next rendering
   renderer.reset();
-
   //console.log("finished blurring and compositing");
 }
-
-//TODO separate method that only calculates which layers changed and only render difference??
-/*
-export async function updateOverlay(newData: FilterLayer[]): Promise<void> {
-  // calc differences
-  createOverlay(newData);
-}
-*/

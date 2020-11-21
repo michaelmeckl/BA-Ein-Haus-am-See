@@ -1,7 +1,8 @@
 import { map } from "./map/mapboxConfig";
 
 /**
- * This class is used to control performance measuring for the mapbox map.
+ * This class is used to control performance measuring (fps) for the mapbox map.
+ * This code is based on https://github.com/mapbox/mapbox-gl-framerate and was slightly reduced and modified.
  */
 export class PerformanceMeasurer {
   private frames = 0;
@@ -14,13 +15,13 @@ export class PerformanceMeasurer {
     map.on("moveend", this.onMoveEnd.bind(this));
   }
 
-  onMoveStart = () => {
+  onMoveStart = (): void => {
     this.frames = 0;
     this.time = performance.now();
     map.on("render", this.onRender);
   };
 
-  onMoveEnd = () => {
+  onMoveEnd = (): void => {
     const now = performance.now();
     const fps = this.getFPS(now);
     const fpsAvg = Math.round((1e3 * this.totalFrames) / this.totalTime) || 0;
@@ -32,7 +33,7 @@ export class PerformanceMeasurer {
     map.off("render", this.onRender);
   };
 
-  onRender = () => {
+  onRender = (): void => {
     this.frames++;
     const now = performance.now();
     //@ts-expect-error

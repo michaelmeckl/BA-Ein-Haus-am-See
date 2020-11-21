@@ -68,14 +68,13 @@ export function combineOverlayFragmentShader(): string {
 }
 
 export function getVSForGaussBlur(): string {
-  return `#version 300 es
-
+  return `
   precision mediump float;
 
-  in vec3 coordinate;
-  in vec2 textureCoordinate;
+  attribute vec3 coordinate;
+  attribute vec2 textureCoordinate;
 
-  out vec2 varyingTextureCoordinate;
+  varying vec2 varyingTextureCoordinate;
 
   void main(void) {
     gl_Position = vec4(coordinate, 1.0);
@@ -85,8 +84,8 @@ export function getVSForGaussBlur(): string {
   `;
 }
 
-//* 2D gaussian blur fs:
-// see. http://pieper.github.io/sites/glimp/gaussian.html
+//* 2D gaussian blur fragment shader:
+//* original code taken from  http://pieper.github.io/sites/glimp/gaussian.html
 //! The for loop should be unrolled for better performance!
 export function getGaussianBlurFS(): string {
   return `
@@ -106,12 +105,10 @@ export function getGaussianBlurFS(): string {
   uniform vec2 sourceTextureSize;
   uniform vec2 sourceTexelSize;
   
-  in vec2 varyingTextureCoordinate;
-
-  out vec4 fragColor;
+  varying vec2 varyingTextureCoordinate;
   
   void main(void) {
-    vec4 c = texture(sourceTextureSampler, varyingTextureCoordinate);
+    vec4 c = texture2D(sourceTextureSampler, varyingTextureCoordinate);
     vec4 gc = c;
     vec4 bc = c;
     
@@ -140,7 +137,7 @@ export function getGaussianBlurFS(): string {
 
         // color at pixel in the neighborhood
         vec2 coord = varyingTextureCoordinate.xy + vec2(float(i), float(j)) * sourceTexelSize.xy;
-        cc = texture(sourceTextureSampler, coord).rgb;
+        cc = texture2D(sourceTextureSampler, coord).rgb;
 
         // compute the gaussian smoothed (multiply both so the blur effect decreases faster, see x*x 
         // in the gaussian distribution equation above)
@@ -159,7 +156,7 @@ export function getGaussianBlurFS(): string {
 
     c = gc;
       
-    fragColor = c;
+    gl_FragColor = c;
   }
   `;
 }

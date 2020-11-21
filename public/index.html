@@ -6,7 +6,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="author" content="Michael Meckl">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ein Haus am See</title>
+    <!--TODO probably not the best title ... -->
+    <title>Haus am See</title>
     <link rel="icon" href="./favicon.ico">
 
     <!-- Mapbox GL style -->
@@ -37,11 +38,12 @@
             <label class="mode-label">
                 Darstellungsart:
             </label>
+
+            <!-- TODO these names are not really intuitive ... -->
             <select id="mode-select" class="select-box">
                 <option value="Overlay" selected>Gebiete</option>
                 <option value="Normal">Orte</option>
             </select>
-            <!-- <i class="caret-down"></i> -->
         </div>
 
         <button type="button" id="manualLoadButton" class="button-disabled head-btn" disabled>Lade Daten
@@ -56,7 +58,6 @@
 
         <div id="map"></div>
 
-        <!-- ! only used for the study! -->
         <!--<button type="button" id="uploadLogsButton">Upload</button>-->
 
         <!-- offscreen canvas used for the overlay creation -->
@@ -77,10 +78,10 @@
 
                 <form id="modal-form" action="javascript:void(0);">
                     <div class="distance-container">
+                        <!-- TODO maybe "Umkreis" or "Distanz" would be better names?? -->
                         <p class="settings-label">Entfernung: </p>
 
-                        <!--<input type="number" class="distance-input" value="300">-->
-                        <input type="text" class="distance-input" value="300" pattern="\d*" />
+                        <input type="text" class="distance-input" value="500" pattern="\d*" />
 
                         <div>
                             <select id="distance-unit-select">
@@ -100,6 +101,7 @@
 
                         <div>
                             <select id="importance-select">
+                                <!-- ! optional does not seem to be very intuitive! -->
                                 <option value="optional">optional</option>
                                 <option value="wichtig" selected>wichtig</option>
                                 <option value="sehr wichtig">sehr wichtig</option>
@@ -152,7 +154,7 @@
                 <div class="filter-entries">
                     <a href="#">Parks und Grünflächen</a>
                     <a href="#">Wald</a>
-                    <!--<a href="#">Fluss</a>-->
+                    <a href="#">Fluss</a>
                 </div>
 
                 <button class="filter-categories">Gastronomie
@@ -184,7 +186,7 @@
                     <i class="caret-down"></i>
                 </button>
                 <div class="filter-entries">
-                    <a href="#">Universität und OTH</a>
+                    <a href="#">Universität und Hochschule</a>
                     <a href="#">Schule</a>
                 </div>
 
@@ -210,8 +212,6 @@
                 <ul id="active-filters"></ul>
             </div>
 
-            <!-- TODO noch 2 Buttons ganz unten für Reset all und Filter anwenden? -->
-
         </div>
 
         <!-- Locations Sidebar 
@@ -228,17 +228,11 @@
     </div>
 
 
-    <!-- TODO erstellte Filter sollten nachträglich auch noch geupdated werden können (wenn Zeit noch implementieren!) -->
+    <!-- TODO erstellte Filter sollten nachträglich auch noch geupdated werden können -->
     <template id="filter-li-template">
         <li>
             <button id="remove-filter-button" type="button">Löschen</button>
             <!-- TODO add a checkbox at the left to allow the user to show and hide filters without completely removing them -->
-
-            <!--
-            <div class="li-content">
-                <button id="remove-filter-button" type="button">Löschen</button>
-            </div>
-            -->
         </li>
     </template>
 
