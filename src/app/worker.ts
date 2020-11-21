@@ -1,3 +1,11 @@
+/**
+ * * This class was an attempt to move some of the computation to a separate worker thread so
+ * * the UI stays responsive all the time. Unfortunately, a web worker can't access DOM elements
+ * * like a canvas and therefore the overlay creation process needs a major refactoring to work with this.
+ * ! An option would be to use an Offscreen-Canvas but this technology is only supported in Chrome, Edge and Opera as of late 2020 :(
+ * ! It is available in Firefox but needs to be enabled in the browser config first (therefore not suited for normal users!)
+ */
+
 import * as twgl from "twgl.js";
 import { combineOverlayFragmentShader, defaultVertexShader } from "./webgl/shaders";
 import * as webglUtils from "./webgl/webglUtils";

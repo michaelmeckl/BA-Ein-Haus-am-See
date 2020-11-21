@@ -1,15 +1,16 @@
 import Redis from "ioredis";
+import { Config } from "../shared/config";
 
 class RedisCache {
   private readonly redisClient: Redis.Redis;
 
   constructor() {
     this.redisClient = new Redis({
-      port: 6379,
+      port: Config.REDIS_PORT,
       host: "127.0.0.1",
     });
 
-    //TODO use this as the this.redisClient instead ot the one above?
+    //? use this as the this.redisClient instead ot the one above?
     // see https://github.com/arjunmehta/node-georedis for more infos
     //const geoRedisClient = geoRedis.initialize(this.redisClient);
 
@@ -39,7 +40,6 @@ class RedisCache {
   }
 
   cacheData(key: string, value: string, expiryTime: number): void {
-    //TODO use hset instead to store as a hash for performance reasons
     this.redisClient.setex(key, expiryTime, value);
   }
 }

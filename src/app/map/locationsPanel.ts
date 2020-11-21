@@ -1,12 +1,18 @@
+/**
+ * !This file contains methods for fetching and showing house data on the map.
+ * ! Unfortunately, the current implementation is computationally too complex and is
+ * ! therefore not used yet.
+ */
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Feature, FeatureCollection, GeoJsonProperties } from "geojson";
-import mapboxgl, { LngLatLike, LngLat } from "mapbox-gl";
-import { map } from "./mapboxConfig";
+import geojsonCoords from "@mapbox/geojson-coords";
 import distance from "@turf/distance";
 import * as turfHelpers from "@turf/helpers";
-import { fetchOsmDataFromServer, fetchOsmDataFromClientVersion } from "../network/networkUtils";
+import type { Feature, FeatureCollection, GeoJsonProperties } from "geojson";
+import mapboxgl, { LngLat } from "mapbox-gl";
 import osmTagCollection from "../mapData/osmTagCollection";
-import geojsonCoords from "@mapbox/geojson-coords";
+import { fetchOsmDataFromClientVersion } from "../network/networkUtils";
+import { map } from "./mapboxConfig";
 
 const houses = {
   type: "FeatureCollection",
@@ -217,7 +223,7 @@ function getBbox(
   ];
 }
 
-//TODO: this function is not used yet
+//! this function is not used yet
 //TODO -> needs to be called at first with a point from where to sort the distances !! (-> let user define??)
 export function sortDistances(point: LngLat): void {
   console.log(point);
@@ -292,6 +298,7 @@ export async function loadLocations(): Promise<void> {
   const eastLng = currBounds.getEast();
 
   //TODO maybe fetch all Houses in an city at the start in a webworker so they are loaded faster later on?
+  //TODO or fetch on server on startup and only update manually or on very rare conditions?
   const boundingBox = `${southLat},${westLng},${northLat},${eastLng}`;
   const houseData = await fetchOsmDataFromClientVersion(boundingBox, housesQuery);
   //console.log("HouseData: ", houseData);

@@ -1,10 +1,9 @@
 import type { FeatureCollection, GeometryObject } from "geojson";
 import osmtogeojson from "osmtogeojson";
-//import * as rax from "retry-axios";
 import Benchmark from "../../shared/benchmarking";
 import { showSnackbar, SnackbarType } from "../utils";
-//import axios from "axios";
 import axios from "./axiosInterceptor";
+//import * as rax from "retry-axios";
 
 // attach the retry interceptor to the global axios instance, so all requests are retried if they fail
 //const interceptorId = rax.attach();
@@ -130,11 +129,10 @@ export async function fetchOsmDataFromServer(
     });
     const url = "/osmRequestCache?" + params;
 
-    //Benchmark.startMeasure("Request client side");
-
+    Benchmark.startMeasure("Request client side");
     // set a timeout of 7 seconds
     const response = await axios.get(url, { timeout: 7000 });
-    //console.log(Benchmark.stopMeasure("Request client side"));
+    console.log(Benchmark.stopMeasure("Request client side"));
 
     //console.log(response);
 

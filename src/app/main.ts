@@ -1,35 +1,46 @@
 /* eslint-env browser */
 import { Config } from "../shared/config";
-//import { getLogs, clearLogs } from "./Logger";
 import MapController, { VisualType } from "./map/mapController";
 import { FilterLayer, FilterRelevance } from "./mapData/filterLayer";
 import FilterManager from "./mapData/filterManager";
-import { uploadLogs } from "./network/networkUtils";
 import { showSnackbar, SnackbarType } from "./utils";
+import Benchmark from "../shared/benchmarking";
+//import { uploadLogs } from "./network/networkUtils";
+//import { getLogs, clearLogs } from "./Logger";
 
 // * const enum instead of enum as this inlines the elements at runtime
-//TODO alle html element accessor names hier auslagern:
 const enum HtmlElements {
-  LIST_TEMPLATE_ID = "#li-template",
-  FILTER_LIST_TEMPLATE_ID = "#filter-li-template",
-  // heading buttons
-  SHOW_LOCATIONS_BUTTON_ID = "#showLocations",
-  SHOW_FILTER_BUTTON_ID = "#showFilters",
-  SHOW_CUSTOM_DATA_ID = "#showCustomData",
-  // api controls
-  QUERY_INPUT_ID = "#query-input",
-  QUERY_BUTTON_ID = "#query-button",
-  SELECTION_LIST_ID = "#selection-list",
-  SELECTION_BOX_CLASS = ".selection-box",
-  DROPDOWN_CONTENT_CLASS = ".dropdown-content",
-  // sidebar
-  CLOSE_SIDEBAR_BUTTON_CLASS = ".closeSidebar",
-  FILTER_SIDEBAR = "#filter-sidebar",
-  LOCATIONS_SIDEBAR = "#loc-sidebar",
   // container elements
-  SIDEBAR = ".sidebar",
   MAP_CONTAINER = "#mapContainer",
   MAP = "#map",
+  SIDEBAR = ".sidebar",
+
+  // headline controls
+  SHOW_LOCATIONS_BUTTON_ID = "#showLocations",
+  SHOW_FILTER_BUTTON_ID = "#showFilters",
+  LOAD_MANUALLY_BUTTON_ID = "#manualLoadButton",
+  RESET_BUTTON_ID = "#resetMapButton",
+  MODE_SELECT_ID = "#mode-select",
+
+  // sidebar
+  FILTER_SIDEBAR_ID = "#filter-sidebar",
+  LOCATIONS_SIDEBAR_ID = "#loc-sidebar",
+  CLOSE_SIDEBAR_BUTTON_CLASS = ".closeSidebar",
+  FILTER_LIST_TEMPLATE_ID = "#filter-li-template",
+  FILTER_LIST_ID = "#active-filters",
+  NO_FILTER_TEXT_ID = ".no-filter",
+
+  // modal
+  MODAL_ID = "#filterModal",
+  MODAL_FORM_ID = "#modal-form",
+  MODAL_HEADER_CLASS = ".modal-header",
+  DISTANCE_INPUT_CLASS = ".distance-input",
+  DISTANCE_UNIT_SELECT_ID = "#distance-unit-select",
+  IMPORTANCE_SELECT_ID = "#importance-select",
+
+  REMOVE_FILTER_BUTTON_ID = "#remove-filter-button",
+  CANCEL_BUTTON_ID = "#cancel-button",
+  ADD_FILTER_BUTTON_ID = "#add-filter-button",
 }
 
 const enum SidebarType {
@@ -47,40 +58,46 @@ let sidebarOpen = false;
 const mapConatiner = document.querySelector(HtmlElements.MAP_CONTAINER) as HTMLDivElement;
 const mapElement = document.querySelector(HtmlElements.MAP) as HTMLDivElement;
 
-// buttons
+/**
+ * buttons and headline controls
+ */
 const showFilterButtton = document.querySelector(
   HtmlElements.SHOW_FILTER_BUTTON_ID
 ) as HTMLButtonElement;
-/*
-const showLocationsButtton = document.querySelector(
-  HtmlElements.SHOW_LOCATIONS_BUTTON_ID
+const manualLoadButton = document.querySelector(
+  HtmlElements.LOAD_MANUALLY_BUTTON_ID
 ) as HTMLButtonElement;
-*/
-const resetButtton = document.querySelector("#resetMapButton") as HTMLButtonElement;
-//const showMapDataButtton = document.querySelector("#deckglButton");
-const manualLoadButton = document.querySelector("#manualLoadButton") as HTMLButtonElement;
+const resetButtton = document.querySelector(HtmlElements.RESET_BUTTON_ID) as HTMLButtonElement;
 const closeSidebarButtton = document.querySelector(
   HtmlElements.CLOSE_SIDEBAR_BUTTON_CLASS
 ) as HTMLButtonElement;
-//const queryButton = document.querySelector(HtmlElements.QUERY_BUTTON_ID) as HTMLButtonElement;
+//const showLocationsButtton = document.querySelector(HtmlElements.SHOW_LOCATIONS_BUTTON_ID) as HTMLButtonElement;
+const modeSelection = document.querySelector(HtmlElements.MODE_SELECT_ID) as HTMLSelectElement;
 
-//templates
-//const LIST_TEMPLATE = document.querySelector(HtmlElements.LIST_TEMPLATE_ID)?.innerHTML.trim();
+/**
+ * templates
+ */
 const FILTER_LIST_TEMPLATE = document
   .querySelector(HtmlElements.FILTER_LIST_TEMPLATE_ID)
   ?.innerHTML.trim();
 
-//sidebar
+/**
+ * sidebar and modal
+ */
 const sidebarContainer = document.querySelector(HtmlElements.SIDEBAR) as HTMLDivElement;
-const filterSidebar = document.querySelector(HtmlElements.FILTER_SIDEBAR) as HTMLDivElement;
+const filterSidebar = document.querySelector(HtmlElements.FILTER_SIDEBAR_ID) as HTMLDivElement;
 //const locationsSidebar = document.querySelector(HtmlElements.LOCATIONS_SIDEBAR) as HTMLDivElement;
 
-const list = document.querySelector("#active-filters") as HTMLUListElement;
-const noFilterText = document.querySelector(".no-filter") as HTMLParagraphElement;
-const modal = document.querySelector("#filterModal") as HTMLDivElement;
-const errormessage = document.querySelector("#errormessage") as HTMLDivElement;
+const list = document.querySelector(HtmlElements.FILTER_LIST_ID) as HTMLUListElement;
+const noFilterText = document.querySelector(HtmlElements.NO_FILTER_TEXT_ID) as HTMLParagraphElement;
+const modal = document.querySelector(HtmlElements.MODAL_ID) as HTMLDivElement;
+//const errormessage = document.querySelector("#errormessage") as HTMLDivElement;
 
-// ####### Logic starts here: ########
+/**
+ * ###################
+ * Logic starts here:
+ * ###################
+ */
 
 async function performOsmQuery(): Promise<void> {
   if (FilterManager.activeFilters.size === 0) {
@@ -90,7 +107,7 @@ async function performOsmQuery(): Promise<void> {
     );
     return;
   }
-  mapController.loadMapData(); //? await this and activate location button only after this has finished?
+  mapController.loadMapData();
   /*
   const data = await testGuide("restaurant");
   console.log(data);
@@ -174,7 +191,7 @@ function addNewFilter(
   containerElement.firstElementChild?.insertAdjacentHTML("afterbegin", title);
 
   // get the remove button for the list element
-  const removeButton = containerElement.querySelector("#remove-filter-button");
+  const removeButton = containerElement.querySelector(HtmlElements.REMOVE_FILTER_BUTTON_ID);
 
   // add the selected data to the list element and append the list element
   listEl.appendChild(
@@ -200,11 +217,10 @@ function addNewFilter(
 
 function resetModalContent(): void {
   //reset inputs
-  const modalForm = document.querySelector("#modal-form") as HTMLFormElement;
+  const modalForm = document.querySelector(HtmlElements.MODAL_FORM_ID) as HTMLFormElement;
   modalForm.reset();
 
   //reset error message
-
   //errormessage.classList.add(Config.CSS_HIDDEN);
 }
 
@@ -213,30 +229,32 @@ function showFilterDetailModal(filterName: string | null): void {
   modal.style.display = "block";
 
   // set the title to the current filter
-  const modalTitle = document.querySelector(".modal-header") as HTMLElement;
+  const modalTitle = document.querySelector(HtmlElements.MODAL_HEADER_CLASS) as HTMLElement;
   modalTitle.textContent = filterName;
 }
 
 function onCancelBtnClick(): void {
+  // hide modal and reset its content to default
   modal.style.display = "none";
   resetModalContent();
 }
 
 function onAddFilterBtnClick(): void {
   // get all relevant input information
-  const filterName = document.querySelector(".modal-header") as HTMLElement;
-  const distance = document.querySelector(".distance-input") as HTMLInputElement;
-  const distanceUnit = document.querySelector("#distance-unit-select") as HTMLSelectElement;
-  const importance = document.querySelector("#importance-select") as HTMLSelectElement;
+  const filterName = document.querySelector(HtmlElements.MODAL_HEADER_CLASS) as HTMLElement;
+  const distance = document.querySelector(HtmlElements.DISTANCE_INPUT_CLASS) as HTMLInputElement;
+  const distanceUnit = document.querySelector(
+    HtmlElements.DISTANCE_UNIT_SELECT_ID
+  ) as HTMLSelectElement;
+  const importance = document.querySelector(HtmlElements.IMPORTANCE_SELECT_ID) as HTMLSelectElement;
   const filterWanted = document.querySelector(
     "input[name = 'polarity']:checked"
   ) as HTMLInputElement;
 
+  /*
   const distanceInMeters =
     distanceUnit.value === "m" ? parseInt(distance.value) : parseInt(distance.value) * 1000;
-
-  //! bei zu großen werten hängt sich webgl im moment auf und die anwendung crasht!!!!!
-  /*
+  
   if (distanceInMeters > 700) {
     errormessage.classList.remove(Config.CSS_HIDDEN);
     return;
@@ -260,8 +278,8 @@ function onAddFilterBtnClick(): void {
 }
 
 function setupModalButtons(): void {
-  const cancelBtn = document.querySelector("#cancel-button");
-  const addFilterBtn = document.querySelector("#add-filter-button");
+  const cancelBtn = document.querySelector(HtmlElements.CANCEL_BUTTON_ID);
+  const addFilterBtn = document.querySelector(HtmlElements.ADD_FILTER_BUTTON_ID);
 
   //handle click on cancel button
   cancelBtn?.addEventListener("click", onCancelBtnClick);
@@ -283,8 +301,6 @@ function openSidebar(sidebarType: SidebarType): void {
     //locationsSidebar.classList.remove(Config.CSS_HIDDEN);
   }
   
-  //! use width = 30% für mehr responsitivität
-  //const sidebarWidth = "350px";
   const sidebarWidth = "30%";
   sidebarContainer.style.width = sidebarWidth;
   mapConatiner.style.marginLeft = sidebarWidth;
@@ -367,7 +383,6 @@ function switchVisualMode(newMode: string): void {
 function setupUI(): void {
   showFilterButtton.addEventListener("click", toggleFilterPanel);
 
-  const modeSelection = document.querySelector("#mode-select") as HTMLSelectElement;
   modeSelection.addEventListener("change", () => {
     switchVisualMode(modeSelection.value);
   });
@@ -382,7 +397,6 @@ function setupUI(): void {
 
   manualLoadButton.addEventListener("click", performOsmQuery);
 
-  //FIXME funktioniert im locations Panel nicht!!!
   closeSidebarButtton.addEventListener("click", closeSidebar);
 
   /*
@@ -418,7 +432,6 @@ function setupUI(): void {
   };
 
   //setup house side panel
-  //! not possible performance-wise at the moment
   //loadLocations();
 
   /*
@@ -431,14 +444,14 @@ function setupUI(): void {
 }
 
 export function init(): void {
-  console.time("load map");
+  Benchmark.startMeasure("load map");
 
   mapController = new MapController();
   mapController
     .init()
     .then(() => {
       // map loaded sucessfully
-      console.timeEnd("load map");
+      Benchmark.stopMeasure("load map");
 
       // setup the initial map state
       mapController.setupMapState();

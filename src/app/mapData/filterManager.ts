@@ -1,3 +1,4 @@
+import Benchmark from "../../shared/benchmarking";
 import type { FilterLayer } from "./filterLayer";
 
 class FilterManager {
@@ -33,7 +34,6 @@ class FilterManager {
     return null;
   }
 
-  //TODO for schleife umdrehen?
   private removeFilterLayer(name: string): void {
     for (let index = 0; index < this.allFilterLayers.length; index++) {
       const layer = this.allFilterLayers[index];
@@ -48,9 +48,11 @@ class FilterManager {
    * ! Otherwise they would not be in sync with the map!!
    */
   recalculateScreenCoords(): void {
+    Benchmark.startMeasure("recalculate all Screen Coords");
     this.allFilterLayers.forEach((filterLayer) => {
       filterLayer.calculatePointCoordsForFeatures();
     });
+    Benchmark.stopMeasure("recalculate all Screen Coords");
   }
 
   /**

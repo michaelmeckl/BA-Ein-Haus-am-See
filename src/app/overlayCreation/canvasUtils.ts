@@ -4,7 +4,8 @@
 import { map } from "../map/mapboxConfig";
 import mapLayerManager from "../mapData/mapLayerManager";
 import { getViewportBounds } from "../map/mapboxUtils";
-//import "../vendors/fast-gauss-blur.js";
+import Benchmark from "../../shared/benchmarking";
+import "../vendors/fast-gauss-blur.js";
 
 export function clearCanvasPart(
   ctx: CanvasRenderingContext2D,
@@ -71,6 +72,8 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
     return;
   }
 
+  Benchmark.startMeasure("create alpha mask");
+
   context.drawImage(canvas, 0, 0);
 
   const imageData = context.getImageData(0, 0, c.width, c.height);
@@ -99,15 +102,18 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
   }
 
   context.putImageData(imageData, 0, 0);
+  Benchmark.stopMeasure("create alpha mask");
 
+  Benchmark.startMeasure("add canvas layer to map");
   //* add canvas with opacity 0.7 (i.e. 70% overlay, 30% map background) which makes the overlay clearly visible
   //* even for lighter grey but still allows the user to see the map background everywhere
   addCanvasOverlay(c, overlayOpacity);
+  Benchmark.stopMeasure("add canvas layer to map");
 }
 
 // function taken from previous bachelor thesis from Julien Wachter
-/*
 export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+  Benchmark.startMeasure("fastgaussblur");
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
   const redChannel = [];
@@ -119,10 +125,9 @@ export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
   const blurredRedChannel: any[] = [];
 
   const size = 25;
-  console.time("fastgaussblur");
+
   //@ts-expect-error
   FastGaussBlur.apply(redChannel, blurredRedChannel, canvas.width, canvas.height, size);
-  console.timeEnd("fastgaussblur");
 
   for (let i = 0; i < imgData.data.length; i += 4) {
     const colorValue = blurredRedChannel[i / 4];
@@ -132,5 +137,5 @@ export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
   }
 
   ctx.putImageData(imgData, 0, 0);
+  Benchmark.stopMeasure("fastgaussblur");
 }
-*/

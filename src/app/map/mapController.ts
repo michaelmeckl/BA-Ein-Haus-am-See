@@ -23,7 +23,7 @@ export const enum VisualType {
 }
 
 // tresholds to prevent reloading when small movements are made (performance optimization)
-const zoomTreshold = 0.7; // zoom level difference -> update if a map zoom event changed more than this
+const zoomTreshold = 0.5; // zoom level difference -> update if a map zoom event changed more than this
 const moveTreshold = 1000; // map center difference in meters
 
 /**
@@ -34,13 +34,14 @@ export default class MapController {
   private currentZoom: number = initialZoomLevel;
   private currentMapCenter: LngLat = new LngLat(initialPosition[0], initialPosition[1]);
 
+  // default visual type is the overlay:
   private selectedVisualType: VisualType = VisualType.OVERLAY;
 
   set VisualType(type: VisualType) {
     const changedOverlay = this.selectedVisualType !== type;
     this.selectedVisualType = type;
 
-    //reload if type changed
+    //reload if visual type was changed by the user
     if (changedOverlay) {
       //console.log("reloading");
       if (FilterManager.activeFilters.size > 0) {
@@ -52,7 +53,7 @@ export default class MapController {
       } else {
         // no filters are active so the user wont see any change; inform him about this!
         showSnackbar(
-          "Aktive Filter müssen vorhanden sein für Darstellung!",
+          "Aktive Filter müssen vorhanden sein, um Informationen anzuzeigen!",
           SnackbarType.WARNING,
           2000
         );
@@ -84,7 +85,7 @@ export default class MapController {
 
     // start measuring the frame rate
     const performanceMeasurer = new PerformanceMeasurer();
-    performanceMeasurer.startMeasuring();
+    //performanceMeasurer.startMeasuring();
 
     //map.showTileBoundaries = true;
 
@@ -120,10 +121,10 @@ export default class MapController {
   onMapDragEnd(): void {
     // Uses the Haversine Formula to calculate difference between tow latLng coords in meters
     const distance = this.currentMapCenter.distanceTo(map.getCenter());
-    //console.log("Distance", distance);
 
-    //! overlay needs to be updated all the time unfortunately as long as there is no way to draw the canvas
-    //! bigger than the screen and retain correct world corrdinates :( -> would probably require view matrix transformation
+    //! overlay needs to be updated all the time unfortunately as long as i can't find a way
+    //! to draw the canvas bigger than the screen and also retain correct pixel corrdinates :(
+    //!  -> would probably require view matrix transformations
     if (this.selectedVisualType === VisualType.OVERLAY) {
       FilterManager.recalculateScreenCoords();
       // this is a threshold to avoid firing events with small moves
@@ -197,7 +198,6 @@ export default class MapController {
       //console.warn("no active filters! cant load anything!");
       return;
     }
-    //console.log("Performing osm query for active filters: ", allCurrentFilters);
 
     // give feedback to the user
     showSnackbar("Daten werden geladen...", SnackbarType.INFO, undefined, true);
@@ -205,7 +205,7 @@ export default class MapController {
     //get screen viewport and 500 meter around to compensate for the move treshold for new data
     const bounds = mapboxUtils.getViewportBoundsString(500);
 
-    Benchmark.startMeasure("Performing osm query for active filters");
+    Benchmark.startMeasure("Loading for all active filters");
     const allResults = await Promise.allSettled(
       Array.from(allCurrentFilters).map(async (tag) => {
         // get overpass query for each tag
@@ -213,7 +213,7 @@ export default class MapController {
 
         //TODO check if already locally loaded this tag; only fetch if not!
         //TODO also check that bounds are nearly the same!
-        //! doesnt work like this because filterlayer is created before in main!
+        //! doesnt work like this because filterlayer has already been created before in main!
         /*
         if (FilterManager.activeFilters.has(tag)) {
           console.log("loadin locally");
@@ -224,14 +224,13 @@ export default class MapController {
           return;
         }*/
 
-        //Benchmark.startMeasure("Fetching data from osm");
+        Benchmark.startMeasure("Fetching data from osm");
         // request data from osm
-        //const data = await fetchOsmDataFromClientVersion(bounds, query);
-        console.log("loading from server");
         const data = await fetchOsmDataFromServer(bounds, query);
-        //Benchmark.stopMeasure("Fetching data from osm");
+        Benchmark.stopMeasure("Fetching data from osm");
 
         console.log("data from server:", data);
+
         if (data) {
           //const filterLayer = this.preprocessGeoData(data, tag);
 
@@ -245,15 +244,17 @@ export default class MapController {
           if (this.selectedVisualType === VisualType.NORMAL) {
             this.showDataOnMap(data, tag);
           } else {
+            Benchmark.startMeasure("Preprocessing geo data for one filter");
             this.preprocessGeoData(data, tag);
+            Benchmark.stopMeasure("Preprocessing geo data for one filter");
           }
         }
       })
     );
 
-    Benchmark.stopMeasure("Performing osm query for active filters");
-
-    //console.log("Finished adding data to map!");
+    Benchmark.stopMeasure("Loading for all active filters");
+    // hide the snackbar after data has finished loading
+    hideSnackbar();
 
     let success = true;
     for (const res of allResults) {
@@ -262,22 +263,21 @@ export default class MapController {
         break;
       }
     }
-
     if (!success) {
       showSnackbar("Nicht alle Daten konnten erfolgreich geladen werden", SnackbarType.ERROR, 1500);
       //return;
     }
 
-    // hide the snackbar after data has finished loading
-    hideSnackbar();
-
+    Benchmark.startMeasure("show Areas on Map");
     this.showAreasOnMap();
+    Benchmark.stopMeasure("show Areas on Map");
   }
 
   showAreasOnMap(): void {
     //update / show the overlay if this visual type is activated
     if (this.selectedVisualType === VisualType.OVERLAY) {
       if (mapLayerManager.geojsonSourceActive) {
+        // remove layers from other visual type
         mapLayerManager.removeAllDataFromMap();
       }
 
@@ -298,7 +298,7 @@ export default class MapController {
 
     if (this.selectedVisualType === VisualType.OVERLAY) {
       mapLayerManager.removeCanvasSource("overlaySource");
-      this.addAreaOverlay(); //recreate overlay without this filter layer
+      this.addAreaOverlay(); //recreate overlay without the given filter layer
     } else {
       mapLayerManager.removeGeojsonSource(sourceName);
     }
@@ -313,15 +313,14 @@ export default class MapController {
   }
 
   showDataOnMap(data: any, tagName: string): void {
-    //console.log("Tagname: ", tagName);
-
+    Benchmark.startMeasure("showing geojson data on map");
     //const ftCollection = featureCollection(data);
 
     //remove area overlay if it exists
     if (map.getSource("overlaySource")) {
       mapLayerManager.removeCanvasSource("overlaySource");
     }
-
+    //remove all current layers
     mapLayerManager.removeAllLayersForSource(tagName);
 
     if (map.getSource(tagName)) {
@@ -335,14 +334,17 @@ export default class MapController {
 
     //show the source data on the map
     mapLayerManager.addLayersForSource(tagName);
+
+    Benchmark.stopMeasure("showing geojson data on map");
   }
 
   //! most of the data preprocessing could (and probably should) already happen on the server!
-  //! (after the data has been fetched and before being saved in Redis)
+  //! (maybe after the data has been fetched and before being saved in Redis)
   preprocessGeoData(
     data: FeatureCollection<GeometryObject, any>,
     dataName: string
   ): FilterLayer | null {
+    //* split up multipoints, multilinestrings and multipolygons into normal ones
     //const flattenedData = mapboxUtils.flattenMultiGeometry(data);
 
     // truncate geojson precision to 4 decimals;
@@ -356,29 +358,27 @@ export default class MapController {
     }
 
     //! reset arrays for this layer
-    //! the new and the old information (if any) could probably be merged somehow to improve this
+    //TODO the new and the old information (if any) could probably be merged somehow to improve this
     layer.Points.length = 0;
     layer.Features.length = 0;
 
     // convert to pixels and add these to filterlayer
     for (let index = 0; index < truncatedData.features.length; index++) {
       const feature = truncatedData.features[index];
+
+      Benchmark.startMeasure("buffering polygon");
       const bufferedPoly = addBufferToFeature(feature, layer.Distance, "meters");
+      Benchmark.stopMeasure("buffering polygon");
 
       layer.Features.push(bufferedPoly);
 
-      mapboxUtils.convertPolygonCoordsToPixels(bufferedPoly, layer);
+      mapboxUtils.convertPolygonCoordsToPixelCoords(bufferedPoly, layer);
     }
-
-    //console.log("allPoints in layer:", layer.Points);
-    //console.log("allfeatures in layer:", layer.Features);
 
     return layer;
   }
 
   addAreaOverlay(): void {
-    //console.log("FilterManager in addAreaOverlay: ", FilterManager);
-
     /**
      * FilterManager.allFilterLayers should look like this at this point:
      *[
@@ -405,7 +405,7 @@ export default class MapController {
     if (FilterManager.allFilterLayers.length > 0) {
       createOverlay(FilterManager.allFilterLayers);
     } else {
-      console.log("Creating an overlay is not possible because overlayData is empty!");
+      console.warn("Creating an overlay is not possible because overlayData is empty!");
     }
   }
 }

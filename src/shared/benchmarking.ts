@@ -1,7 +1,7 @@
 //import { performance } from "perf_hooks";
 
 //! using performance.now() might be a little bit more accurate, but it works a little bit different on the
-// node server than on the client, which might make measurements inaccurate?
+//! node server than on the client, which might make measurements inaccurate?
 
 const NUMBER_OF_EXECUTIONS = 50;
 

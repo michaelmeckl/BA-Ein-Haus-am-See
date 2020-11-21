@@ -4,6 +4,7 @@ import fs from "fs";
 import { OK } from "http-status-codes";
 import querystring from "querystring";
 import Benchmark from "../shared/benchmarking";
+import { Config } from "../shared/config";
 import RedisCache from "./redisCache";
 import * as ServerUtils from "./serverUtils";
 /*
@@ -45,7 +46,7 @@ export default class OsmRouter {
       fs.writeFile(
         `./public/logs/log_${date.getDate()}_${date.getHours()}_${date.getMinutes()}.txt`,
         logs,
-        (err) => {
+        (err: any) => {
           if (err) {
             console.error(err);
             return res.send("saving log failed!");
@@ -68,36 +69,32 @@ export default class OsmRouter {
         const query = req.query.osmQuery?.toString();
 
         if (bounds && query) {
-          // TODO: show user some kind of progress information: progress bar or simply percentage / remaining time!
+          // TODO show user some kind of progress information: progress bar or simply percentage / remaining time!
           //res.status(200).send("Got it! You sent: " + query + ",\n" + bounds);
           const compositeKey = (bounds + "/" + query).trim().toLowerCase();
           const osmQuery = ServerUtils.buildOverpassQuery(bounds, query);
 
           try {
-            //Benchmark.startMeasure("Getting data from osm total");
+            Benchmark.startMeasure("Getting data from overpass api");
             const encodedQuery = querystring.stringify({ data: osmQuery });
             const geoData = await axios.get(
-              `https://overpass-api.de/api/interpreter?${encodedQuery}`, //TODO change to local version below
-              // local overpass api (docker image)
-              //const url = `https://localhost:12347/api/interpreter?${encodedQuery}`;
-              { timeout: 8000 }
+              //`https://overpass-api.de/api/interpreter?${encodedQuery}`, // official overpass api (online version)
+              //`https://localhost:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // local overpass api (docker image)
+              `http://pro.mi.ur.de:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // hosted overpass api on project server
+              { timeout: 12000 }
             );
-            //Benchmark.stopMeasure("Getting data from osm total");
+            Benchmark.stopMeasure("Getting data from overpass api");
 
-            //remove tags as we don't need them
+            //* remove tags as we don't need them on the frontend (small performance improvement)
             geoData.data.elements.forEach((el: any) => {
               el.tags = {};
             });
 
-            //TODO redis spatial features genauer anschauen, die könnten das hier um einiges verbessern vllt
-
-            //Benchmark.startMeasure("Caching data");
             // cache data for one hour, this should be enough for a typical usecase
             //const cacheTime = 3600;
             //! cache only for 15 minutes during study to prevent influencing the next participant!
             const cacheTime = 900;
             RedisCache.cacheData(compositeKey, geoData.data, cacheTime);
-            //Benchmark.stopMeasure("Caching data");
 
             //this.saveGeoData(geoData.data, query);
 
@@ -115,7 +112,6 @@ export default class OsmRouter {
       }
     );
 
-    //TODO vllt sinnvoll für osmium?
     /*
     this.osmRouter.get("/getMask", async (req: Request, res: Response, next: NextFunction) => {
       const queryParam = req.query.filter;
@@ -155,12 +151,11 @@ export default class OsmRouter {
     const query = req.query.osmQuery?.toString();
     //console.log("Check RedisCache Request:\n" + query + "\n" + bounds);
 
-    //TODO am besten nicht die exakten Bounds, sondern auf überlappung prüfen und nur nötiges holen?
-    //TODO vllt mit einer geospatial query möglich?? siehe Redis Plugin für Geodaten!
+    //TODO needs some major improvement! don't only check for exact key but instead check for overlap in bounds ?
     const compositeKey = (bounds + "/" + query).trim().toLowerCase();
-    //Benchmark.startMeasure("Getting data from cache");
+    //Benchmark.startMeasure("Getting data from redis cache");
     const result = await RedisCache.fetchDataFromCache(compositeKey);
-    //Benchmark.stopMeasure("Getting data from cache");
+    //Benchmark.stopMeasure("Getting data from redis cache");
 
     if (result) {
       //console.log("Found in cache!");
@@ -171,7 +166,7 @@ export default class OsmRouter {
     }
   };
 
-  //! geht nur in linux
+  //! only works in linux
   /*
   testNodeOsmium(): void {
     console.time("read with osmium");

@@ -6,7 +6,7 @@ Made with Mapbox GL & OpenStreetMap.
 
 ## Requirements
 
-The application needs a redis instance as well as the docker version of the Overpass-API running locally to work so these need to be setup before running the application. The docker version of the overpass api can be installed from Dockerhub (**Link TODO**). For detailed instructions on how to set this up, see **TODO wiktorn dockerhub**. The application assumes the Redis Instance is available at port **TODO** and the local Overpass API runs at **TODO**. You can of course change this in the code itself.
+The application needs a redis instance as well as the docker version of the Overpass-API running locally to work so these need to be setup before running the application. The docker version of the overpass api can be found at Dockerhub (<https://hub.docker.com/r/wiktorn/overpass-api>). For detailed instructions on how to set this up, see the instructions and examples there. The application assumes the Redis Instance is available at port 6379 and the local Overpass API runs at the port that was specified when building the docker image (something like 12345 or 12346 if you followed the examples). You can of course change this in the code (in the config.ts - File).
 
 ## Build Instructions
 
@@ -17,11 +17,13 @@ npm install
 npm start
 ```
 
-If everything worked well you can visit the website in your browser at <http://localhost:8000>. Note that the application uses WebGL and some other newer web technologies that may not be supported in all browsers (certainly not in IE). The application was only tested in current versions of Google Chrome and Firefox so I recommend using one of these.
+If everything worked well you can visit the website in your browser at <http://localhost:8000>. Note that the application uses WebGL and some other newer web technologies that may not be supported in all browsers (certainly not in IE). The application was only tested in current versions of Google Chrome and Firefox so I recommend using one of these. Some early tests suggest that it might also work as intended on current versions of Microsoft Edge and Opera.
 
 ## Demo
 
 **TODO add screenshot and / or GIF**
+
+**At the moment the website is available at <http://pro.mi.ur.de:8000> (but this might change soon probably).**
 
 ## License
 

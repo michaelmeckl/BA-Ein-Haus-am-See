@@ -84,8 +84,8 @@ export function getVSForGaussBlur(): string {
   `;
 }
 
-//* 2D gaussian blur fs:
-// see. http://pieper.github.io/sites/glimp/gaussian.html
+//* 2D gaussian blur fragment shader:
+//* original code taken from  http://pieper.github.io/sites/glimp/gaussian.html
 //! The for loop should be unrolled for better performance!
 export function getGaussianBlurFS(): string {
   return `

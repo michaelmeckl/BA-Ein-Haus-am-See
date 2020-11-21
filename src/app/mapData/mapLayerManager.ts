@@ -6,10 +6,11 @@ import type {
   Geometry,
   GeometryObject,
 } from "geojson";
-import type { CustomLayerInterface, GeoJSONSource, Layer } from "mapbox-gl";
-//import ClusterManager from "../map/clusterManager";
+import type { CustomLayerInterface, Layer } from "mapbox-gl";
 import { map } from "../map/mapboxConfig";
 import Legend from "./legend";
+import { TagColors } from "./osmTagCollection";
+//import ClusterManager from "../map/clusterManager";
 
 type mapboxLayerType =
   | "symbol"
@@ -23,34 +24,18 @@ type mapboxLayerType =
   | "hillshade"
   | undefined;
 
-export const TagColors = new Map([
-  ["Bar", "#7209b7"],
-  ["Restaurant", "#e63946"],
-  ["Cafe", "#38a3a5"],
-  ["Schule", "#aa998f"],
-  ["Parks und Grünflächen", "#90be6d"],
-  ["Universität und Hochschule", "#cb997e"],
-  ["Supermarkt", "#fe7f2d"],
-  ["Einkaufszentrum", "#f20089"],
-  ["Bahnhof", "#a44a3f"],
-  ["Bushaltestelle", "#00b4d8"],
-  ["Parkplatz", "#de9e36"],
-  ["Autobahn", "#f4a261"],
-  ["Fluss", "#1d3557"],
-  ["Wald", "#386641"],
-]);
-
 //all possible geojson geometry types
 const pointType = ["Point", "MultiPoint"],
   lineType = ["LineString", "MultiLineString"],
   polygonType = ["Polygon", "MultiPolygon"];
 
 // declare some filters for clustering
+//! clustering does work but needs some improvement (not used in the final version)
 const bar = ["==", ["get", "amenity"], "Bar"];
 const restaurant = ["==", ["get", "amenity"], "Restaurant"];
 const supermarket = ["==", ["get", "amenity"], "Supermarket"];
 const cafe = ["==", ["get", "amenity"], "Cafe"];
-const other = ["==", ["get", "amenity"], ""]; //TODO oder null statt leerstring?
+const other = ["==", ["get", "amenity"], ""];
 
 /**
  * Util-Class to handle all sorts of source and layer related methods and keep track of all active (or hidden)
@@ -58,7 +43,7 @@ const other = ["==", ["get", "amenity"], ""]; //TODO oder null statt leerstring?
  */
 class MapLayerManager {
   private visibleLayers: (Layer | CustomLayerInterface)[] = [];
-  private hiddenLayers: (Layer | CustomLayerInterface)[] = [];
+  private hiddenLayers: (Layer | CustomLayerInterface)[] = []; //! not used yet
 
   // small performance optimizations:
   private minZoom = 6; // Bavaria can be seen as a whole on this level
@@ -67,7 +52,7 @@ class MapLayerManager {
   private legend: Legend;
   private legendIsShown = false;
 
-  geojsonSourceActive = false;
+  geojsonSourceActive = false; // keep track of the type of shown mapbox layer (i.e. geojson or canvas)
 
   constructor() {
     this.legend = new Legend();
@@ -125,8 +110,6 @@ class MapLayerManager {
     }
 
     map.addSource(tagName, { type: "geojson", ...sourceOptions });
-    //console.log("Source: ", map.getSource(sourceName));
-
     this.geojsonSourceActive = true;
 
     this.updateLegend(tagName);
@@ -160,11 +143,12 @@ class MapLayerManager {
     id: string,
     data: FeatureCollection<GeometryObject, GeoJsonProperties>
   ): boolean {
-    if (map.getSource(id)?.type !== "geojson") {
-      return false;
+    const source = map.getSource(id);
+    if (source.type === "geojson") {
+      const result = source.setData(data);
+      return result ? true : false;
     }
-    const result = (map.getSource(id) as GeoJSONSource).setData(data);
-    return result ? true : false;
+    return false;
   }
 
   addNewCanvasSource(sourceName: string, canvas: HTMLCanvasElement, bounds: number[][]): void {
@@ -207,7 +191,7 @@ class MapLayerManager {
    * ####################################
    */
 
-  //add item to legend and show if it isn't shown already
+  //add item to legend and show it if it isn't shown already
   private updateLegend(tagName: string): void {
     const color = TagColors.get(tagName);
 
@@ -271,7 +255,6 @@ class MapLayerManager {
     this.visibleLayers = this.visibleLayers.filter((el) => el.id !== layer.id);
     this.hiddenLayers.push(layer);
 
-    //TODO remove / hide from legend as well?
     /*
     //remove it from the legend
     this.removeSourceFromLegend();
@@ -279,11 +262,10 @@ class MapLayerManager {
   }
 
   removeGeojsonLayerFromMap(layerId: string): void {
-    //console.log("removing layer from map: ", layerId);
     //remove it from the map
     map.removeLayer(layerId);
 
-    // remove it from the local lists
+    // remove it from the local lists by filtering it out
     this.visibleLayers = this.visibleLayers.filter((el) => el.id !== layerId);
     this.hiddenLayers = this.hiddenLayers.filter((el) => el.id !== layerId);
   }
@@ -311,7 +293,8 @@ class MapLayerManager {
   addLayersForSource(sourceName: string): void {
     const tagColor = TagColors.get(sourceName);
 
-    //! with ["has", "name"] it can be tested if something exists in the properties
+    //! with ["has", "name"] it can be tested if something exists in the geojson properties
+
     const pointLayer: Layer = {
       id: sourceName + "-l1",
       type: "circle",
@@ -389,11 +372,9 @@ class MapLayerManager {
     };
     */
 
-    //show points below the map symbols
+    //! add the layers to the map and show them below the map symbols so they don't hide labels and names
     this.addNewGeojsonLayer(pointLayer, true);
-    //show lines
     this.addNewGeojsonLayer(lineLayer, true);
-    //show filled polygons
     this.addNewGeojsonLayer(polygonFillLayer, true);
   }
 
@@ -435,7 +416,7 @@ class MapLayerManager {
     //clear all sources on map
     const allSources = map.getStyle().sources;
     for (const source in allSources) {
-      // "composite" is the default vector layer of mapbox-streets; don't delete this!
+      //! "composite" is the default vector layer of mapbox-streets; don't delete this!
       if (source !== "composite") {
         if (source === "overlaySource") {
           this.removeCanvasSource(source);
@@ -458,6 +439,7 @@ class MapLayerManager {
     }
   }
 
+  //! Classic Heatmap does work, but isn't selectable as a visual type in the UI yet
   /*
   addHeatmapLayer(data?: string): void {
     const heatmap = new Heatmap(data);

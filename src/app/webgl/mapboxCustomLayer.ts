@@ -1,6 +1,5 @@
 import * as webglUtils from "./webglUtils";
 import * as twgl from "twgl.js";
-import { map } from "../map/mapboxConfig";
 import { defaultVertexShader } from "./shaders";
 
 //! das custom Layer unterstützt nur webgl1 !
@@ -56,9 +55,6 @@ export class MapboxCustomLayer {
    * see https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
    */
   onAdd(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
-    //console.log("in onAdd: ", gl.canvas.getContext("webgl"));
-    //console.log("in onAdd: ", gl.canvas.getContext("webgl2"));
-
     const vertexSource = defaultVertexShader();
     this.program = twgl.createProgramFromSources(gl, [vertexSource, fragmentSource2]);
 
@@ -107,7 +103,6 @@ export class MapboxCustomLayer {
    *               the mercator world and  [1, 1] represents the bottom right corner.
    */
   render(gl: WebGLRenderingContext, matrix: number[]): void {
-    //TODO ein paar der aufrufe könnten theoretisch auch schon in onAdd ausgelagert werden -> Testen!
     gl.useProgram(this.program);
 
     // set the map camera matrix
@@ -126,17 +121,8 @@ export class MapboxCustomLayer {
     //enable alpha blending
     gl.enable(gl.BLEND);
     //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    //TODO andere blend Functions benutzen?
     // diese ist laut https://limnu.com/webgl-blending-youre-probably-wrong/ die "beste" für "premultiplied alphas"
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    // oder das:
-    // used for blending pixel arithmetic for RGB and alpha components separately:
-    //gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    //TODO oder:
-    /*
-    gl.blendFuncSeparate(gl.ONE_MINUS_DST_ALPHA, gl.ONE_MINUS_DST_ALPHA, gl.ONE, gl.ONE);
-    gl.blendEquation(gl.FUNC_ADD);
-    */
 
     // enable Stencil Buffer
 
@@ -196,8 +182,6 @@ export class MapboxCustomLayer {
     gl.vertexAttribPointer(this.aPos2, size2, gl.FLOAT, normalized2, stride2, 0);
 
     gl.drawArrays(gl.TRIANGLES, 0, this.data.length / 2);
-
-    //TODO ? map.triggerRepaint();
   }
 
   /**
@@ -206,10 +190,8 @@ export class MapboxCustomLayer {
    */
   onRemove(map: mapboxgl.Map, gl: WebGLRenderingContext): void {
     // Cleanup resources
-    this.buffer = null;
-    // TODO oder:
     // desallocate memory after send data to avoid memory leak issues
-    //gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
     // delete the gl context
     //delete this.gl;
@@ -224,7 +206,7 @@ export class MapboxCustomLayer {
    * before rendering.
    */
   prerender(gl: WebGLRenderingContext, matrix: number[]): void {
-    //TODO If the layer needs to render to a texture, it should implement the `prerender` method
+    //* If the layer needs to render to a texture, it should implement the `prerender` method
     // to do this and only use the `render` method for drawing directly into the main framebuffer.
     //Kommentar Ansis: "So if you need to use gl to draw into a gl texture you should do that in prerender"
   }

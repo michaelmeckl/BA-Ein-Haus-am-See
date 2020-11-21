@@ -15,7 +15,7 @@ export function buildOverpassQuery(bounds: string, userQuery: string): string {
 }
 
 /**
- * TODO the code below is only for executing local cmd scripts!
+ * TODO the code below is only needed for executing local cmd scripts! (not used right now)
  */
 
 /*
@@ -56,16 +56,16 @@ export async function executeOSMFilter(path: string): Promise<string | null> {
 
 // executes command line scripts
 export async function executeScript(script: string): Promise<void> {
-  // TODO: check for correct os!
+  // TODO check for correct os!
   const platform = getPlatform();
   let exampleScript: string;
 
   if (platform === "win32") {
     exampleScript = "docker -v";
-    //TODO: use cmd (or test.bat)
+    //TODO use cmd (or test.bat)
   } else if (platform === "linux") {
     exampleScript = "ls";
-    //TODO: use test.sh
+    //TODO use test.sh
   } else {
     console.error("Only Windows and Linux are supported at the moment!");
     return;
@@ -84,7 +84,7 @@ export async function executeScript(script: string): Promise<void> {
   }
 }
 
-//TODO: spawn besser für memory-intensive tasks!
+//TODO spawn besser für memory-intensive tasks!
 
 export async function executeFile(command: string): Promise<void> {
   const script = exec("sh test.sh /myDir");
