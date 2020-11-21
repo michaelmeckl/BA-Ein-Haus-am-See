@@ -75,7 +75,7 @@ class TagCollection {
         return 'nwr["highway"~"^motorway|motorway_link$"];';
 
       case TagNames.Parks:
-        return 'nwr["leisure"~"^park|nature_reserve|village_green|recreation_ground$"];';
+        return 'nwr["leisure"~"^park|nature_reserve$"]; nwr["landuse"~"^village_green|recreation_ground$"];';
 
       // landuse=meadow für Wiesen auch verwenden ?
 

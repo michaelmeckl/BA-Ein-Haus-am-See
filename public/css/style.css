@@ -35,6 +35,12 @@ body {
     border-top: 3px solid #bbb;
 }
 
+/* TODO */
+.mapboxgl-ctrl-attrib-button {
+    display: none;
+}
+
+
 /** Headline Styling */
 
 .heading {
