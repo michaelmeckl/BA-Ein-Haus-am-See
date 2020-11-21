@@ -2,6 +2,7 @@ import { map } from "./map/mapboxConfig";
 
 /**
  * This class is used to control performance measuring (fps) for the mapbox map.
+ * This code is based on https://github.com/mapbox/mapbox-gl-framerate and was slightly reduced and modified.
  */
 export class PerformanceMeasurer {
   private frames = 0;

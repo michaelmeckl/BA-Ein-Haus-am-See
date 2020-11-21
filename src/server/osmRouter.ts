@@ -79,8 +79,8 @@ export default class OsmRouter {
             const encodedQuery = querystring.stringify({ data: osmQuery });
             const geoData = await axios.get(
               //`https://overpass-api.de/api/interpreter?${encodedQuery}`, // official overpass api (online version)
-              `http://localhost:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // local overpass api (docker image)
-              //`http://pro.mi.ur.de:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // hosted overpass api on project server
+              //`http://localhost:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // local overpass api (docker image)
+              `http://pro.mi.ur.de:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // hosted overpass api on project server
               { timeout: 12000 }
             );
             Benchmark.stopMeasure("Fetching data from overpass api");

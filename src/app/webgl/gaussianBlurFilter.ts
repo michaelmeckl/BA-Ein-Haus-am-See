@@ -57,17 +57,10 @@ renderCanvas.addEventListener(
 );
 renderCanvas.addEventListener("webglcontextrestored", init, false);
 
-function setupProgram(blurStrength: number): void {
-  let blurSize = Math.floor(blurStrength / 2); // divide by 2 to make it look a bit sharper
-
-  if (blurSize === 0) {
-    blurSize = 15; //default value to prevent dividing by zero in glsl
-  }
-
+function setupProgram(blurSize: number): void {
   //! the blur size needs to be defined as a constant so it can be used as an array index in the shader!
   //const blurShaderSource = `#version 300 es\n#define MSIZE ${blurSize}` + getGaussianBlurFS();
   const blurShaderSource = `#define MSIZE ${blurSize}` + getGaussianBlurFS();
-  //const blurShaderSource = `#define MSIZE 25` + getGaussianBlurFS();
 
   // create and link program
   glProgram = twgl.createProgramFromSources(gl, [getVSForGaussBlur(), blurShaderSource]);

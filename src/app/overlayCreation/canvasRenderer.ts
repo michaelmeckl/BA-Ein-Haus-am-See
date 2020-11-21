@@ -4,7 +4,11 @@ import type { FilterLayer } from "../mapData/filterLayer";
 import { applyGaussianBlur, setupGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
 import { combineOverlayFragmentShader, defaultVertexShader } from "../webgl/shaders";
 import * as webglUtils from "../webgl/webglUtils";
-import { fastGaußBlur, makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
+import {
+  applyFastGaußBlur,
+  makeAlphaMask as applyAlphaMask,
+  readImageFromCanvas,
+} from "./canvasUtils";
 import { map } from "../map/mapboxConfig";
 import { metersInPixel } from "../map/mapboxUtils";
 import { handleWebglInitError, showSnackbar, SnackbarType } from "../utils";
@@ -29,6 +33,8 @@ class CanvasRenderer {
   private weights: number[] = [];
   allTextures: HTMLImageElement[] = [];
 
+  private currentBlurSize = 0;
+
   constructor() {
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
     canvas.width = map.getCanvas().clientWidth;
@@ -43,7 +49,7 @@ class CanvasRenderer {
     this.ctx = context;
 
     // setup the webgl code for the gaussian blur filter
-    //setupGaussianBlurFilter();
+    setupGaussianBlurFilter();
   }
 
   /**
@@ -53,29 +59,15 @@ class CanvasRenderer {
   async renderPolygons(mapLayer: FilterLayer): Promise<any> {
     // clear the canvas
     this.ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-
     this.weights.push(mapLayer.Relevance);
 
-    /*
-    const pixelDist = metersInPixel(mapLayer.Distance, map.getCenter().lat, map.getZoom());
-    console.log("PixelDist: ", pixelDist);
+    // calculate the blur size for this layer based on the distance the user specified
+    this.calculateBlurSize(mapLayer.Distance);
 
-    let blurStrength;
-    if (pixelDist > 100) {
-      blurStrength = pixelDist / 10;
-    } else if (pixelDist > 20) {
-      blurStrength = pixelDist / 4;
-    } else {
-      blurStrength = 7;
-    }
-    console.warn("blurStrength: ", blurStrength);
+    Benchmark.startMeasure("render polygons of this layer");
 
     // apply a "feather"/blur - effect to everything that is drawn on the canvas from now on
-    this.ctx.filter = `blur(${blurStrength}px)`;
-    */
-    //TODO a good function to bring the pixelDistance in relation to the blur size is still needed!
-    //TODO -> should probably have an upper and lower bound (?) and needs to rise quite slow
-    this.ctx.filter = "blur(7px)";
+    //this.ctx.filter = `blur(${this.currentBlurSize}px)`;
 
     if (mapLayer.Wanted) {
       //fill canvas black initially
@@ -92,8 +84,6 @@ class CanvasRenderer {
       // fill polygons black, fully opaque
       this.ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
     }
-
-    Benchmark.startMeasure("render all polygons of one layer");
 
     for (const polygon of mapLayer.Points) {
       const startPoint = polygon[0];
@@ -113,29 +103,56 @@ class CanvasRenderer {
       this.ctx.fill("evenodd");
     }
 
-    console.warn("constant canvas blur applied!");
-    Benchmark.stopMeasure("render all polygons of one layer");
-
-    /*
-    const img = await readImageFromCanvas(this.overlayCanvas);
-
-    Benchmark.startMeasure("blur Image in Webgl");
-    const blurredCanvas = applyGaussianBlur(img, pixelDist);
-    Benchmark.stopMeasure("blur Image in Webgl");
-
-    // draw blurred canvas on the overlayCanvas
-    this.ctx.drawImage(blurredCanvas, 0, 0);
-    */
+    Benchmark.stopMeasure("render polygons of this layer");
 
     /*
     Benchmark.startMeasure("fastgaussblur");
-    fastGaußBlur(this.ctx, this.overlayCanvas);
+    applyFastGaußBlur(this.ctx, this.overlayCanvas, this.currentBlurSize);
     Benchmark.stopMeasure("fastgaussblur");
     */
 
+    await this.applyGaussianBlur();
+
+    Benchmark.startMeasure("read and save final layer image from canvas");
     const blurredImage = await readImageFromCanvas(this.overlayCanvas);
     // save the blurred image for this layer
     this.allTextures.push(blurredImage);
+    Benchmark.stopMeasure("read and save final layer image from canvas");
+
+    //console.warn("webgl blur is currently used!");
+  }
+
+  //TODO a better function to bring the pixelDistance in relation to the blur size is still needed!
+  //TODO -> should probably rise quite slow (upper bound maybe not even necessary?)
+  calculateBlurSize(layerDistance: number): void {
+    const pixelDist = metersInPixel(layerDistance, map.getCenter().lat, map.getZoom());
+
+    // divide by 2 to make it look a bit sharper
+    // floor is needed for glsl to provide an integer which can be used as the matrix size
+    let blurStrength = Math.floor(pixelDist / 2);
+
+    //! define upper and lower bounds to prevent dividing by zero in glsl or getting a too big matrix
+    //! these bounds are not really necessary for the canvas blur and the faßtgaußblur
+    if (blurStrength <= 5) {
+      blurStrength = 5;
+    } else if (blurStrength >= 80) {
+      blurStrength = 80;
+    }
+
+    this.currentBlurSize = blurStrength;
+  }
+
+  async applyGaussianBlur(): Promise<void> {
+    Benchmark.startMeasure("get image from canvas to blur");
+    const img = await readImageFromCanvas(this.overlayCanvas);
+    Benchmark.stopMeasure("get image from canvas to blur");
+
+    Benchmark.startMeasure("blur Image in Webgl");
+    const blurredCanvas = applyGaussianBlur(img, this.currentBlurSize);
+    Benchmark.stopMeasure("blur Image in Webgl");
+
+    // draw the blurred canvas on the overlayCanvas
+    this.ctx.drawImage(blurredCanvas, 0, 0);
   }
 
   /**

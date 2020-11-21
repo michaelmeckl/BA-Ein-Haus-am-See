@@ -112,7 +112,11 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
 }
 
 // function taken from previous bachelor thesis from Julien Wachter
-export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+export function applyFastGaußBlur(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  size: number
+): void {
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
   const redChannel = [];
@@ -123,9 +127,7 @@ export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
 
   const blurredRedChannel: any[] = [];
 
-  const size = 25;
-
-  //@ts-expect-error
+  //@ts-expect-error - the global fast gauß blur is not recognized here
   FastGaussBlur.apply(redChannel, blurredRedChannel, canvas.width, canvas.height, size);
 
   for (let i = 0; i < imgData.data.length; i += 4) {

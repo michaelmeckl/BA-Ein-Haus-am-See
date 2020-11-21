@@ -268,9 +268,7 @@ export default class MapController {
       //return;
     }
 
-    Benchmark.startMeasure("show Areas on Map");
     this.showAreasOnMap();
-    Benchmark.stopMeasure("show Areas on Map");
   }
 
   showAreasOnMap(): void {
@@ -347,10 +345,13 @@ export default class MapController {
     //* split up multipoints, multilinestrings and multipolygons into normal ones
     //const flattenedData = mapboxUtils.flattenMultiGeometry(data);
 
+    //Benchmark.startMeasure("truncate geodata");
+
     // truncate geojson precision to 4 decimals;
     // this increases performance and the perfectly exact coords aren't necessary for the area overlay
     const options = { precision: 4, coordinates: 2, mutate: true };
     const truncatedData: FeatureCollection<Geometry, any> = truncate(data, options);
+    //Benchmark.stopMeasure("truncate geodata");
 
     const layer = FilterManager.getFilterLayer(dataName);
     if (!layer) {
