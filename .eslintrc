@@ -1,0 +1,68 @@
+{
+  "root": true,
+  "env": {
+    "es6": true,
+    "browser": true,
+    "node": true
+  },
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "sourceType": "module"
+  },
+  "plugins": [
+    "@typescript-eslint"
+    //"prettier"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "rules": {
+    "block-scoped-var": "warn",
+    "camelcase": "warn",
+    "comma-dangle": ["warn", "always-multiline"],
+    "consistent-return": "error",
+    "curly": "error",
+    "default-case": "error",
+    "eqeqeq": "error",
+    "guard-for-in": "error",
+    "no-alert": "error",
+    "no-console": "off",
+    "no-debugger": "warn",
+    "no-else-return": "error",
+    "no-empty-function": "warn",
+    "no-eval": "error",
+    "no-eq-null": "error",
+    "no-extend-native": "warn",
+    "no-extra-bind": "error",
+    "no-loop-func": "error",
+    "no-magic-numbers": ["warn", {
+      "ignore": [0, 1, -1, 2],
+      "ignoreArrayIndexes": true
+    }],
+    "no-multiple-empty-lines": ["warn", {
+      "max": 1
+    }],
+    "no-multi-spaces": "warn",
+    "no-new": "error",
+    "no-new-func": "error",
+    "no-new-wrappers": "error",
+    "no-unused-expressions": "warn",
+    "no-useless-concat": "error",
+    "no-undef-init": "error",
+    "no-underscore-dangle": "error",
+    "no-param-reassign": "error",
+    "no-self-compare": "error",
+    "no-var": "warn",
+    "no-void": "error",
+    "no-with": "error",
+    "one-var": "off",
+    "quotes": ["warn", "double"],
+    "semi": "error",
+    "strict": "error",
+    "vars-on-top": "error",
+    "yoda": "error"
+  }
+}

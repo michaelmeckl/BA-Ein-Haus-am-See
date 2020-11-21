@@ -1,0 +1,672 @@
+/* Include the padding and border in an element's total width and height */
+* {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    font: 300 14px/20px Helvetica, Verdana, Geneva, Sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+
+/** General Stylings */
+
+.hidden {
+    display: none;
+    opacity: 0;
+
+    /* better performance than display: none as transform can use hardware acceleration but unfortunately leaves the space
+    transform: scale(0);*/
+}
+
+.divider {
+    border-top: 3px solid #bbb;
+}
+
+/* TODO */
+.mapboxgl-ctrl-attrib-button {
+    display: none;
+}
+
+
+/** Headline Styling */
+
+.heading {
+    background-color: lavender;
+    z-index: 2;
+    height: 50px;
+    box-shadow: 0.5px 0.5px 3px 0px rgba(0, 0, 0, .6);
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+}
+
+.heading h1 {
+    font-weight: normal;
+}
+
+.head-btn {
+    margin-bottom: 1em;
+    padding: 0.6em;
+
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    border-radius: 2px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+    background-color: #06a046;
+    color: whitesmoke;
+}
+
+.head-btn:hover,
+.head-btn:active {
+    background-color: #058f3e;
+}
+
+#resetMapButton {
+    margin-bottom: 1em;
+    padding: 0.6em;
+
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    border-radius: 6px;
+    background-color: #be150f;
+    color: whitesmoke;
+}
+
+#resetMapButton:hover,
+#resetMapButton:active {
+    background-color: #a30d08;
+}
+
+.button-disabled {
+    opacity: 0.4;
+    background-color: #5c5c5c;
+    cursor: auto;
+}
+
+.button-disabled:hover,
+.button-disabled:active {
+    background-color: #5c5c5c;
+}
+
+/** Map Styling */
+
+#mapContainer {
+    transition: margin-left .5s;
+}
+
+#map {
+    position: absolute;
+    width: 100%;
+    height: calc(100% - 50px);
+    bottom: 0;
+}
+
+/** Legend Styling */
+
+.map-overlay {
+    position: absolute;
+    bottom: 10px;
+    right: -10px;
+    background: rgba(255, 255, 255, 0.8);
+    margin-right: 20px;
+    font-family: Arial, sans-serif;
+    overflow: auto;
+    border-radius: 3px;
+}
+
+#legend {
+    padding: 10px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    line-height: 18px;
+    height: 220px;
+    margin-bottom: 50px;
+    width: 150px;
+}
+
+.legend-key {
+    display: inline-block;
+    border-radius: 20%;
+    width: 10px;
+    height: 10px;
+    margin-right: 5px;
+}
+
+/** Upload button - very small in the bottom rigth corner so users are not disturbed by it */
+#uploadLogsButton {
+    position: absolute;
+    bottom: 22px;
+    font-size: 0.7em;
+    right: 2px;
+    padding: 0.4em;
+    cursor: pointer;
+    border-width: 0;
+    background-color: #dadada;
+    color: #2f2f2fd6;
+}
+
+#visualMode-dropdown {
+    display: inline-flex;
+    position: relative;
+    -webkit-align-items: center;
+    align-items: center;
+    margin-bottom: 1em;
+}
+
+.mode-label {
+    display: inline;
+    font-size: 16px;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+.select-box {
+    font-style: italic;
+    opacity: .7;
+    line-height: 24px;
+    padding: 6px 30px 6px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    display: inline;
+    width: 100%;
+}
+
+/* Caret down icon */
+.caret-down {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgb(99 99 99);
+    float: right;
+    margin: 5px;
+}
+
+/* Caret up icon */
+.caret-up {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid rgb(99 99 99);
+    float: right;
+    margin: 5px;
+}
+
+/** Snackbar Styling */
+
+#snackbar {
+    visibility: hidden;
+    min-width: 250px;
+    background-color: darkviolet;
+    color: #fff;
+    text-align: center;
+    border-radius: 2px;
+    padding: 16px;
+    position: fixed;
+    z-index: 3;
+    left: 15px;
+    bottom: 30px;
+    font-size: 17px;
+}
+
+#snackbar.show {
+    visibility: visible;
+    -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
+    animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+@-webkit-keyframes fadein {
+    from {
+        bottom: 0;
+        opacity: 0;
+    }
+
+    to {
+        bottom: 30px;
+        opacity: 1;
+    }
+}
+
+@keyframes fadein {
+    from {
+        bottom: 0;
+        opacity: 0;
+    }
+
+    to {
+        bottom: 30px;
+        opacity: 1;
+    }
+}
+
+@-webkit-keyframes fadeout {
+    from {
+        bottom: 30px;
+        opacity: 1;
+    }
+
+    to {
+        bottom: 0;
+        opacity: 0;
+    }
+}
+
+@keyframes fadeout {
+    from {
+        bottom: 30px;
+        opacity: 1;
+    }
+
+    to {
+        bottom: 0;
+        opacity: 0;
+    }
+}
+
+
+/** Sidebar Styling */
+
+.sidebar {
+    position: fixed;
+    height: calc(100% - 50px);
+    width: 0;
+    top: 50px;
+    left: 0;
+    overflow-y: auto;
+    border-right: 1px solid rgba(0, 0, 0, 0.25);
+    background-color: floralwhite;
+    transition: 0.5s;
+}
+
+.sideHeading {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    background-color: #5cb85c;
+    border-bottom: 1px solid #eee;
+    min-height: 60px;
+    line-height: 60px;
+}
+
+.sideHeading h2 {
+    font-size: 22px;
+    margin: 0;
+    font-weight: 400;
+    padding: 0 10px;
+    color: #fff;
+}
+
+.filter-categories {
+    padding: 6px 8px 14px 16px;
+    text-decoration: none;
+    font-size: 18px;
+    color: #707070;
+    display: block;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    outline: none;
+}
+
+.filter-entries {
+    display: none;
+}
+
+.filter-entries a {
+    display: block;
+    width: 100%;
+    background-color: #f8f0e0;
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+}
+
+.filter-categories:hover {
+    color: #8a8686;
+}
+
+.filter-entries a:hover {
+    background-color: #ece6da;
+}
+
+/* Add an active class to the active dropdown button */
+.active-filter-category {
+    background-color: #acba13;
+    color: whitesmoke;
+}
+
+.sideHeading .closeSidebar {
+    font-size: 30px;
+    flex: 0;
+    text-decoration: none;
+    transition: 0.3s;
+    margin: 0 10px 0 10px;
+    color: #fff;
+}
+
+.sideHeading .closeSidebar:hover {
+    color: #cccccc;
+}
+
+.no-filter {
+    padding: 20px;
+}
+
+#active-filters {
+    font-size: 0.9em;
+    list-style: none;
+    padding: 0 5px 10px 5px;
+}
+
+#active-filters li {
+    position: relative;
+    padding: 6px;
+    margin: 3px 0 3px 0;
+    transition: 0.2s;
+    border: 1px solid lightgray;
+
+    /* make the list items unselectable */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+#active-filters h4 {
+    margin: 4px 0;
+}
+
+#active-filters li:hover {
+    background: #f7f2df;
+}
+
+#remove-filter-button {
+    margin-bottom: 1em;
+    padding: 0.2em 0.4em;
+    margin: 0 6px 1px 2px;
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    float: right;
+    border-radius: 15px;
+    background-color: #e20f00;
+    color: white;
+}
+
+#remove-filter-button:hover,
+#remove-filter-button:active {
+    background-color: #a50d02;
+}
+
+::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+    border-left: 0;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-track {
+    background: none;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #00853e;
+    border-radius: 0;
+}
+
+/** Mapbox Marker Styling */
+
+.marker {
+    border: none;
+    cursor: pointer;
+    height: 40px;
+    width: 32px;
+    background-image: url(../assets/mapbox_marker.png);
+    background-color: rgba(0, 0, 0, 0);
+    background-repeat: no-repeat;
+}
+
+.clearfix {
+    display: block;
+}
+
+.clearfix::after {
+    content: '.';
+    display: block;
+    height: 0;
+    clear: both;
+    visibility: hidden;
+}
+
+/** Modal styling */
+
+/* The modal background */
+.modal {
+    display: none;
+    /* Stay in place */
+    position: fixed;
+    z-index: 2;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    /* Fallback color */
+    background-color: rgb(0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: white;
+    /* 5% from the top and bottom and horizontally centered */
+    margin: 5% auto 5% auto;
+    padding: 0;
+    position: relative;
+    border-radius: 8px;
+
+    width: 35vw;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    -webkit-animation-name: animatetop;
+    -webkit-animation-duration: 0.5s;
+    animation-name: animatetop;
+    animation-duration: 0.5s
+}
+
+.modal-header {
+    padding: 12px 0;
+    background-color: #5cb85c;
+    color: white;
+    /* add rounded corners to top left and top right corner */
+    border-radius: 8px 8px 0 0;
+    /* center heading */
+    display: flex;
+    justify-content: center;
+}
+
+.modal-body {
+    padding: 2px 16px;
+    display: flex;
+    justify-content: center;
+}
+
+/* Add Animation */
+@-webkit-keyframes animatetop {
+    from {
+        top: -300px;
+        opacity: 0
+    }
+
+    to {
+        top: 0;
+        opacity: 1
+    }
+}
+
+@keyframes animatetop {
+    from {
+        top: -300px;
+        opacity: 0
+    }
+
+    to {
+        top: 0;
+        opacity: 1
+    }
+}
+
+.distance-container,
+.importance-container {
+    display: flex;
+    align-items: center;
+}
+
+.settings-label {
+    font-size: 16px;
+    margin-right: 12px;
+}
+
+/* Input Field for distance */
+.distance-input {
+    padding: 6px;
+    margin-right: 8px;
+    width: 8vw;
+    height: 4vh;
+    border: 1px solid gray;
+    border-radius: 2px;
+}
+
+#errormessage {
+    color: red;
+    font-size: 12px;
+}
+
+
+/* Custom Radio Buttons, see https://www.w3schools.com/howto/tryit.asp?filename=tryhow_css_custom_radio */
+/* The container */
+.container {
+    display: block;
+    position: relative;
+    padding-left: 30px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    font-size: 14px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Hide the browser's default radio button */
+.container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* Create a custom radio button */
+.checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 18px;
+    width: 18px;
+    background-color: #eee;
+    border-radius: 50%;
+}
+
+/* On mouse-over, add a grey background color */
+.container:hover input~.checkmark {
+    background-color: #ccc;
+}
+
+/* When the radio button is checked, add a blue background */
+.container input:checked~.checkmark {
+    background-color: #2196F3;
+}
+
+/* Create the indicator (the dot/circle - hidden when not checked) */
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+/* Show the indicator (dot/circle) when checked */
+.container input:checked~.checkmark:after {
+    display: block;
+}
+
+/* Style the indicator (dot/circle) */
+.container .checkmark:after {
+    top: 6px;
+    left: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: white;
+}
+
+#modal-buttons {
+    margin-top: 25px;
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+}
+
+#add-filter-button {
+    margin-bottom: 1em;
+    padding: 0.8em;
+    width: 15vw;
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    border-radius: 4px;
+    background-color: #14bd5a;
+    color: whitesmoke;
+}
+
+#add-filter-button:hover,
+#add-filter-button:active {
+    background-color: #11a74f;
+}
+
+#cancel-button {
+    margin-bottom: 1em;
+    padding: 0.8em;
+    width: 15vw;
+    cursor: pointer;
+    overflow: hidden;
+    border-width: 0;
+    outline: none;
+    border-radius: 4px;
+    background-color: #e8e8e8;
+    color: black;
+}
+
+#cancel-button:hover,
+#cancel-button:active {
+    background-color: #e2dede;
+}
