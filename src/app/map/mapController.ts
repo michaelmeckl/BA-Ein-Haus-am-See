@@ -23,7 +23,7 @@ export const enum VisualType {
 }
 
 // tresholds to prevent reloading when small movements are made (performance optimization)
-const zoomTreshold = 0.5; // zoom level difference -> update if a map zoom event changed more than this
+const zoomTreshold = 0.7; // zoom level difference -> update if a map zoom event changed more than this
 const moveTreshold = 1000; // map center difference in meters
 
 /**
@@ -85,7 +85,7 @@ export default class MapController {
 
     // start measuring the frame rate
     const performanceMeasurer = new PerformanceMeasurer();
-    //performanceMeasurer.startMeasuring();
+    performanceMeasurer.startMeasuring();
 
     //map.showTileBoundaries = true;
 
@@ -205,7 +205,7 @@ export default class MapController {
     //get screen viewport and 500 meter around to compensate for the move treshold for new data
     const bounds = mapboxUtils.getViewportBoundsString(500);
 
-    Benchmark.startMeasure("Loading for all active filters");
+    Benchmark.startMeasure("Loading data for all active filters");
     const allResults = await Promise.allSettled(
       Array.from(allCurrentFilters).map(async (tag) => {
         // get overpass query for each tag
@@ -229,7 +229,7 @@ export default class MapController {
         const data = await fetchOsmDataFromServer(bounds, query);
         Benchmark.stopMeasure("Fetching data from osm");
 
-        console.log("data from server:", data);
+        //console.log("data from server:", data);
 
         if (data) {
           //const filterLayer = this.preprocessGeoData(data, tag);
@@ -252,7 +252,7 @@ export default class MapController {
       })
     );
 
-    Benchmark.stopMeasure("Loading for all active filters");
+    Benchmark.stopMeasure("Loading data for all active filters");
     // hide the snackbar after data has finished loading
     hideSnackbar();
 
@@ -365,10 +365,7 @@ export default class MapController {
     // convert to pixels and add these to filterlayer
     for (let index = 0; index < truncatedData.features.length; index++) {
       const feature = truncatedData.features[index];
-
-      Benchmark.startMeasure("buffering polygon");
       const bufferedPoly = addBufferToFeature(feature, layer.Distance, "meters");
-      Benchmark.stopMeasure("buffering polygon");
 
       layer.Features.push(bufferedPoly);
 

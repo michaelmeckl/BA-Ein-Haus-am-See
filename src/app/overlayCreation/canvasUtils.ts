@@ -113,7 +113,6 @@ export function makeAlphaMask(canvas: HTMLCanvasElement): any {
 
 // function taken from previous bachelor thesis from Julien Wachter
 export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
-  Benchmark.startMeasure("fastgaussblur");
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
   const redChannel = [];
@@ -137,5 +136,4 @@ export function fastGaußBlur(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
   }
 
   ctx.putImageData(imgData, 0, 0);
-  Benchmark.stopMeasure("fastgaussblur");
 }

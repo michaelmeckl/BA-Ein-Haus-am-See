@@ -132,7 +132,7 @@ export async function fetchOsmDataFromServer(
     Benchmark.startMeasure("Request client side");
     // set a timeout of 7 seconds
     const response = await axios.get(url, { timeout: 7000 });
-    console.log(Benchmark.stopMeasure("Request client side"));
+    Benchmark.stopMeasure("Request client side");
 
     //console.log(response);
 

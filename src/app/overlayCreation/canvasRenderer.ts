@@ -4,7 +4,7 @@ import type { FilterLayer } from "../mapData/filterLayer";
 import { applyGaussianBlur, setupGaussianBlurFilter } from "../webgl/gaussianBlurFilter";
 import { combineOverlayFragmentShader, defaultVertexShader } from "../webgl/shaders";
 import * as webglUtils from "../webgl/webglUtils";
-import { makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
+import { fastGaußBlur, makeAlphaMask as applyAlphaMask, readImageFromCanvas } from "./canvasUtils";
 import { map } from "../map/mapboxConfig";
 import { metersInPixel } from "../map/mapboxUtils";
 import { handleWebglInitError, showSnackbar, SnackbarType } from "../utils";
@@ -113,7 +113,7 @@ class CanvasRenderer {
       this.ctx.fill("evenodd");
     }
 
-    console.log("canvas blur applied!");
+    console.warn("constant canvas blur applied!");
     Benchmark.stopMeasure("render all polygons of one layer");
 
     /*
@@ -125,6 +125,12 @@ class CanvasRenderer {
 
     // draw blurred canvas on the overlayCanvas
     this.ctx.drawImage(blurredCanvas, 0, 0);
+    */
+
+    /*
+    Benchmark.startMeasure("fastgaussblur");
+    fastGaußBlur(this.ctx, this.overlayCanvas);
+    Benchmark.stopMeasure("fastgaussblur");
     */
 
     const blurredImage = await readImageFromCanvas(this.overlayCanvas);
@@ -280,7 +286,7 @@ class CanvasRenderer {
   createOverlay(textures: HTMLImageElement[]): HTMLCanvasElement {
     Benchmark.startMeasure("combining textures");
     this.combineOverlays(textures);
-    Benchmark.startMeasure("combining textures");
+    Benchmark.stopMeasure("combining textures");
 
     return this.overlayCanvas;
   }
@@ -333,7 +339,7 @@ export async function createOverlay(data: FilterLayer[]): Promise<void> {
   Benchmark.startMeasure("render all Polygons");
   const allRenderProcesses = data.map((layer: FilterLayer) => renderer.renderPolygons(layer));
   await Promise.all(allRenderProcesses);
-  Benchmark.startMeasure("render all Polygons");
+  Benchmark.stopMeasure("render all Polygons");
 
   //console.log("Current number of saved textures in canvasRenderer: ", renderer.allTextures.length);
 

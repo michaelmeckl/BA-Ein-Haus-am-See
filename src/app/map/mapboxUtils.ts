@@ -164,7 +164,6 @@ export function convertPolygonCoordsToPixelCoords(
   polygon: Feature<Polygon | MultiPolygon, GeoJsonProperties>,
   layer: FilterLayer
 ): void {
-  Benchmark.startMeasure("converting polygon to pixel coords");
   const coords = polygon.geometry.coordinates;
 
   // check if this is a multidimensional array (i.e. a multipolygon or a normal one)
@@ -199,8 +198,6 @@ export function convertPolygonCoordsToPixelCoords(
     });
     layer.Points.push(pointData);
   }
-
-  Benchmark.stopMeasure("converting polygon to pixel coords");
 }
 
 //////////////////! not used (only kept as reference): /////////////////////////
