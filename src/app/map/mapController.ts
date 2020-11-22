@@ -46,7 +46,8 @@ export default class MapController {
       //console.log("reloading");
       if (FilterManager.activeFilters.size > 0) {
         if (this.selectedVisualType === VisualType.OVERLAY) {
-          this.showAreasOnMap();
+          //this.showAreasOnMap();
+          this.loadMapData();
         } else {
           this.showPOILocations();
         }
@@ -363,15 +364,23 @@ export default class MapController {
     layer.Points.length = 0;
     layer.Features.length = 0;
 
-    // convert to pixels and add these to filterlayer
+    Benchmark.startMeasure("buffer all Polygons of layer");
+    // add buffer to filterlayer
     for (let index = 0; index < truncatedData.features.length; index++) {
       const feature = truncatedData.features[index];
       const bufferedPoly = addBufferToFeature(feature, layer.Distance, "meters");
 
       layer.Features.push(bufferedPoly);
-
-      mapboxUtils.convertPolygonCoordsToPixelCoords(bufferedPoly, layer);
     }
+    Benchmark.stopMeasure("buffer all Polygons of layer");
+
+    Benchmark.startMeasure("convert all Polygons to pixel coords");
+    // convert to pixels
+    for (let index = 0; index < layer.Features.length; index++) {
+      const element = layer.Features[index];
+      mapboxUtils.convertPolygonCoordsToPixelCoords(element, layer);
+    }
+    Benchmark.stopMeasure("convert all Polygons to pixel coords");
 
     return layer;
   }
