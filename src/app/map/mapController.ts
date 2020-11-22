@@ -225,10 +225,10 @@ export default class MapController {
           return;
         }*/
 
-        Benchmark.startMeasure("Fetching data from osm");
+        //Benchmark.startMeasure("Fetching data from osm");
         // request data from osm
         const data = await fetchOsmDataFromServer(bounds, query);
-        Benchmark.stopMeasure("Fetching data from osm");
+        //Benchmark.stopMeasure("Fetching data from osm");
 
         //console.log("data from server:", data);
 
@@ -312,7 +312,7 @@ export default class MapController {
   }
 
   showDataOnMap(data: any, tagName: string): void {
-    Benchmark.startMeasure("showing geojson data on map");
+    Benchmark.startMeasure("remove existing layers");
     //const ftCollection = featureCollection(data);
 
     //remove area overlay if it exists
@@ -322,6 +322,9 @@ export default class MapController {
     //remove all current layers
     mapLayerManager.removeAllLayersForSource(tagName);
 
+    Benchmark.stopMeasure("remove existing layers");
+
+    Benchmark.startMeasure("add new geo data");
     if (map.getSource(tagName)) {
       // the source already exists, only update the data
       //console.log(`Source ${tagName} is already used! Updating it!`);
@@ -334,7 +337,7 @@ export default class MapController {
     //show the source data on the map
     mapLayerManager.addLayersForSource(tagName);
 
-    Benchmark.stopMeasure("showing geojson data on map");
+    Benchmark.stopMeasure("add new geo data");
   }
 
   //! most of the data preprocessing could (and probably should) already happen on the server!
@@ -374,6 +377,7 @@ export default class MapController {
     }
     Benchmark.stopMeasure("buffer all Polygons of layer");
 
+    //! two for loops to be able to measure the performance of both separately
     Benchmark.startMeasure("convert all Polygons to pixel coords");
     // convert to pixels
     for (let index = 0; index < layer.Features.length; index++) {
