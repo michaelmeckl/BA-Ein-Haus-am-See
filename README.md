@@ -2,6 +2,10 @@
 
 This repository contains the code for my bachelor thesis"Ein Haus am See im Browser - Interaktives Finden von geeigneten Orten" at the University of Regensburg. The developed website shows an interactive map provided by Mapbox GL that allows the user to specify several criteria and highlights suitable regions on the map based on these preferences. The website is meant as an early tool that could be used when searching for places or areas (e.g. when moving to a new city) that fulfill certain requirements as existing websites and tools don't support this type of local search well.
 
+![Start page](img/Haus am See.png)
+
+![Filter Example](img/Haus am See - Filter.png)
+
 Made with Mapbox GL & OpenStreetMap.
 
 ## Requirements
@@ -21,7 +25,7 @@ If everything worked well you can visit the website in your browser at <http://l
 
 ## Demo
 
-**TODO add screenshot and / or GIF**
+![Demo gif](img/Haus am See.gif)
 
 **At the moment the website is available at <http://pro.mi.ur.de:8000> (but this might change soon probably).**
 
