@@ -367,6 +367,17 @@ export default class MapController {
     layer.Points.length = 0;
     layer.Features.length = 0;
 
+    // add buffer to filterlayer
+    for (let index = 0; index < truncatedData.features.length; index++) {
+      const feature = truncatedData.features[index];
+      const bufferedPoly = addBufferToFeature(feature, layer.Distance, "meters");
+
+      layer.Features.push(bufferedPoly);
+      mapboxUtils.convertPolygonCoordsToPixelCoords(bufferedPoly, layer);
+    }
+
+    /*
+    //! Benchmarking version: two for loops to be able to measure the performance of both separately
     Benchmark.startMeasure("buffer all Polygons of layer");
     // add buffer to filterlayer
     for (let index = 0; index < truncatedData.features.length; index++) {
@@ -377,7 +388,6 @@ export default class MapController {
     }
     Benchmark.stopMeasure("buffer all Polygons of layer");
 
-    //! two for loops to be able to measure the performance of both separately
     Benchmark.startMeasure("convert all Polygons to pixel coords");
     // convert to pixels
     for (let index = 0; index < layer.Features.length; index++) {
@@ -385,6 +395,7 @@ export default class MapController {
       mapboxUtils.convertPolygonCoordsToPixelCoords(element, layer);
     }
     Benchmark.stopMeasure("convert all Polygons to pixel coords");
+    */
 
     return layer;
   }
