@@ -32,6 +32,9 @@ If everything worked well you can visit the website in your browser at <http://l
 
 **At the moment the website is available at <http://pro.mi.ur.de:8000> (but this might change soon probably).**
 
+## Further Information
+In the wiki of this repository are notes to some of the most relevant aspects and concepts for this thesis alongside some additional sources.
+
 ## License
 
 The project is licensed under the MIT License.
