@@ -159,7 +159,7 @@ class CanvasRenderer {
     // floor is needed for glsl to provide an integer which can be used as the matrix size
     let blurStrength = Math.floor(pixelDist / 2);
 
-    //! define upper and lower bounds to prevent dividing by zero in glsl or getting a too big matrix
+    //! define upper and lower bounds to prevent dividing by zero in glsl or getting a too large kernel
     //! these bounds are not really necessary for the canvas blur and the fastgaußblur
     if (blurStrength <= 5) {
       blurStrength = 5;
