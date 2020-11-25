@@ -136,9 +136,9 @@ export async function fetchOsmDataFromServer(
 
     //console.log(response);
 
-    //Benchmark.startMeasure("o2geo client");
+    Benchmark.startMeasure("o2geo client");
     const geoJson = osmtogeojson(response.data);
-    //Benchmark.stopMeasure("o2geo client");
+    Benchmark.stopMeasure("o2geo client");
 
     return geoJson as FeatureCollection<GeometryObject, any>;
   } catch (error) {

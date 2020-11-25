@@ -6,6 +6,8 @@
  * * uniforms can now be set in vao and therefore it is not needed at rendertime time to get them -> performance boost over webgl1
  */
 
+// Source: https://webgl2fundamentals.org/webgl/lessons/webgl-fundamentals.html
+// The source was slightly modified to be able to work for images.
 export function defaultVertexShader(): string {
   return `
   attribute vec2 a_position;
@@ -25,6 +27,7 @@ export function defaultVertexShader(): string {
       // convert from 0->2 to -1->+1 (clipspace)
       vec2 clipSpace = zeroToTwo - 1.0;
 
+      // flip the clip space y coordinate by multiplying with (1, -1) so the point (0, 0) is the top-left corner
       gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
 
       // pass the texCoord to the fragment shader
@@ -92,8 +95,6 @@ export function getGaussianBlurFS(): string {
   precision mediump float;
 
   // Gaussian filter.  Based on https://www.shadertoy.com/view/4dfGDH#
-  #define SIGMA 10.0
-  
   
   // gaussian distribution (the blur effect decreases fast the more we get away from the center)
   float normpdf(in float x, in float sigma)

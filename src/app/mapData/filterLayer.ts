@@ -16,7 +16,7 @@ export enum FilterRelevance {
   veryImportant = 0.8,
 }
 
-const defaultDistance = 300;
+const defaultDistance = 500;
 
 /**
  * This class holds all necessary information for one layer (= one specific osm filter).

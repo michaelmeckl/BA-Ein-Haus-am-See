@@ -60,7 +60,14 @@ renderCanvas.addEventListener("webglcontextrestored", init, false);
 function setupProgram(blurSize: number): void {
   //! the blur size needs to be defined as a constant so it can be used as an array index in the shader!
   //const blurShaderSource = `#version 300 es\n#define MSIZE ${blurSize}` + getGaussianBlurFS();
-  const blurShaderSource = `#define MSIZE ${blurSize}` + getGaussianBlurFS();
+
+  //TODO adjusting the sigma based on the kernelsize changes how sharp/blurry the result appears per zoom level
+  //TODO which gives quite nice effect when zooming out -> Find a good formula (maybe a better one than dividing by 2)
+  //const sigma = (blurSize / 2).toFixed(1); //! needs to be a float to work correctly!
+  const sigma = (10).toFixed(1);
+  const blurShaderSource =
+    `#define MSIZE ${blurSize}\n#define SIGMA ${sigma}` + getGaussianBlurFS();
+  //console.log(blurShaderSource);
 
   // create and link program
   glProgram = twgl.createProgramFromSources(gl, [getVSForGaussBlur(), blurShaderSource]);

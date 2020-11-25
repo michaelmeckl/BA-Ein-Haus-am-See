@@ -19,7 +19,7 @@ class Geocoder {
     this.geocoder = new MapboxGeocoder({
       accessToken: mapboxgl.accessToken, // Set the access token
       mapboxgl: mapboxgl, // Set the mapbox-gl instance
-      limit: 7, //max. number of results
+      limit: 10, //max. number of results
       minLength: 4, // only autocomplete after at least 4 characters have been entered (optimization as autocomplete on every keystroke counts as one geocoding operation to the free limit)
       zoom: initialZoomLevel, // Set the zoom level for geocoding results
       placeholder: "Ort suchen ...", // This placeholder text will display in the search bar

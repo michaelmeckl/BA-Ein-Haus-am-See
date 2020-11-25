@@ -34,6 +34,7 @@ class CanvasRenderer {
   allTextures: HTMLImageElement[] = [];
 
   private currentBlurSize = 0;
+  //this.currentBlurType = BlurType.WebglBlur
 
   constructor() {
     const canvas = document.querySelector("#texture_canvas") as HTMLCanvasElement;
@@ -85,7 +86,15 @@ class CanvasRenderer {
       this.ctx.fillStyle = "rgba(0.0, 0.0, 0.0, 1.0)";
     }
 
+    /*
+    //* for benchmarking:
+    let renderPolyBenchmarks = 0;
+    let blurBenchmarks = 0;
+    const avgBlur = [];
+    */
+
     for (const polygon of mapLayer.Points) {
+      //let start = performance.now();
       const startPoint = polygon[0];
       if (!startPoint) {
         continue;
@@ -101,11 +110,32 @@ class CanvasRenderer {
       this.ctx.closePath();
 
       this.ctx.fill("evenodd");
+
+      /*
+      //! this code is used to measure performance for every polygon blur for benchmarking!
+      let end = performance.now();
+      renderPolyBenchmarks += end - start;
+
+      start = performance.now();
+      await this.applyGaussianBlur();
+      end = performance.now();
+      const diff = end - start;
+      blurBenchmarks += diff;
+      avgBlur.push(diff);
+      */
     }
 
     Benchmark.stopMeasure("render polygons of this layer");
 
     /*
+    console.log(`Render polys took ${renderPolyBenchmarks} ms`);
+    console.log(`Blur all polys took ${blurBenchmarks} ms`);
+    const average = avgBlur.reduce((prev, curr) => prev + curr, 0) / avgBlur.length;
+    console.log(`Blur one polys took avg ${average} ms`);
+    */
+
+    /*
+    //* fast gauß blur test code
     Benchmark.startMeasure("fastgaussblur");
     applyFastGaußBlur(this.ctx, this.overlayCanvas, this.currentBlurSize);
     Benchmark.stopMeasure("fastgaussblur");
@@ -118,12 +148,10 @@ class CanvasRenderer {
     // save the blurred image for this layer
     this.allTextures.push(blurredImage);
     Benchmark.stopMeasure("read and save final layer image from canvas");
-
-    //console.warn("webgl blur is currently used!");
   }
 
-  //TODO a better function to bring the pixelDistance in relation to the blur size is still needed!
-  //TODO -> should probably rise quite slow (upper bound maybe not even necessary?)
+  //TODO find a better function to bring the pixelDistance in relation to the blur size
+  //TODO -> should probably rise quite slow (upper bound may not even be necessary then?)
   calculateBlurSize(layerDistance: number): void {
     const pixelDist = metersInPixel(layerDistance, map.getCenter().lat, map.getZoom());
 
@@ -131,8 +159,8 @@ class CanvasRenderer {
     // floor is needed for glsl to provide an integer which can be used as the matrix size
     let blurStrength = Math.floor(pixelDist / 2);
 
-    //! define upper and lower bounds to prevent dividing by zero in glsl or getting a too big matrix
-    //! these bounds are not really necessary for the canvas blur and the faßtgaußblur
+    //! define upper and lower bounds to prevent dividing by zero in glsl or getting a too large kernel
+    //! these bounds are not really necessary for the canvas blur and the fastgaußblur
     if (blurStrength <= 5) {
       blurStrength = 5;
     } else if (blurStrength >= 80) {
