@@ -95,8 +95,6 @@ export function getGaussianBlurFS(): string {
   precision mediump float;
 
   // Gaussian filter.  Based on https://www.shadertoy.com/view/4dfGDH#
-  #define SIGMA 10.0
-  
   
   // gaussian distribution (the blur effect decreases fast the more we get away from the center)
   float normpdf(in float x, in float sigma)
