@@ -43,7 +43,7 @@
     "helmet": "^3.23.2",
     "http-status-codes": "^1.4.0",
     "ioredis": "^4.17.3",
-    "osmtogeojson": "^3.0.0-beta.4",
+    "osmtogeojson": "^3.0.0-beta.5",
     "query-string": "^6.13.1",
     "redis-json": "^4.2.1",
     "tslib": "^2.0.0",
