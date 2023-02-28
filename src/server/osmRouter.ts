@@ -5,7 +5,7 @@ import { OK } from "http-status-codes";
 import querystring from "querystring";
 import Benchmark from "../shared/benchmarking";
 import { Config } from "../shared/config";
-import RedisCache from "./redisCache";
+//import RedisCache from "./redisCache";
 import * as ServerUtils from "./serverUtils";
 /*
 //@ts-expect-error
@@ -59,11 +59,11 @@ export default class OsmRouter {
 
     /**
      * * Forwards the query and the bounds to the overpass api and returns and caches the result.
-     * * Also checks the redis cache first before sending requerst to overpass api to prevent unnecessary requests.
+     * * Also checks the redis cache first before sending request to overpass api to prevent unnecessary requests.
      */
     this.osmRouter.get(
       "/osmRequestCache",
-      this.checkCache,
+      //this.checkCache,
       async (req: Request, res: Response, next: NextFunction) => {
         const bounds = req.query.bounds?.toString();
         const query = req.query.osmQuery?.toString();
@@ -78,9 +78,9 @@ export default class OsmRouter {
             Benchmark.startMeasure("Fetching data from overpass api");
             const encodedQuery = querystring.stringify({ data: osmQuery });
             const geoData = await axios.get(
-              //`https://overpass-api.de/api/interpreter?${encodedQuery}`, // official overpass api (online version)
+              `https://overpass-api.de/api/interpreter?${encodedQuery}`, // official overpass api (online version)
               //`http://localhost:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // local overpass api (docker image)
-              `http://pro.mi.ur.de:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // hosted overpass api on project server
+              //`http://pro.mi.ur.de:${Config.OVERPASS_PORT}/api/interpreter?${encodedQuery}`, // hosted overpass api on project server
               { timeout: 12000 }
             );
             Benchmark.stopMeasure("Fetching data from overpass api");
@@ -94,7 +94,7 @@ export default class OsmRouter {
             //const cacheTime = 3600;
             //! cache only for 15 minutes during study to prevent influencing the next participant!
             const cacheTime = 900;
-            RedisCache.cacheData(compositeKey, geoData.data, cacheTime);
+            //RedisCache.cacheData(compositeKey, geoData.data, cacheTime);
 
             //this.saveGeoData(geoData.data, query);
 
@@ -145,6 +145,7 @@ export default class OsmRouter {
     */
   }
 
+  /*
   //Express middleware function to check Redis Cache
   checkCache = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const bounds = req.query.bounds?.toString();
@@ -165,6 +166,7 @@ export default class OsmRouter {
       next();
     }
   };
+  */
 
   //! only works in linux
   /*
